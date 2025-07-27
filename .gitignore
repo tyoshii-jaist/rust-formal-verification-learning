@@ -1,0 +1,7 @@
+**/target/
+**/.cargo/
+**/.idea/ # IDE files
+**/Cargo.lock
+**/Cargo.toml.orig
+**/*.rs.bk
+
