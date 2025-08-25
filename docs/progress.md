@@ -114,7 +114,7 @@ https://www.youtube.com/watch?v=ngTCf2cnGkY のQAにおいて以下のように�
 「ロックフリーアルゴリズムは、正しく実装するのが非常に難しいことで有名です。 正しく動いているように見えて、99.99%の時間は動くけれど、肝心な時に動かない、ということが非常によくあります。私が自分のロックフリーアルゴリズムが正しいかどうかを頭の中でモデル化して検討する作業の多くは、ETHチューリッヒのアンドレア・ラトゥーダ・アックスと一緒に行いました。数年前のChaos Communication Congressで、私たちは座って考えられるすべてのことを図に描き出しました。それでも、このコードの内部を触るたびに、少し神経質になります。だから、BBQueueのほとんどすべてのバージョンで、コアロジックはほぼ常に全く同じなんです。一度解明したら、もう触りたくない、触ると不安になるからです。」
 
 
-### BBQueue 内部を見てみる
+### BBQueue の内部を見てみる
 メモリ領域は `UnsafeCell<MaybeUninit<[u8; N]>>` として定義されている。これの Verusでの取り扱い型を知る必要がある。
 ==> PCellが用意されていた。これから読む。
 https://verus-lang.github.io/verus/verusdoc/vstd/cell/struct.PCell.html
@@ -125,6 +125,8 @@ Atomic系のVerusでのハンドリング方法を知る必要がある。
 ==> 用意されていた。これから読む。
 https://verus-lang.github.io/verus/verusdoc/vstd/atomic_ghost/index.html
 https://verus-lang.github.io/verus/verusdoc/vstd/pervasive/macro.struct_with_invariants.html
+
+struct_with_invariants は K, V, Pred: InvariantPredicate を取る
 
 各機能はここを見るのが大事
 https://verus-lang.github.io/verus/guide/features.html?highlight=UnsafeCell#supported-rust-features
