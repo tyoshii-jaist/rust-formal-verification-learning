@@ -168,3 +168,23 @@ pub struct BBBuffer<const N: usize> {
     already_split: AtomicBool,
 }
 ```
+
+
+# 8/30 のゼミでのコメント
+デッドロックなどの証明はVerusでできるのか？
+
+invariantでデッドロックは直接的には証明できない。
+Event-B (形式記述言語) ではできる。Rely Guaranteeなど。
+手続き型でそのままはかけない。
+データ競合自体はチェックできる。
+
+Verusではそのようなデッドロック等問題にそもそも取り組めるのかについて調べる。
+
+Verus上に問題をエンコードする方法があるかの確認からまずは必要。
+
+
+# Concurency
+
+https://verus-lang.github.io/verus/state_machines/intro.html
+
+https://verus-lang.github.io/verus/guide/concurrency.html
