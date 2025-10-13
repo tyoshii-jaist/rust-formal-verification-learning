@@ -51,3 +51,5 @@ Verus は invariant と token を用いて、lock とかを紐づけることで
 # 値の転送プログラムの検証
 TOTAL 値を決め、a = TOTAL、b = 0 から始めて、2つのスレッドがめいめいに a から 1 引き、b に 1 加える。
 a が 0 になるまで繰り返す。
+
+まずは簡単に a 回 decrement して b を increment する ()
