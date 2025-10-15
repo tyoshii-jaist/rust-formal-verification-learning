@@ -53,3 +53,26 @@ TOTAL 値を決め、a = TOTAL、b = 0 から始めて、2つのスレッドが�
 a が 0 になるまで繰り返す。
 
 まずは簡単に a 回 decrement して b を increment する ()
+
+
+# 3.4.5 の Ghost Object
+Here, the word “invariant” is taken
+from separation logic, where an invariant can be thought of as a kind of “container” that stores a
+proposition. The container can be shared, and it permits clients to temporarily obtain ownership
+of the contents.
+
+### state machine の inductive について
+コンパイラが教えてくれる！！
+
+```
+error: missing inductiveness proofs for 3 transition(s); try adding the following stubs:
+       
+        #[inductive(initialize)]
+        fn initialize_inductive(post: Self) { }
+       
+        #[inductive(tr_decrement_a)]
+        fn tr_decrement_a_inductive(pre: Self, post: Self, thread_id: int, current_a: int) { }
+       
+        #[inductive(tr_increment_b)]
+        fn tr_increment_b_inductive(pre: Self, post: Self, thread_id: int) { }
+```

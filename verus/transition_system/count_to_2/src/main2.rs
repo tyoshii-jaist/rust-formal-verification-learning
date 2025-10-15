@@ -20,7 +20,6 @@ tokenized_state_machine!(
             pub inc_b: bool,
         }
 
-         // この操作は Atomic 以外の場合は逐次評価されるのか？
         #[invariant]
         pub fn main_inv(&self) -> bool {
             self.counter == (if self.inc_a { 1 as int} else { 0 }) + (if self.inc_b { 1 as int } else { 0 })
@@ -132,8 +131,9 @@ fn main() {
                         globals.instance.borrow().tr_inc_a(&mut c, &mut token); // atomic increment
                     }
                 );
-            Tracked(token)
-        }),
+                Tracked(token)
+            }
+        ),
     );
 
     let global_arc2 = global_arc.clone();

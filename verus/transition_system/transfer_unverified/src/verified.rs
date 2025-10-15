@@ -7,11 +7,13 @@ use vstd::thread::*;
 use vstd::*;
 
 verus! {
-const TOTAL = 10;
-
-tokenized_state_machine! {
+const TOTAL: u32 = 10;
+tokenized_state_machine!(
     TransferAtoB {
         fields {
+            #[sharding(constant)]
+            pub total: int,
+
             #[sharding(variable)]
             pub a: int,
 
@@ -24,14 +26,15 @@ tokenized_state_machine! {
 
         #[invariant]
         pub fn main_invariant(&self) -> bool {
-            self.a + self.b + self.decrement_ticket.dom().filter(|&(_, v)| *v).len() == TOTAL
+            self.a + self.b + self.decrement_ticket.dom().filter(|k: int| self.decrement_ticket[k]).len() == self.total
         }
 
         init!{
-            initialize() {
-                init a = TOTAL;
+            initialize(total: int) {
+                init total = total;
+                init a = total;
                 init b = 0;
-                init decrement_ticket = Map::new();
+                init decrement_ticket = Map::empty();
             }
         }
 
@@ -39,7 +42,6 @@ tokenized_state_machine! {
             tr_decrement_a(thread_id: int, current_a: int) {
                 require(current_a == pre.a);
                 require(pre.a > 0);
-                require(!decrement_ticket.dom().contains(thread_id));
                 update a = pre.a - 1;
                 add decrement_ticket += [thread_id => true];
             }
@@ -47,27 +49,41 @@ tokenized_state_machine! {
 
         transition!{
             tr_increment_b(thread_id: int) {
-                require(decrement_ticket[thread_id]);
                 update b = pre.b + 1;
                 remove decrement_ticket -= [thread_id => true];
             }
         }
 
         property!{
-            finalize() {
+            finalize_a() {
                 assert pre.a == 0;
-                assert pre.b == TOTAL;
-                assert pre.counter == 2;
             }
         }
+
+        property!{
+            finalize_b() {
+                assert pre.b == pre.total;
+            }
+        }
+
+        // これは verus コマンドがコンパイルエラーで suggest したもの。
+        #[inductive(initialize)]
+        fn initialize_inductive(post: Self, total: int) { }
+       
+        #[inductive(tr_decrement_a)]
+        fn tr_decrement_a_inductive(pre: Self, post: Self, thread_id: int, current_a: int) { }
+       
+        #[inductive(tr_increment_b)]
+        fn tr_increment_b_inductive(pre: Self, post: Self, thread_id: int) { }
+        // ここまで。
     }
-}
+);
 
 struct_with_invariants! {
     pub struct Global {
         pub a_atomic: AtomicU32<_, TransferAtoB::a, _>,
         pub b_atomic: AtomicU32<_, TransferAtoB::b, _>,
-        pub instance: Tracked<TransferAtoB>,
+        pub instance: Tracked<TransferAtoB::Instance>,
     }
 
     spec fn wf(&self) -> bool {
@@ -89,8 +105,8 @@ fn main() {
         Tracked(instance),
         Tracked(a_token),
         Tracked(b_token),
-        Tracked(decrement_ticket_token),
-    ) = TransferAtoB::initialize();
+        Tracked(decrement_ticket_map_token),
+    ) = TransferAtoB::Instance::initialize(TOTAL as int);
 
     let tr_instance: Tracked<TransferAtoB::Instance> = Tracked(instance.clone());
     let a_atomic = AtomicU32::new(Ghost(tr_instance), 0, Tracked(a_token));
@@ -104,13 +120,47 @@ fn main() {
 
     // Spawn threads
     let join_handle1 = spawn(
-        (move || -> (new_a_token: Tracked<TransferAtoB::a>, new_b_token: Tracked<TransferAtoB::b>, new_decrement_ticket_token: Tracked<TransferAtoB::decrement_ticket>)
+        (move || -> (new_a_token: Tracked<TransferAtoB::a>)
             ensures
-                new_a_token@.instance_id() == instance@.id() && new_b_token@.instance_id() == instance@.id() && new_decrement_ticket_token@.instance_id() == instance@.id(),
+                new_a_token@.instance_id() == instance.id(), // TODO: b も decrement_ticket も同じ instance_idかチェックすべき
             {
                 let tracked mut a_token = a_token;
                 let tracked mut b_token = b_token;
-                let tracked mut decrement_ticket_token = decrement_ticket_token;
+                let tracked mut decrement_ticket_token = decrement_ticket_map_token;
+                let thread_id = 0; // 固定値
+                let globals = &*global_arc;
+
+                loop {
+                    let current_a = atomic_with_ghost!(&globals.a_atomic => load();
+                        ghost c => {}
+                    );
+                    if current_a == 0 {
+                        break;
+                    }
+
+                    let res = atomic_with_ghost!(&globals.a_atomic => compare_exchange(current_a, current_a - 1);
+                        ghost a => {
+                            // transition を呼び出すときの引数リストが特殊で、よくわからない。
+                            // 原著論文を確認すると、pre 等で使われている variable、読まれている? map が instance の定義順に並んでいるように見える。
+                            globals.instance.borrow().tr_decrement_a(thread_id as int, current_a as int, &mut a);
+                            globals.instance.borrow().tr_increment_b(thread_id as int, &mut b_token, decrement_ticket_map_token.into_map().index(0));
+                        }
+                    );
+                };
+
+                Tracked(a_token)
+            }
+        )
+    );
+
+    let join_handle2 = spawn(
+        (move || -> (new_a_token: Tracked<TransferAtoB::a>)
+            ensures
+                new_a_token@.instance_id() == instance.id(),
+            {
+                let tracked mut a_token = a_token;
+                let tracked mut b_token = b_token;
+                let tracked mut decrement_ticket_map_token = decrement_ticket_map_token;
                 let thread_id = 1; // 固定値
                 let globals = &*global_arc;
 
@@ -123,18 +173,55 @@ fn main() {
                     }
 
                     let res = atomic_with_ghost!(&globals.a_atomic => compare_exchange(current_a, current_a - 1);
-                        ghost c => {
-                            globals.instance.borrow().tr_decrement_a(thread_id, current_a as int, &mut c, &mut a_token, &mut decrement_ticket_token);
-                            globals.instance.borrow().tr_increment_b(thread_id, &mut c, &mut b_token, &mut decrement_ticket_token);
+                        ghost a => {
+                            // transition を呼び出すときの引数リストが特殊で、よくわからない。
+                            // 原著論文を確認すると、pre 等で使われている variable、読まれている? map が instance の定義順に並んでいるように見える。
+                            globals.instance.borrow().tr_decrement_a(thread_id as int, current_a as int, &mut a);
+                            globals.instance.borrow().tr_increment_b(thread_id as int, &mut b_token, decrement_ticket_map_token.into_map().index(1));
                         }
                     );
-
-
                 };
 
-                Tracked(local_a_token, local_b_token, local_decrement_ticket_token)
+                Tracked(a_token)
             }
         )
     );
+
+    match join_handle1.join() {
+        Result::Ok(token) => {
+            ()
+        },
+        _ => {
+            return ;
+        },
+    };
+
+    match join_handle2.join() {
+        Result::Ok(token) => {
+            ()
+        },
+        _ => {
+            return ;
+        },
+    };
+
+    // thread を join して、atomicを再度ロードする
+    let global = &*global_arc;
+    let a =
+        atomic_with_ghost!(&global.a_atomic => load();
+        ghost a => {
+            instance.finalize_a(&a);
+        }
+    );
+
+    let b =
+        atomic_with_ghost!(&global.b_atomic => load();
+        ghost b => {
+            instance.finalize_b(&b);
+        }
+    );
+
+    assert(a == 0);
+    assert(b == TOTAL);
 }
 }
