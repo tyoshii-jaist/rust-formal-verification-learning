@@ -76,3 +76,6 @@ error: missing inductiveness proofs for 3 transition(s); try adding the followin
         #[inductive(tr_increment_b)]
         fn tr_increment_b_inductive(pre: Self, post: Self, thread_id: int) { }
 ```
+
+
+### PCell もやりたい

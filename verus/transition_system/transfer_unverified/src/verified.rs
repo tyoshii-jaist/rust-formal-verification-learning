@@ -6,6 +6,8 @@ use vstd::prelude::*;
 use vstd::thread::*;
 use vstd::*;
 
+// https://github.com/verus-lang/verus/blob/808725c449a5769ea5ad393ca551d120ebea5242/examples/state_machines/maps.rs#L13
+
 verus! {
 const TOTAL: u32 = 10;
 tokenized_state_machine!(
@@ -20,7 +22,7 @@ tokenized_state_machine!(
             #[sharding(variable)]
             pub b: int,
 
-            #[sharding(map)]
+            #[sharding(storage_map)]
             pub decrement_ticket: Map<int, bool>, // tid vs whether the thread has a decrement ticket
         }
 
@@ -30,27 +32,27 @@ tokenized_state_machine!(
         }
 
         init!{
-            initialize(total: int) {
+            initialize(total: int, decrement_ticket: Map<builtin::int, bool>) {
                 init total = total;
                 init a = total;
                 init b = 0;
-                init decrement_ticket = Map::empty();
+                init decrement_ticket = decrement_ticket;
             }
         }
 
         transition!{
-            tr_decrement_a(thread_id: int, current_a: int) {
+            tr_decrement_a(thread_id: int, current_a: int, b: bool) {
                 require(current_a == pre.a);
                 require(pre.a > 0);
                 update a = pre.a - 1;
-                add decrement_ticket += [thread_id => true];
+                deposit decrement_ticket += [thread_id => b];
             }
         }
 
         transition!{
-            tr_increment_b(thread_id: int) {
+            tr_increment_b(thread_id: int, b: bool) {
                 update b = pre.b + 1;
-                remove decrement_ticket -= [thread_id => true];
+                withdraw decrement_ticket -= [thread_id => b];
             }
         }
 
@@ -68,13 +70,13 @@ tokenized_state_machine!(
 
         // これは verus コマンドがコンパイルエラーで suggest したもの。
         #[inductive(initialize)]
-        fn initialize_inductive(post: Self, total: int) { }
+        fn initialize_inductive(post: Self, total: int, decrement_ticket: Map<builtin::int, bool>) { }
        
         #[inductive(tr_decrement_a)]
-        fn tr_decrement_a_inductive(pre: Self, post: Self, thread_id: int, current_a: int) { }
+        fn tr_decrement_a_inductive(pre: Self, post: Self, thread_id: int, current_a: int, b: bool) { }
        
         #[inductive(tr_increment_b)]
-        fn tr_increment_b_inductive(pre: Self, post: Self, thread_id: int) { }
+        fn tr_increment_b_inductive(pre: Self, post: Self, thread_id: int, b: bool) { }
         // ここまで。
     }
 );
@@ -105,8 +107,7 @@ fn main() {
         Tracked(instance),
         Tracked(a_token),
         Tracked(b_token),
-        Tracked(decrement_ticket_map_token),
-    ) = TransferAtoB::Instance::initialize(TOTAL as int);
+    ) = TransferAtoB::Instance::initialize(TOTAL as int, Map::empty(), Map::tracked_empty());
 
     let tr_instance: Tracked<TransferAtoB::Instance> = Tracked(instance.clone());
     let a_atomic = AtomicU32::new(Ghost(tr_instance), 0, Tracked(a_token));
@@ -119,6 +120,7 @@ fn main() {
     let global_arc = Arc::new(global);
 
     // Spawn threads
+    let global_arc1 = global_arc.clone();
     let join_handle1 = spawn(
         (move || -> (new_a_token: Tracked<TransferAtoB::a>)
             ensures
@@ -126,9 +128,8 @@ fn main() {
             {
                 let tracked mut a_token = a_token;
                 let tracked mut b_token = b_token;
-                let tracked mut decrement_ticket_token = decrement_ticket_map_token;
                 let thread_id = 0; // 固定値
-                let globals = &*global_arc;
+                let globals = &*global_arc1;
 
                 loop {
                     let current_a = atomic_with_ghost!(&globals.a_atomic => load();
@@ -142,8 +143,8 @@ fn main() {
                         ghost a => {
                             // transition を呼び出すときの引数リストが特殊で、よくわからない。
                             // 原著論文を確認すると、pre 等で使われている variable、読まれている? map が instance の定義順に並んでいるように見える。
-                            globals.instance.borrow().tr_decrement_a(thread_id as int, current_a as int, &mut a);
-                            globals.instance.borrow().tr_increment_b(thread_id as int, &mut b_token, decrement_ticket_map_token.into_map().index(0));
+                            globals.instance.borrow().tr_decrement_a(thread_id as int, current_a as int, true, &mut a, true);
+                            globals.instance.borrow().tr_increment_b(thread_id as int, true, &mut b_token);
                         }
                     );
                 };
@@ -153,16 +154,16 @@ fn main() {
         )
     );
 
+    let global_arc2 = global_arc.clone();
     let join_handle2 = spawn(
-        (move || -> (new_a_token: Tracked<TransferAtoB::a>)
+        (move || -> (new_b_token: Tracked<TransferAtoB::b>)
             ensures
-                new_a_token@.instance_id() == instance.id(),
+                new_b_token@.instance_id() == instance.id(),
             {
                 let tracked mut a_token = a_token;
                 let tracked mut b_token = b_token;
-                let tracked mut decrement_ticket_map_token = decrement_ticket_map_token;
                 let thread_id = 1; // 固定値
-                let globals = &*global_arc;
+                let globals = &*global_arc2;
 
                 loop {
                     let current_a = atomic_with_ghost!(&globals.a_atomic => load();
@@ -176,13 +177,13 @@ fn main() {
                         ghost a => {
                             // transition を呼び出すときの引数リストが特殊で、よくわからない。
                             // 原著論文を確認すると、pre 等で使われている variable、読まれている? map が instance の定義順に並んでいるように見える。
-                            globals.instance.borrow().tr_decrement_a(thread_id as int, current_a as int, &mut a);
-                            globals.instance.borrow().tr_increment_b(thread_id as int, &mut b_token, decrement_ticket_map_token.into_map().index(1));
+                            globals.instance.borrow().tr_decrement_a(thread_id as int, current_a as int, true, &mut a, true);
+                            globals.instance.borrow().tr_increment_b(thread_id as int, true, &mut b_token);
                         }
                     );
                 };
 
-                Tracked(a_token)
+                Tracked(b_token)
             }
         )
     );
