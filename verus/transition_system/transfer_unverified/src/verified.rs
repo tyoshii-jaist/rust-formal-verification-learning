@@ -122,12 +122,8 @@ fn main() {
     // Spawn threads
     let global_arc1 = global_arc.clone();
     let join_handle1 = spawn(
-        (move || -> (new_a_token: Tracked<TransferAtoB::a>)
-            ensures
-                new_a_token@.instance_id() == instance.id(), // TODO: b も decrement_ticket も同じ instance_idかチェックすべき
+        (move || -> ()
             {
-                let tracked mut a_token = a_token;
-                let tracked mut b_token = b_token;
                 let thread_id = 0; // 固定値
                 let globals = &*global_arc1;
 
@@ -141,19 +137,23 @@ fn main() {
 
                     let res = atomic_with_ghost!(&globals.a_atomic => compare_exchange(current_a, current_a - 1);
                         ghost a => {
-                            // transition を呼び出すときの引数リストが特殊で、よくわからない。
-                            // 原著論文を確認すると、pre 等で使われている variable、読まれている? map が instance の定義順に並んでいるように見える。
                             globals.instance.borrow().tr_decrement_a(thread_id as int, current_a as int, true, &mut a, true);
-                            globals.instance.borrow().tr_increment_b(thread_id as int, true, &mut b_token);
+                        }
+                    );
+                    
+                    let res = atomic_with_ghost!(&globals.b_atomic => fetch_sub(1);
+                        ghost b => {
+                            // transition を呼び出すときの引数リストが特殊で、よくわからない。
+                            globals.instance.borrow().tr_increment_b(thread_id as int, true, &mut b);
                         }
                     );
                 };
-
-                Tracked(a_token)
+                ()
             }
         )
     );
 
+    /*
     let global_arc2 = global_arc.clone();
     let join_handle2 = spawn(
         (move || -> (new_b_token: Tracked<TransferAtoB::b>)
@@ -187,6 +187,7 @@ fn main() {
             }
         )
     );
+    */
 
     match join_handle1.join() {
         Result::Ok(token) => {
@@ -197,6 +198,7 @@ fn main() {
         },
     };
 
+    /*
     match join_handle2.join() {
         Result::Ok(token) => {
             ()
@@ -205,6 +207,7 @@ fn main() {
             return ;
         },
     };
+    */
 
     // thread を join して、atomicを再度ロードする
     let global = &*global_arc;
