@@ -107,11 +107,11 @@ fn main() {
             }),
     );
 
-    let tracked cae_a_token_neo;
+    let tracked cae_a_token;
     match join_handle1.join() {
         Result::Ok(token) => {
             proof {
-                cae_a_token_neo = token.get();
+                cae_a_token = token.get();
             }
         },
         _ => {
@@ -124,7 +124,7 @@ fn main() {
     let x =
         atomic_with_ghost!(&global.atomic_counter => load();
         ghost c => {
-            instance.finalize(&c, &cae_a_token_neo);
+            instance.finalize(&c, &cae_a_token);
         })
     ;
 
