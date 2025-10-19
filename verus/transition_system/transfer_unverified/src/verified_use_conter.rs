@@ -22,13 +22,13 @@ tokenized_state_machine!(
             #[sharding(variable)]
             pub b: int,
 
-            #[sharding(storage_map)]
-            pub decrement_ticket: Map<int, bool>, // tid vs whether the thread has a decrement ticket
+            #[sharding(counter)]
+            pub increment_ticket: nat,
         }
 
         #[invariant]
         pub fn main_invariant(&self) -> bool {
-            self.a + self.b + self.decrement_ticket.dom().filter(|k: int| self.decrement_ticket[k]).len() == self.total
+            self.a + self.b + self.increment_ticket == self.total
         }
 
         init!{
@@ -36,7 +36,7 @@ tokenized_state_machine!(
                 init total = total;
                 init a = total;
                 init b = 0;
-                init decrement_ticket = decrement_ticket;
+                init decrement_ticket = 0;
             }
         }
 
@@ -45,14 +45,18 @@ tokenized_state_machine!(
                 require(current_a == pre.a);
                 require(pre.a > 0);
                 update a = pre.a - 1;
-                deposit decrement_ticket += [thread_id => b];
+                deposit decrement_ticket += [thread_id => b] by {
+                    assume(!self.decrement_ticket.dom().contains(thread_id));
+                };
             }
         }
 
         transition!{
             tr_increment_b(thread_id: int, b: bool) {
                 update b = pre.b + 1;
-                withdraw decrement_ticket -= [thread_id => b];
+                withdraw decrement_ticket -= [thread_id => b] by {
+                    assume(self.decrement_ticket.dom().contains(thread_id));
+                };
             }
         }
 
@@ -126,9 +130,13 @@ fn main() {
             {
                 let thread_id = 0; // 固定値
                 let globals = &*global_arc1;
-
-                loop {
-                    let current_a = atomic_with_ghost!(&globals.a_atomic => load();
+                let mut current_a = atomic_with_ghost!(&globals.a_atomic => load();
+                    ghost c => {}
+                );
+                loop 
+                    decreases current_a
+                {
+                    current_a = atomic_with_ghost!(&globals.a_atomic => load();
                         ghost c => {}
                     );
                     if current_a == 0 {
@@ -141,7 +149,7 @@ fn main() {
                         }
                     );
                     
-                    let res = atomic_with_ghost!(&globals.b_atomic => fetch_sub(1);
+                    let res = atomic_with_ghost!(&globals.b_atomic => fetch_add(1);
                         ghost b => {
                             // transition を呼び出すときの引数リストが特殊で、よくわからない。
                             globals.instance.borrow().tr_increment_b(thread_id as int, true, &mut b);
