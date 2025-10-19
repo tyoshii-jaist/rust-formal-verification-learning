@@ -39,15 +39,22 @@ tokenized_state_machine!(
         }
 
         property!{
+            already_incremented() {
+                require(pre.cae_a);
+                assert pre.counter == 1;
+            }
+        }
+
+        property!{
             increment_will_not_overflow_u32() {
                 assert 0 <= pre.counter < 0xffff_ffff;
             }
         }
 
         property!{
-            finalize() {
-                require(pre.cae_a);
-                assert pre.counter == 1;
+            finalize(updated: bool) {
+                require((updated && pre.cae_a) || !updated);
+                assert ((updated && pre.counter == 1) || !updated);
             }
         }
         #[inductive(initialize)]
@@ -90,28 +97,52 @@ fn main() {
     // Spawn threads
     let global_arc1 = global_arc.clone();
     let join_handle1 = spawn(
-        (move || -> (new_token: Tracked<CompareAndExchangeTest::cae_a>)
+        (move || -> (ret: (Tracked<(CompareAndExchangeTest::cae_a, bool)>))
             ensures
-                new_token@.instance_id() == instance.id() && new_token@.value() == true,
+                ret@.0.instance_id() == instance.id() && ((ret@.0.value() == true && ret@.1 == true) || ret@.1 == false),
             {
                 let tracked mut token = cae_a_token; // moved
+                let tracked mut updated;
                 let globals = &*global_arc1;
+                let current =
+                    atomic_with_ghost!(&globals.atomic_counter => load();
+                    returning ret;
+                    ghost c => {
+                        assert(c.value() == ret as int);
+                    }
+                );
+                proof {
+                    assume(current + 1 < 0xffff_ffff);
+                }
                 let _ =
-                    atomic_with_ghost!(&globals.atomic_counter => fetch_add(1);
+                    atomic_with_ghost!(&globals.atomic_counter => compare_exchange(current, current + 1);
+                        update old_val -> new_val;
+                        returning ret;
                         ghost c => {
-                            globals.instance.borrow().increment_will_not_overflow_u32(&mut c);
-                            globals.instance.borrow().tr_inc_a(&mut c, &mut token); // atomic increment
+                            match ret {
+                                Result::Ok(_) => {
+                                    assert(old_val == current);
+                                    assert(new_val == current + 1);
+                                    globals.instance.borrow().increment_will_not_overflow_u32(&mut c);
+                                    globals.instance.borrow().tr_inc_a(&mut c, &mut token); // atomic increment
+                                    updated = true;
+                                },
+                                Result::Err(_) => {
+                                    assert(old_val == new_val);
+                                    updated = false;
+                                }
+                            }
                         }
-                    );
-                Tracked(token)
+                );
+                Tracked((token, updated))
             }),
     );
 
-    let tracked cae_a_token;
+    let tracked mut t;
     match join_handle1.join() {
-        Result::Ok(token) => {
+        Result::Ok(thread_ret) => {
             proof {
-                cae_a_token = token.get();
+                t = thread_ret.get();
             }
         },
         _ => {
@@ -124,10 +155,10 @@ fn main() {
     let x =
         atomic_with_ghost!(&global.atomic_counter => load();
         ghost c => {
-            instance.finalize(&c, &cae_a_token);
+            instance.finalize(t.1, &c, &t.0);
         })
     ;
 
-    assert(x == 1);
+    assert(t.1 && x == 1 || !t.1);
 }
 }
