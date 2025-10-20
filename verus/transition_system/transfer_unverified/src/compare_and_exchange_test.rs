@@ -94,6 +94,8 @@ fn main() {
     };
     let global_arc = Arc::new(global);
 
+    let total: u32 = 10;
+
     // Spawn threads
     let global_arc1 = global_arc.clone();
     let join_handle1 = spawn(
@@ -101,19 +103,17 @@ fn main() {
             ensures
                 ret@.0.instance_id() == instance.id() && ((ret@.0.value() == true && ret@.1 == true) || ret@.1 == false),
             {
+                let globals = &*global_arc1;
                 let tracked mut token = cae_a_token; // moved
                 let tracked mut updated;
-                let globals = &*global_arc1;
                 let current =
                     atomic_with_ghost!(&globals.atomic_counter => load();
                     returning ret;
                     ghost c => {
-                        assert(c.value() == ret as int);
+                        globals.instance.borrow().increment_will_not_overflow_u32(&mut c);
                     }
                 );
-                proof {
-                    assume(current + 1 < 0xffff_ffff);
-                }
+
                 let _ =
                     atomic_with_ghost!(&globals.atomic_counter => compare_exchange(current, current + 1);
                         update old_val -> new_val;

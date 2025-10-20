@@ -79,3 +79,23 @@ error: missing inductiveness proofs for 3 transition(s); try adding the followin
 
 
 ### PCell もやりたい
+
+
+### Sharding Strategy について
+各 sharding strategy ごとに、tokenized_state_machine の transition の引数、返り値が異なる。
+非常に癖があってわかりづらい。
+
+verus --log-all で出力される lifetime.rs を見るとなんとなくわかる。
+あとは以下の文章を読み解くとなんとなくわかるのかもしれない。
+
+count だと return に含まれるとかを一応書いてくれている。
+
+https://verus-lang.github.io/verus/state_machines/strategy-reference.html
+
+atomic_with_ghost の返り値は
+
+https://verus-lang.github.io/verus/verusdoc/vstd/macro.atomic_with_ghost.html
+
+The value returned by the atomic_with_ghost!(...) expression will be equal to ret, although the return value is an exec value (the actual result of the operation) while ret is a spec value.
+
+ということらしい。
