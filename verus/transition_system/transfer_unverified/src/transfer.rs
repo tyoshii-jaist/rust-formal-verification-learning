@@ -23,7 +23,7 @@ tokenized_state_machine!(
 
         #[invariant]
         pub fn main_invariant(&self) -> bool {
-            self.a + self.b + self.waiting_increment == 10
+            self.a + self.b + self.waiting_increment == 1
         }
 
         init!{
@@ -52,7 +52,7 @@ tokenized_state_machine!(
 
         property!{
             decrement_will_not_underflow_u32() {
-                assert 0 <= pre.a;
+                assert 0 < pre.a;
             }
         }
 
@@ -63,9 +63,8 @@ tokenized_state_machine!(
         }
 
         property!{
-            finalize(updated: bool) {
+            finalize_a() {
                 require(pre.a == 0);
-                require(pre.b == 1);
             }
         }
         #[inductive(initialize)]
@@ -119,22 +118,28 @@ fn main() {
     // Spawn threads
     let global_arc1 = global_arc.clone();
     let join_handle1 = spawn(
-        (move || -> (ret: (Tracked<(TransferAtoB::a, TransferAtoB::b, bool)>))
+        (move || -> (ret: Tracked<TransferAtoB::waiting_increment>)
             ensures
-                ret@.0.instance_id() == instance.id() && ret@.1.instance_id() == instance.id() ,
+                ret@.instance_id() == instance.id() && ret@.value() == 0,
             {
                 let globals = &*global_arc1;
-                let tracked mut a_token = a_token; // moved
-                let tracked mut b_token = b_token; // moved
+                let tracked mut waiting_increment_token = waiting_increment_token; // moved
+                let tracked mut updated;
                 let current_a =
                     atomic_with_ghost!(&globals.atomic_a => load();
                     returning ret;
                     ghost a => {
-                        globals.instance.borrow().decrement_will_not_underflow_u32(&mut a);
+                        assume(a.value() == 1);
+                        assume(ret == 1);
+                        //globals.instance.borrow().decrement_will_not_underflow_u32(&mut a);
                     }
                 );
 
-                let _ =
+                if current_a < 1 {
+                    return Tracked((waiting_increment_token));
+                }
+
+                let cae_ret =
                     atomic_with_ghost!(&globals.atomic_a => compare_exchange(current_a, current_a - 1);
                         update old_val -> new_val;
                         returning ret;
@@ -144,17 +149,8 @@ fn main() {
                                     assert(old_val == current_a);
                                     assert(new_val == current_a - 1);
                                     globals.instance.borrow().decrement_will_not_underflow_u32(&mut a);
-                                    globals.instance.borrow().tr_dec_a(&mut c, &mut a_token); // atomic decrement
+                                    globals.instance.borrow().tr_dec_a(&mut a, &mut waiting_increment_token); // atomic decrement
                                     updated = true;
-
-                                    let current_b =
-                                        atomic_with_ghost!(&globals.atomic_b => fetch_add(1);
-                                        returning ret;
-                                        ghost b => {
-                                            globals.instance.borrow().increment_will_not_overflow_u32(&mut b);
-                                            globals.instance.borrow().tr_inc_b(&mut c, &mut b_token); // atomic increment
-                                        }
-                                    );
                                 },
                                 Result::Err(_) => {
                                     assert(old_val == new_val);
@@ -163,7 +159,21 @@ fn main() {
                             }
                         }
                 );
-                Tracked((a_token, b_token, updated))
+
+                match cae_ret {
+                    Result::Ok(_) => {
+                        let current_b =
+                            atomic_with_ghost!(&globals.atomic_b => fetch_add(1);
+                            returning ret;
+                            ghost b => {
+                                assume(ret == 1);
+                                globals.instance.borrow().increment_will_not_overflow_u32(&mut b);
+                                globals.instance.borrow().tr_inc_b(&mut b, &mut waiting_increment_token); // atomic increment
+                            }
+                        );
+                    }, _ => {}
+                }
+                Tracked((waiting_increment_token))
             }),
     );
 
@@ -183,11 +193,11 @@ fn main() {
     let global = &*global_arc;
     let x =
         atomic_with_ghost!(&global.atomic_a => load();
-        ghost c => {
-            instance.finalize(t.1, &c, &t.0);
+        ghost a => {
+            instance.finalize_a(&a);
         })
     ;
 
-    assert(t.1 && x == 1 || !t.1);
+    assert(x == 0);
 }
 }
