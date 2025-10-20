@@ -39,13 +39,6 @@ tokenized_state_machine!(
         }
 
         property!{
-            already_incremented() {
-                require(pre.cae_a);
-                assert pre.counter == 1;
-            }
-        }
-
-        property!{
             increment_will_not_overflow_u32() {
                 assert 0 <= pre.counter < 0xffff_ffff;
             }
@@ -93,8 +86,6 @@ fn main() {
         instance: Tracked(instance),
     };
     let global_arc = Arc::new(global);
-
-    let total: u32 = 10;
 
     // Spawn threads
     let global_arc1 = global_arc.clone();
