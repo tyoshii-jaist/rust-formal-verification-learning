@@ -759,20 +759,16 @@
 (declare-const fuel%vstd!set.axiom_set_ext_equal_deep. FuelId)
 (declare-const fuel%vstd!set.axiom_set_insert_finite. FuelId)
 (declare-const fuel%vstd!set.axiom_set_remove_finite. FuelId)
-(declare-const fuel%main!FifoQueue.impl&%19.initialize. FuelId)
-(declare-const fuel%main!FifoQueue.impl&%19.produce_start. FuelId)
-(declare-const fuel%main!FifoQueue.impl&%19.produce_end. FuelId)
-(declare-const fuel%main!FifoQueue.impl&%19.consume_start. FuelId)
-(declare-const fuel%main!FifoQueue.impl&%19.consume_end. FuelId)
-(declare-const fuel%main!FifoQueue.impl&%19.inc_wrap. FuelId)
-(declare-const fuel%main!impl&%0.is_Idle. FuelId)
-(declare-const fuel%main!impl&%0.get_Idle_0. FuelId)
-(declare-const fuel%main!impl&%0.is_Producing. FuelId)
-(declare-const fuel%main!impl&%0.get_Producing_0. FuelId)
-(declare-const fuel%main!impl&%2.is_Idle. FuelId)
-(declare-const fuel%main!impl&%2.get_Idle_0. FuelId)
-(declare-const fuel%main!impl&%2.is_Consuming. FuelId)
-(declare-const fuel%main!impl&%2.get_Consuming_0. FuelId)
+(declare-const fuel%producer_comsumer_example!FifoQueue.impl&%19.initialize. FuelId)
+(declare-const fuel%producer_comsumer_example!FifoQueue.impl&%19.produce_start. FuelId)
+(declare-const fuel%producer_comsumer_example!FifoQueue.impl&%19.produce_end. FuelId)
+(declare-const fuel%producer_comsumer_example!FifoQueue.impl&%19.consume_start. FuelId)
+(declare-const fuel%producer_comsumer_example!FifoQueue.impl&%19.consume_end. FuelId)
+(declare-const fuel%producer_comsumer_example!FifoQueue.impl&%19.inc_wrap. FuelId)
+(declare-const fuel%producer_comsumer_example!impl&%0.arrow_Idle_0. FuelId)
+(declare-const fuel%producer_comsumer_example!impl&%0.arrow_Producing_0. FuelId)
+(declare-const fuel%producer_comsumer_example!impl&%1.arrow_Idle_0. FuelId)
+(declare-const fuel%producer_comsumer_example!impl&%1.arrow_Consuming_0. FuelId)
 (declare-const fuel%vstd!array.group_array_axioms. FuelId)
 (declare-const fuel%vstd!function.group_function_axioms. FuelId)
 (declare-const fuel%vstd!laws_cmp.group_laws_cmp. FuelId)
@@ -819,12 +815,12 @@
   fuel%vstd!seq.axiom_seq_ext_equal_deep. fuel%vstd!set.axiom_set_insert_same. fuel%vstd!set.axiom_set_insert_different.
   fuel%vstd!set.axiom_set_remove_same. fuel%vstd!set.axiom_set_remove_insert. fuel%vstd!set.axiom_set_remove_different.
   fuel%vstd!set.axiom_set_ext_equal. fuel%vstd!set.axiom_set_ext_equal_deep. fuel%vstd!set.axiom_set_insert_finite.
-  fuel%vstd!set.axiom_set_remove_finite. fuel%main!FifoQueue.impl&%19.initialize. fuel%main!FifoQueue.impl&%19.produce_start.
-  fuel%main!FifoQueue.impl&%19.produce_end. fuel%main!FifoQueue.impl&%19.consume_start.
-  fuel%main!FifoQueue.impl&%19.consume_end. fuel%main!FifoQueue.impl&%19.inc_wrap.
-  fuel%main!impl&%0.is_Idle. fuel%main!impl&%0.get_Idle_0. fuel%main!impl&%0.is_Producing.
-  fuel%main!impl&%0.get_Producing_0. fuel%main!impl&%2.is_Idle. fuel%main!impl&%2.get_Idle_0.
-  fuel%main!impl&%2.is_Consuming. fuel%main!impl&%2.get_Consuming_0. fuel%vstd!array.group_array_axioms.
+  fuel%vstd!set.axiom_set_remove_finite. fuel%producer_comsumer_example!FifoQueue.impl&%19.initialize.
+  fuel%producer_comsumer_example!FifoQueue.impl&%19.produce_start. fuel%producer_comsumer_example!FifoQueue.impl&%19.produce_end.
+  fuel%producer_comsumer_example!FifoQueue.impl&%19.consume_start. fuel%producer_comsumer_example!FifoQueue.impl&%19.consume_end.
+  fuel%producer_comsumer_example!FifoQueue.impl&%19.inc_wrap. fuel%producer_comsumer_example!impl&%0.arrow_Idle_0.
+  fuel%producer_comsumer_example!impl&%0.arrow_Producing_0. fuel%producer_comsumer_example!impl&%1.arrow_Idle_0.
+  fuel%producer_comsumer_example!impl&%1.arrow_Consuming_0. fuel%vstd!array.group_array_axioms.
   fuel%vstd!function.group_function_axioms. fuel%vstd!laws_cmp.group_laws_cmp. fuel%vstd!laws_eq.bool_laws.group_laws_eq.
   fuel%vstd!laws_eq.u8_laws.group_laws_eq. fuel%vstd!laws_eq.i8_laws.group_laws_eq.
   fuel%vstd!laws_eq.u16_laws.group_laws_eq. fuel%vstd!laws_eq.i16_laws.group_laws_eq.
@@ -927,47 +923,78 @@
 (declare-sort vstd!cell.CellId. 0)
 (declare-sort vstd!seq.Seq<vstd!cell.CellId.>. 0)
 (declare-sort vstd!set.Set<nat.>. 0)
-(declare-datatypes ((vstd!raw_ptr.MemContents. 0) (main!FifoQueue.State. 0) (main!ProducerState.
+(declare-datatypes ((vstd!raw_ptr.MemContents. 0) (producer_comsumer_example!FifoQueue.State.
    0
-  ) (main!ConsumerState. 0) (tuple%0. 0)
+  ) (producer_comsumer_example!ProducerState. 0) (producer_comsumer_example!ConsumerState.
+   0
+  ) (tuple%0. 0)
  ) (((vstd!raw_ptr.MemContents./Uninit) (vstd!raw_ptr.MemContents./Init (vstd!raw_ptr.MemContents./Init/?0
      Poly
    ))
-  ) ((main!FifoQueue.State./State (main!FifoQueue.State./State/?backing_cells vstd!seq.Seq<vstd!cell.CellId.>.)
-    (main!FifoQueue.State./State/?storage Poly) (main!FifoQueue.State./State/?head Int)
-    (main!FifoQueue.State./State/?tail Int) (main!FifoQueue.State./State/?producer main!ProducerState.)
-    (main!FifoQueue.State./State/?consumer main!ConsumerState.)
+  ) ((producer_comsumer_example!FifoQueue.State./State (producer_comsumer_example!FifoQueue.State./State/?backing_cells
+     vstd!seq.Seq<vstd!cell.CellId.>.
+    ) (producer_comsumer_example!FifoQueue.State./State/?storage Poly) (producer_comsumer_example!FifoQueue.State./State/?head
+     Int
+    ) (producer_comsumer_example!FifoQueue.State./State/?tail Int) (producer_comsumer_example!FifoQueue.State./State/?producer
+     producer_comsumer_example!ProducerState.
+    ) (producer_comsumer_example!FifoQueue.State./State/?consumer producer_comsumer_example!ConsumerState.)
    )
-  ) ((main!ProducerState./Idle (main!ProducerState./Idle/?0 Int)) (main!ProducerState./Producing
-    (main!ProducerState./Producing/?0 Int)
-   )
-  ) ((main!ConsumerState./Idle (main!ConsumerState./Idle/?0 Int)) (main!ConsumerState./Consuming
-    (main!ConsumerState./Consuming/?0 Int)
-   )
+  ) ((producer_comsumer_example!ProducerState./Idle (producer_comsumer_example!ProducerState./Idle/?0
+     Int
+    )
+   ) (producer_comsumer_example!ProducerState./Producing (producer_comsumer_example!ProducerState./Producing/?0
+     Int
+   ))
+  ) ((producer_comsumer_example!ConsumerState./Idle (producer_comsumer_example!ConsumerState./Idle/?0
+     Int
+    )
+   ) (producer_comsumer_example!ConsumerState./Consuming (producer_comsumer_example!ConsumerState./Consuming/?0
+     Int
+   ))
   ) ((tuple%0./tuple%0))
 ))
 (declare-fun vstd!raw_ptr.MemContents./Init/0 (Dcr Type vstd!raw_ptr.MemContents.)
  Poly
 )
-(declare-fun main!FifoQueue.State./State/backing_cells (main!FifoQueue.State.) vstd!seq.Seq<vstd!cell.CellId.>.)
-(declare-fun main!FifoQueue.State./State/storage (main!FifoQueue.State.) Poly)
-(declare-fun main!FifoQueue.State./State/head (main!FifoQueue.State.) Int)
-(declare-fun main!FifoQueue.State./State/tail (main!FifoQueue.State.) Int)
-(declare-fun main!FifoQueue.State./State/producer (main!FifoQueue.State.) main!ProducerState.)
-(declare-fun main!FifoQueue.State./State/consumer (main!FifoQueue.State.) main!ConsumerState.)
-(declare-fun main!ProducerState./Idle/0 (main!ProducerState.) Int)
-(declare-fun main!ProducerState./Producing/0 (main!ProducerState.) Int)
-(declare-fun main!ConsumerState./Idle/0 (main!ConsumerState.) Int)
-(declare-fun main!ConsumerState./Consuming/0 (main!ConsumerState.) Int)
+(declare-fun producer_comsumer_example!FifoQueue.State./State/backing_cells (producer_comsumer_example!FifoQueue.State.)
+ vstd!seq.Seq<vstd!cell.CellId.>.
+)
+(declare-fun producer_comsumer_example!FifoQueue.State./State/storage (producer_comsumer_example!FifoQueue.State.)
+ Poly
+)
+(declare-fun producer_comsumer_example!FifoQueue.State./State/head (producer_comsumer_example!FifoQueue.State.)
+ Int
+)
+(declare-fun producer_comsumer_example!FifoQueue.State./State/tail (producer_comsumer_example!FifoQueue.State.)
+ Int
+)
+(declare-fun producer_comsumer_example!FifoQueue.State./State/producer (producer_comsumer_example!FifoQueue.State.)
+ producer_comsumer_example!ProducerState.
+)
+(declare-fun producer_comsumer_example!FifoQueue.State./State/consumer (producer_comsumer_example!FifoQueue.State.)
+ producer_comsumer_example!ConsumerState.
+)
+(declare-fun producer_comsumer_example!ProducerState./Idle/0 (producer_comsumer_example!ProducerState.)
+ Int
+)
+(declare-fun producer_comsumer_example!ProducerState./Producing/0 (producer_comsumer_example!ProducerState.)
+ Int
+)
+(declare-fun producer_comsumer_example!ConsumerState./Idle/0 (producer_comsumer_example!ConsumerState.)
+ Int
+)
+(declare-fun producer_comsumer_example!ConsumerState./Consuming/0 (producer_comsumer_example!ConsumerState.)
+ Int
+)
 (declare-fun TYPE%vstd!cell.PointsTo. (Dcr Type) Type)
 (declare-const TYPE%vstd!cell.CellId. Type)
 (declare-fun TYPE%vstd!map.Map. (Dcr Type Dcr Type) Type)
 (declare-fun TYPE%vstd!raw_ptr.MemContents. (Dcr Type) Type)
 (declare-fun TYPE%vstd!seq.Seq. (Dcr Type) Type)
 (declare-fun TYPE%vstd!set.Set. (Dcr Type) Type)
-(declare-fun TYPE%main!FifoQueue.State. (Dcr Type) Type)
-(declare-const TYPE%main!ProducerState. Type)
-(declare-const TYPE%main!ConsumerState. Type)
+(declare-fun TYPE%producer_comsumer_example!FifoQueue.State. (Dcr Type) Type)
+(declare-const TYPE%producer_comsumer_example!ProducerState. Type)
+(declare-const TYPE%producer_comsumer_example!ConsumerState. Type)
 (declare-fun Poly%vstd!cell.CellId. (vstd!cell.CellId.) Poly)
 (declare-fun %Poly%vstd!cell.CellId. (Poly) vstd!cell.CellId.)
 (declare-fun Poly%vstd!seq.Seq<vstd!cell.CellId.>. (vstd!seq.Seq<vstd!cell.CellId.>.)
@@ -978,12 +1005,18 @@
 (declare-fun %Poly%vstd!set.Set<nat.>. (Poly) vstd!set.Set<nat.>.)
 (declare-fun Poly%vstd!raw_ptr.MemContents. (vstd!raw_ptr.MemContents.) Poly)
 (declare-fun %Poly%vstd!raw_ptr.MemContents. (Poly) vstd!raw_ptr.MemContents.)
-(declare-fun Poly%main!FifoQueue.State. (main!FifoQueue.State.) Poly)
-(declare-fun %Poly%main!FifoQueue.State. (Poly) main!FifoQueue.State.)
-(declare-fun Poly%main!ProducerState. (main!ProducerState.) Poly)
-(declare-fun %Poly%main!ProducerState. (Poly) main!ProducerState.)
-(declare-fun Poly%main!ConsumerState. (main!ConsumerState.) Poly)
-(declare-fun %Poly%main!ConsumerState. (Poly) main!ConsumerState.)
+(declare-fun Poly%producer_comsumer_example!FifoQueue.State. (producer_comsumer_example!FifoQueue.State.)
+ Poly
+)
+(declare-fun %Poly%producer_comsumer_example!FifoQueue.State. (Poly) producer_comsumer_example!FifoQueue.State.)
+(declare-fun Poly%producer_comsumer_example!ProducerState. (producer_comsumer_example!ProducerState.)
+ Poly
+)
+(declare-fun %Poly%producer_comsumer_example!ProducerState. (Poly) producer_comsumer_example!ProducerState.)
+(declare-fun Poly%producer_comsumer_example!ConsumerState. (producer_comsumer_example!ConsumerState.)
+ Poly
+)
+(declare-fun %Poly%producer_comsumer_example!ConsumerState. (Poly) producer_comsumer_example!ConsumerState.)
 (declare-fun Poly%tuple%0. (tuple%0.) Poly)
 (declare-fun %Poly%tuple%0. (Poly) tuple%0.)
 (axiom (forall ((x vstd!cell.CellId.)) (!
@@ -1126,326 +1159,417 @@
    :qid prelude_datatype_height_vstd!raw_ptr.MemContents./Init/0
    :skolemid skolem_prelude_datatype_height_vstd!raw_ptr.MemContents./Init/0
 )))
-(axiom (forall ((x main!FifoQueue.State.)) (!
-   (= x (%Poly%main!FifoQueue.State. (Poly%main!FifoQueue.State. x)))
-   :pattern ((Poly%main!FifoQueue.State. x))
-   :qid internal_main__FifoQueue__State_box_axiom_definition
-   :skolemid skolem_internal_main__FifoQueue__State_box_axiom_definition
+(axiom (forall ((x producer_comsumer_example!FifoQueue.State.)) (!
+   (= x (%Poly%producer_comsumer_example!FifoQueue.State. (Poly%producer_comsumer_example!FifoQueue.State.
+      x
+   )))
+   :pattern ((Poly%producer_comsumer_example!FifoQueue.State. x))
+   :qid internal_producer_comsumer_example__FifoQueue__State_box_axiom_definition
+   :skolemid skolem_internal_producer_comsumer_example__FifoQueue__State_box_axiom_definition
 )))
 (axiom (forall ((T&. Dcr) (T& Type) (x Poly)) (!
    (=>
-    (has_type x (TYPE%main!FifoQueue.State. T&. T&))
-    (= x (Poly%main!FifoQueue.State. (%Poly%main!FifoQueue.State. x)))
-   )
-   :pattern ((has_type x (TYPE%main!FifoQueue.State. T&. T&)))
-   :qid internal_main__FifoQueue__State_unbox_axiom_definition
-   :skolemid skolem_internal_main__FifoQueue__State_unbox_axiom_definition
+    (has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
+    (= x (Poly%producer_comsumer_example!FifoQueue.State. (%Poly%producer_comsumer_example!FifoQueue.State.
+       x
+   ))))
+   :pattern ((has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&)))
+   :qid internal_producer_comsumer_example__FifoQueue__State_unbox_axiom_definition
+   :skolemid skolem_internal_producer_comsumer_example__FifoQueue__State_unbox_axiom_definition
 )))
 (axiom (forall ((T&. Dcr) (T& Type) (_backing_cells! vstd!seq.Seq<vstd!cell.CellId.>.)
-   (_storage! Poly) (_head! Int) (_tail! Int) (_producer! main!ProducerState.) (_consumer!
-    main!ConsumerState.
-   )
+   (_storage! Poly) (_head! Int) (_tail! Int) (_producer! producer_comsumer_example!ProducerState.)
+   (_consumer! producer_comsumer_example!ConsumerState.)
   ) (!
    (=>
     (and
      (has_type _storage! (TYPE%vstd!map.Map. $ NAT $ (TYPE%vstd!cell.PointsTo. T&. T&)))
      (<= 0 _head!)
      (<= 0 _tail!)
-     (has_type (Poly%main!ProducerState. _producer!) TYPE%main!ProducerState.)
-     (has_type (Poly%main!ConsumerState. _consumer!) TYPE%main!ConsumerState.)
+     (has_type (Poly%producer_comsumer_example!ProducerState. _producer!) TYPE%producer_comsumer_example!ProducerState.)
+     (has_type (Poly%producer_comsumer_example!ConsumerState. _consumer!) TYPE%producer_comsumer_example!ConsumerState.)
     )
-    (has_type (Poly%main!FifoQueue.State. (main!FifoQueue.State./State _backing_cells! _storage!
-       _head! _tail! _producer! _consumer!
+    (has_type (Poly%producer_comsumer_example!FifoQueue.State. (producer_comsumer_example!FifoQueue.State./State
+       _backing_cells! _storage! _head! _tail! _producer! _consumer!
       )
-     ) (TYPE%main!FifoQueue.State. T&. T&)
+     ) (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&)
    ))
-   :pattern ((has_type (Poly%main!FifoQueue.State. (main!FifoQueue.State./State _backing_cells!
-       _storage! _head! _tail! _producer! _consumer!
+   :pattern ((has_type (Poly%producer_comsumer_example!FifoQueue.State. (producer_comsumer_example!FifoQueue.State./State
+       _backing_cells! _storage! _head! _tail! _producer! _consumer!
       )
-     ) (TYPE%main!FifoQueue.State. T&. T&)
+     ) (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&)
    ))
-   :qid internal_main!FifoQueue.State./State_constructor_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State_constructor_definition
+   :qid internal_producer_comsumer_example!FifoQueue.State./State_constructor_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State_constructor_definition
 )))
-(axiom (forall ((x main!FifoQueue.State.)) (!
-   (= (main!FifoQueue.State./State/backing_cells x) (main!FifoQueue.State./State/?backing_cells
+(axiom (forall ((x producer_comsumer_example!FifoQueue.State.)) (!
+   (= (producer_comsumer_example!FifoQueue.State./State/backing_cells x) (producer_comsumer_example!FifoQueue.State./State/?backing_cells
      x
    ))
-   :pattern ((main!FifoQueue.State./State/backing_cells x))
-   :qid internal_main!FifoQueue.State./State/backing_cells_accessor_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State/backing_cells_accessor_definition
+   :pattern ((producer_comsumer_example!FifoQueue.State./State/backing_cells x))
+   :qid internal_producer_comsumer_example!FifoQueue.State./State/backing_cells_accessor_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State/backing_cells_accessor_definition
 )))
-(axiom (forall ((x main!FifoQueue.State.)) (!
-   (= (main!FifoQueue.State./State/storage x) (main!FifoQueue.State./State/?storage x))
-   :pattern ((main!FifoQueue.State./State/storage x))
-   :qid internal_main!FifoQueue.State./State/storage_accessor_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State/storage_accessor_definition
-)))
-(axiom (forall ((T&. Dcr) (T& Type) (x Poly)) (!
-   (=>
-    (has_type x (TYPE%main!FifoQueue.State. T&. T&))
-    (has_type (main!FifoQueue.State./State/storage (%Poly%main!FifoQueue.State. x)) (TYPE%vstd!map.Map.
-      $ NAT $ (TYPE%vstd!cell.PointsTo. T&. T&)
-   )))
-   :pattern ((main!FifoQueue.State./State/storage (%Poly%main!FifoQueue.State. x)) (has_type
-     x (TYPE%main!FifoQueue.State. T&. T&)
+(axiom (forall ((x producer_comsumer_example!FifoQueue.State.)) (!
+   (= (producer_comsumer_example!FifoQueue.State./State/storage x) (producer_comsumer_example!FifoQueue.State./State/?storage
+     x
    ))
-   :qid internal_main!FifoQueue.State./State/storage_invariant_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State/storage_invariant_definition
-)))
-(axiom (forall ((x main!FifoQueue.State.)) (!
-   (= (main!FifoQueue.State./State/head x) (main!FifoQueue.State./State/?head x))
-   :pattern ((main!FifoQueue.State./State/head x))
-   :qid internal_main!FifoQueue.State./State/head_accessor_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State/head_accessor_definition
+   :pattern ((producer_comsumer_example!FifoQueue.State./State/storage x))
+   :qid internal_producer_comsumer_example!FifoQueue.State./State/storage_accessor_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State/storage_accessor_definition
 )))
 (axiom (forall ((T&. Dcr) (T& Type) (x Poly)) (!
    (=>
-    (has_type x (TYPE%main!FifoQueue.State. T&. T&))
-    (<= 0 (main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. x)))
+    (has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
+    (has_type (producer_comsumer_example!FifoQueue.State./State/storage (%Poly%producer_comsumer_example!FifoQueue.State.
+       x
+      )
+     ) (TYPE%vstd!map.Map. $ NAT $ (TYPE%vstd!cell.PointsTo. T&. T&))
+   ))
+   :pattern ((producer_comsumer_example!FifoQueue.State./State/storage (%Poly%producer_comsumer_example!FifoQueue.State.
+      x
+     )
+    ) (has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
    )
-   :pattern ((main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. x)) (has_type
-     x (TYPE%main!FifoQueue.State. T&. T&)
-   ))
-   :qid internal_main!FifoQueue.State./State/head_invariant_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State/head_invariant_definition
+   :qid internal_producer_comsumer_example!FifoQueue.State./State/storage_invariant_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State/storage_invariant_definition
 )))
-(axiom (forall ((x main!FifoQueue.State.)) (!
-   (= (main!FifoQueue.State./State/tail x) (main!FifoQueue.State./State/?tail x))
-   :pattern ((main!FifoQueue.State./State/tail x))
-   :qid internal_main!FifoQueue.State./State/tail_accessor_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State/tail_accessor_definition
-)))
-(axiom (forall ((T&. Dcr) (T& Type) (x Poly)) (!
-   (=>
-    (has_type x (TYPE%main!FifoQueue.State. T&. T&))
-    (<= 0 (main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. x)))
-   )
-   :pattern ((main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. x)) (has_type
-     x (TYPE%main!FifoQueue.State. T&. T&)
-   ))
-   :qid internal_main!FifoQueue.State./State/tail_invariant_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State/tail_invariant_definition
-)))
-(axiom (forall ((x main!FifoQueue.State.)) (!
-   (= (main!FifoQueue.State./State/producer x) (main!FifoQueue.State./State/?producer
+(axiom (forall ((x producer_comsumer_example!FifoQueue.State.)) (!
+   (= (producer_comsumer_example!FifoQueue.State./State/head x) (producer_comsumer_example!FifoQueue.State./State/?head
      x
    ))
-   :pattern ((main!FifoQueue.State./State/producer x))
-   :qid internal_main!FifoQueue.State./State/producer_accessor_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State/producer_accessor_definition
+   :pattern ((producer_comsumer_example!FifoQueue.State./State/head x))
+   :qid internal_producer_comsumer_example!FifoQueue.State./State/head_accessor_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State/head_accessor_definition
 )))
 (axiom (forall ((T&. Dcr) (T& Type) (x Poly)) (!
    (=>
-    (has_type x (TYPE%main!FifoQueue.State. T&. T&))
-    (has_type (Poly%main!ProducerState. (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State.
-        x
-      ))
-     ) TYPE%main!ProducerState.
-   ))
-   :pattern ((main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State. x)) (
-     has_type x (TYPE%main!FifoQueue.State. T&. T&)
-   ))
-   :qid internal_main!FifoQueue.State./State/producer_invariant_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State/producer_invariant_definition
-)))
-(axiom (forall ((x main!FifoQueue.State.)) (!
-   (= (main!FifoQueue.State./State/consumer x) (main!FifoQueue.State./State/?consumer
-     x
-   ))
-   :pattern ((main!FifoQueue.State./State/consumer x))
-   :qid internal_main!FifoQueue.State./State/consumer_accessor_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State/consumer_accessor_definition
-)))
-(axiom (forall ((T&. Dcr) (T& Type) (x Poly)) (!
-   (=>
-    (has_type x (TYPE%main!FifoQueue.State. T&. T&))
-    (has_type (Poly%main!ConsumerState. (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State.
-        x
-      ))
-     ) TYPE%main!ConsumerState.
-   ))
-   :pattern ((main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State. x)) (
-     has_type x (TYPE%main!FifoQueue.State. T&. T&)
-   ))
-   :qid internal_main!FifoQueue.State./State/consumer_invariant_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State/consumer_invariant_definition
-)))
-(axiom (forall ((x main!FifoQueue.State.)) (!
-   (=>
-    (is-main!FifoQueue.State./State x)
-    (height_lt (height (main!FifoQueue.State./State/storage x)) (height (Poly%main!FifoQueue.State.
+    (has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
+    (<= 0 (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
        x
    ))))
-   :pattern ((height (main!FifoQueue.State./State/storage x)))
-   :qid prelude_datatype_height_main!FifoQueue.State./State/storage
-   :skolemid skolem_prelude_datatype_height_main!FifoQueue.State./State/storage
+   :pattern ((producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+      x
+     )
+    ) (has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
+   )
+   :qid internal_producer_comsumer_example!FifoQueue.State./State/head_invariant_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State/head_invariant_definition
+)))
+(axiom (forall ((x producer_comsumer_example!FifoQueue.State.)) (!
+   (= (producer_comsumer_example!FifoQueue.State./State/tail x) (producer_comsumer_example!FifoQueue.State./State/?tail
+     x
+   ))
+   :pattern ((producer_comsumer_example!FifoQueue.State./State/tail x))
+   :qid internal_producer_comsumer_example!FifoQueue.State./State/tail_accessor_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State/tail_accessor_definition
+)))
+(axiom (forall ((T&. Dcr) (T& Type) (x Poly)) (!
+   (=>
+    (has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
+    (<= 0 (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+       x
+   ))))
+   :pattern ((producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+      x
+     )
+    ) (has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
+   )
+   :qid internal_producer_comsumer_example!FifoQueue.State./State/tail_invariant_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State/tail_invariant_definition
+)))
+(axiom (forall ((x producer_comsumer_example!FifoQueue.State.)) (!
+   (= (producer_comsumer_example!FifoQueue.State./State/producer x) (producer_comsumer_example!FifoQueue.State./State/?producer
+     x
+   ))
+   :pattern ((producer_comsumer_example!FifoQueue.State./State/producer x))
+   :qid internal_producer_comsumer_example!FifoQueue.State./State/producer_accessor_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State/producer_accessor_definition
+)))
+(axiom (forall ((T&. Dcr) (T& Type) (x Poly)) (!
+   (=>
+    (has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
+    (has_type (Poly%producer_comsumer_example!ProducerState. (producer_comsumer_example!FifoQueue.State./State/producer
+       (%Poly%producer_comsumer_example!FifoQueue.State. x)
+      )
+     ) TYPE%producer_comsumer_example!ProducerState.
+   ))
+   :pattern ((producer_comsumer_example!FifoQueue.State./State/producer (%Poly%producer_comsumer_example!FifoQueue.State.
+      x
+     )
+    ) (has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
+   )
+   :qid internal_producer_comsumer_example!FifoQueue.State./State/producer_invariant_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State/producer_invariant_definition
+)))
+(axiom (forall ((x producer_comsumer_example!FifoQueue.State.)) (!
+   (= (producer_comsumer_example!FifoQueue.State./State/consumer x) (producer_comsumer_example!FifoQueue.State./State/?consumer
+     x
+   ))
+   :pattern ((producer_comsumer_example!FifoQueue.State./State/consumer x))
+   :qid internal_producer_comsumer_example!FifoQueue.State./State/consumer_accessor_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State/consumer_accessor_definition
+)))
+(axiom (forall ((T&. Dcr) (T& Type) (x Poly)) (!
+   (=>
+    (has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
+    (has_type (Poly%producer_comsumer_example!ConsumerState. (producer_comsumer_example!FifoQueue.State./State/consumer
+       (%Poly%producer_comsumer_example!FifoQueue.State. x)
+      )
+     ) TYPE%producer_comsumer_example!ConsumerState.
+   ))
+   :pattern ((producer_comsumer_example!FifoQueue.State./State/consumer (%Poly%producer_comsumer_example!FifoQueue.State.
+      x
+     )
+    ) (has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
+   )
+   :qid internal_producer_comsumer_example!FifoQueue.State./State/consumer_invariant_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State/consumer_invariant_definition
+)))
+(axiom (forall ((x producer_comsumer_example!FifoQueue.State.)) (!
+   (=>
+    (is-producer_comsumer_example!FifoQueue.State./State x)
+    (height_lt (height (producer_comsumer_example!FifoQueue.State./State/storage x)) (
+      height (Poly%producer_comsumer_example!FifoQueue.State. x)
+   )))
+   :pattern ((height (producer_comsumer_example!FifoQueue.State./State/storage x)))
+   :qid prelude_datatype_height_producer_comsumer_example!FifoQueue.State./State/storage
+   :skolemid skolem_prelude_datatype_height_producer_comsumer_example!FifoQueue.State./State/storage
 )))
 (axiom (forall ((T&. Dcr) (T& Type) (deep Bool) (x Poly) (y Poly)) (!
    (=>
     (and
-     (has_type x (TYPE%main!FifoQueue.State. T&. T&))
-     (has_type y (TYPE%main!FifoQueue.State. T&. T&))
+     (has_type x (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
+     (has_type y (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&))
      (ext_eq deep (TYPE%vstd!seq.Seq. $ TYPE%vstd!cell.CellId.) (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
-       (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. x))
-      ) (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-        (%Poly%main!FifoQueue.State. y)
+       (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+         x
+       ))
+      ) (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (producer_comsumer_example!FifoQueue.State./State/backing_cells
+        (%Poly%producer_comsumer_example!FifoQueue.State. y)
      )))
-     (ext_eq deep (TYPE%vstd!map.Map. $ NAT $ (TYPE%vstd!cell.PointsTo. T&. T&)) (main!FifoQueue.State./State/storage
-       (%Poly%main!FifoQueue.State. x)
-      ) (main!FifoQueue.State./State/storage (%Poly%main!FifoQueue.State. y))
+     (ext_eq deep (TYPE%vstd!map.Map. $ NAT $ (TYPE%vstd!cell.PointsTo. T&. T&)) (producer_comsumer_example!FifoQueue.State./State/storage
+       (%Poly%producer_comsumer_example!FifoQueue.State. x)
+      ) (producer_comsumer_example!FifoQueue.State./State/storage (%Poly%producer_comsumer_example!FifoQueue.State.
+        y
+     )))
+     (= (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+        x
+       )
+      ) (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+        y
+     )))
+     (= (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+        x
+       )
+      ) (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+        y
+     )))
+     (= (producer_comsumer_example!FifoQueue.State./State/producer (%Poly%producer_comsumer_example!FifoQueue.State.
+        x
+       )
+      ) (producer_comsumer_example!FifoQueue.State./State/producer (%Poly%producer_comsumer_example!FifoQueue.State.
+        y
+     )))
+     (= (producer_comsumer_example!FifoQueue.State./State/consumer (%Poly%producer_comsumer_example!FifoQueue.State.
+        x
+       )
+      ) (producer_comsumer_example!FifoQueue.State./State/consumer (%Poly%producer_comsumer_example!FifoQueue.State.
+        y
+    ))))
+    (ext_eq deep (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&) x y)
+   )
+   :pattern ((ext_eq deep (TYPE%producer_comsumer_example!FifoQueue.State. T&. T&) x y))
+   :qid internal_producer_comsumer_example!FifoQueue.State./State_ext_equal_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.State./State_ext_equal_definition
+)))
+(axiom (forall ((x producer_comsumer_example!ProducerState.)) (!
+   (= x (%Poly%producer_comsumer_example!ProducerState. (Poly%producer_comsumer_example!ProducerState.
+      x
+   )))
+   :pattern ((Poly%producer_comsumer_example!ProducerState. x))
+   :qid internal_producer_comsumer_example__ProducerState_box_axiom_definition
+   :skolemid skolem_internal_producer_comsumer_example__ProducerState_box_axiom_definition
+)))
+(axiom (forall ((x Poly)) (!
+   (=>
+    (has_type x TYPE%producer_comsumer_example!ProducerState.)
+    (= x (Poly%producer_comsumer_example!ProducerState. (%Poly%producer_comsumer_example!ProducerState.
+       x
+   ))))
+   :pattern ((has_type x TYPE%producer_comsumer_example!ProducerState.))
+   :qid internal_producer_comsumer_example__ProducerState_unbox_axiom_definition
+   :skolemid skolem_internal_producer_comsumer_example__ProducerState_unbox_axiom_definition
+)))
+(axiom (forall ((_0! Int)) (!
+   (=>
+    (<= 0 _0!)
+    (has_type (Poly%producer_comsumer_example!ProducerState. (producer_comsumer_example!ProducerState./Idle
+       _0!
+      )
+     ) TYPE%producer_comsumer_example!ProducerState.
+   ))
+   :pattern ((has_type (Poly%producer_comsumer_example!ProducerState. (producer_comsumer_example!ProducerState./Idle
+       _0!
+      )
+     ) TYPE%producer_comsumer_example!ProducerState.
+   ))
+   :qid internal_producer_comsumer_example!ProducerState./Idle_constructor_definition
+   :skolemid skolem_internal_producer_comsumer_example!ProducerState./Idle_constructor_definition
+)))
+(axiom (forall ((x producer_comsumer_example!ProducerState.)) (!
+   (= (producer_comsumer_example!ProducerState./Idle/0 x) (producer_comsumer_example!ProducerState./Idle/?0
+     x
+   ))
+   :pattern ((producer_comsumer_example!ProducerState./Idle/0 x))
+   :qid internal_producer_comsumer_example!ProducerState./Idle/0_accessor_definition
+   :skolemid skolem_internal_producer_comsumer_example!ProducerState./Idle/0_accessor_definition
+)))
+(axiom (forall ((x Poly)) (!
+   (=>
+    (has_type x TYPE%producer_comsumer_example!ProducerState.)
+    (<= 0 (producer_comsumer_example!ProducerState./Idle/0 (%Poly%producer_comsumer_example!ProducerState.
+       x
+   ))))
+   :pattern ((producer_comsumer_example!ProducerState./Idle/0 (%Poly%producer_comsumer_example!ProducerState.
+      x
      )
-     (= (main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. x)) (main!FifoQueue.State./State/head
-       (%Poly%main!FifoQueue.State. y)
-     ))
-     (= (main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. x)) (main!FifoQueue.State./State/tail
-       (%Poly%main!FifoQueue.State. y)
-     ))
-     (= (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State. x)) (main!FifoQueue.State./State/producer
-       (%Poly%main!FifoQueue.State. y)
-     ))
-     (= (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State. x)) (main!FifoQueue.State./State/consumer
-       (%Poly%main!FifoQueue.State. y)
-    )))
-    (ext_eq deep (TYPE%main!FifoQueue.State. T&. T&) x y)
+    ) (has_type x TYPE%producer_comsumer_example!ProducerState.)
    )
-   :pattern ((ext_eq deep (TYPE%main!FifoQueue.State. T&. T&) x y))
-   :qid internal_main!FifoQueue.State./State_ext_equal_definition
-   :skolemid skolem_internal_main!FifoQueue.State./State_ext_equal_definition
-)))
-(axiom (forall ((x main!ProducerState.)) (!
-   (= x (%Poly%main!ProducerState. (Poly%main!ProducerState. x)))
-   :pattern ((Poly%main!ProducerState. x))
-   :qid internal_main__ProducerState_box_axiom_definition
-   :skolemid skolem_internal_main__ProducerState_box_axiom_definition
-)))
-(axiom (forall ((x Poly)) (!
-   (=>
-    (has_type x TYPE%main!ProducerState.)
-    (= x (Poly%main!ProducerState. (%Poly%main!ProducerState. x)))
-   )
-   :pattern ((has_type x TYPE%main!ProducerState.))
-   :qid internal_main__ProducerState_unbox_axiom_definition
-   :skolemid skolem_internal_main__ProducerState_unbox_axiom_definition
+   :qid internal_producer_comsumer_example!ProducerState./Idle/0_invariant_definition
+   :skolemid skolem_internal_producer_comsumer_example!ProducerState./Idle/0_invariant_definition
 )))
 (axiom (forall ((_0! Int)) (!
    (=>
     (<= 0 _0!)
-    (has_type (Poly%main!ProducerState. (main!ProducerState./Idle _0!)) TYPE%main!ProducerState.)
-   )
-   :pattern ((has_type (Poly%main!ProducerState. (main!ProducerState./Idle _0!)) TYPE%main!ProducerState.))
-   :qid internal_main!ProducerState./Idle_constructor_definition
-   :skolemid skolem_internal_main!ProducerState./Idle_constructor_definition
+    (has_type (Poly%producer_comsumer_example!ProducerState. (producer_comsumer_example!ProducerState./Producing
+       _0!
+      )
+     ) TYPE%producer_comsumer_example!ProducerState.
+   ))
+   :pattern ((has_type (Poly%producer_comsumer_example!ProducerState. (producer_comsumer_example!ProducerState./Producing
+       _0!
+      )
+     ) TYPE%producer_comsumer_example!ProducerState.
+   ))
+   :qid internal_producer_comsumer_example!ProducerState./Producing_constructor_definition
+   :skolemid skolem_internal_producer_comsumer_example!ProducerState./Producing_constructor_definition
 )))
-(axiom (forall ((x main!ProducerState.)) (!
-   (= (main!ProducerState./Idle/0 x) (main!ProducerState./Idle/?0 x))
-   :pattern ((main!ProducerState./Idle/0 x))
-   :qid internal_main!ProducerState./Idle/0_accessor_definition
-   :skolemid skolem_internal_main!ProducerState./Idle/0_accessor_definition
+(axiom (forall ((x producer_comsumer_example!ProducerState.)) (!
+   (= (producer_comsumer_example!ProducerState./Producing/0 x) (producer_comsumer_example!ProducerState./Producing/?0
+     x
+   ))
+   :pattern ((producer_comsumer_example!ProducerState./Producing/0 x))
+   :qid internal_producer_comsumer_example!ProducerState./Producing/0_accessor_definition
+   :skolemid skolem_internal_producer_comsumer_example!ProducerState./Producing/0_accessor_definition
 )))
 (axiom (forall ((x Poly)) (!
    (=>
-    (has_type x TYPE%main!ProducerState.)
-    (<= 0 (main!ProducerState./Idle/0 (%Poly%main!ProducerState. x)))
+    (has_type x TYPE%producer_comsumer_example!ProducerState.)
+    (<= 0 (producer_comsumer_example!ProducerState./Producing/0 (%Poly%producer_comsumer_example!ProducerState.
+       x
+   ))))
+   :pattern ((producer_comsumer_example!ProducerState./Producing/0 (%Poly%producer_comsumer_example!ProducerState.
+      x
+     )
+    ) (has_type x TYPE%producer_comsumer_example!ProducerState.)
    )
-   :pattern ((main!ProducerState./Idle/0 (%Poly%main!ProducerState. x)) (has_type x TYPE%main!ProducerState.))
-   :qid internal_main!ProducerState./Idle/0_invariant_definition
-   :skolemid skolem_internal_main!ProducerState./Idle/0_invariant_definition
+   :qid internal_producer_comsumer_example!ProducerState./Producing/0_invariant_definition
+   :skolemid skolem_internal_producer_comsumer_example!ProducerState./Producing/0_invariant_definition
+)))
+(axiom (forall ((x producer_comsumer_example!ConsumerState.)) (!
+   (= x (%Poly%producer_comsumer_example!ConsumerState. (Poly%producer_comsumer_example!ConsumerState.
+      x
+   )))
+   :pattern ((Poly%producer_comsumer_example!ConsumerState. x))
+   :qid internal_producer_comsumer_example__ConsumerState_box_axiom_definition
+   :skolemid skolem_internal_producer_comsumer_example__ConsumerState_box_axiom_definition
+)))
+(axiom (forall ((x Poly)) (!
+   (=>
+    (has_type x TYPE%producer_comsumer_example!ConsumerState.)
+    (= x (Poly%producer_comsumer_example!ConsumerState. (%Poly%producer_comsumer_example!ConsumerState.
+       x
+   ))))
+   :pattern ((has_type x TYPE%producer_comsumer_example!ConsumerState.))
+   :qid internal_producer_comsumer_example__ConsumerState_unbox_axiom_definition
+   :skolemid skolem_internal_producer_comsumer_example__ConsumerState_unbox_axiom_definition
 )))
 (axiom (forall ((_0! Int)) (!
    (=>
     (<= 0 _0!)
-    (has_type (Poly%main!ProducerState. (main!ProducerState./Producing _0!)) TYPE%main!ProducerState.)
-   )
-   :pattern ((has_type (Poly%main!ProducerState. (main!ProducerState./Producing _0!))
-     TYPE%main!ProducerState.
+    (has_type (Poly%producer_comsumer_example!ConsumerState. (producer_comsumer_example!ConsumerState./Idle
+       _0!
+      )
+     ) TYPE%producer_comsumer_example!ConsumerState.
    ))
-   :qid internal_main!ProducerState./Producing_constructor_definition
-   :skolemid skolem_internal_main!ProducerState./Producing_constructor_definition
+   :pattern ((has_type (Poly%producer_comsumer_example!ConsumerState. (producer_comsumer_example!ConsumerState./Idle
+       _0!
+      )
+     ) TYPE%producer_comsumer_example!ConsumerState.
+   ))
+   :qid internal_producer_comsumer_example!ConsumerState./Idle_constructor_definition
+   :skolemid skolem_internal_producer_comsumer_example!ConsumerState./Idle_constructor_definition
 )))
-(axiom (forall ((x main!ProducerState.)) (!
-   (= (main!ProducerState./Producing/0 x) (main!ProducerState./Producing/?0 x))
-   :pattern ((main!ProducerState./Producing/0 x))
-   :qid internal_main!ProducerState./Producing/0_accessor_definition
-   :skolemid skolem_internal_main!ProducerState./Producing/0_accessor_definition
+(axiom (forall ((x producer_comsumer_example!ConsumerState.)) (!
+   (= (producer_comsumer_example!ConsumerState./Idle/0 x) (producer_comsumer_example!ConsumerState./Idle/?0
+     x
+   ))
+   :pattern ((producer_comsumer_example!ConsumerState./Idle/0 x))
+   :qid internal_producer_comsumer_example!ConsumerState./Idle/0_accessor_definition
+   :skolemid skolem_internal_producer_comsumer_example!ConsumerState./Idle/0_accessor_definition
 )))
 (axiom (forall ((x Poly)) (!
    (=>
-    (has_type x TYPE%main!ProducerState.)
-    (<= 0 (main!ProducerState./Producing/0 (%Poly%main!ProducerState. x)))
+    (has_type x TYPE%producer_comsumer_example!ConsumerState.)
+    (<= 0 (producer_comsumer_example!ConsumerState./Idle/0 (%Poly%producer_comsumer_example!ConsumerState.
+       x
+   ))))
+   :pattern ((producer_comsumer_example!ConsumerState./Idle/0 (%Poly%producer_comsumer_example!ConsumerState.
+      x
+     )
+    ) (has_type x TYPE%producer_comsumer_example!ConsumerState.)
    )
-   :pattern ((main!ProducerState./Producing/0 (%Poly%main!ProducerState. x)) (has_type
-     x TYPE%main!ProducerState.
-   ))
-   :qid internal_main!ProducerState./Producing/0_invariant_definition
-   :skolemid skolem_internal_main!ProducerState./Producing/0_invariant_definition
-)))
-(axiom (forall ((x main!ConsumerState.)) (!
-   (= x (%Poly%main!ConsumerState. (Poly%main!ConsumerState. x)))
-   :pattern ((Poly%main!ConsumerState. x))
-   :qid internal_main__ConsumerState_box_axiom_definition
-   :skolemid skolem_internal_main__ConsumerState_box_axiom_definition
-)))
-(axiom (forall ((x Poly)) (!
-   (=>
-    (has_type x TYPE%main!ConsumerState.)
-    (= x (Poly%main!ConsumerState. (%Poly%main!ConsumerState. x)))
-   )
-   :pattern ((has_type x TYPE%main!ConsumerState.))
-   :qid internal_main__ConsumerState_unbox_axiom_definition
-   :skolemid skolem_internal_main__ConsumerState_unbox_axiom_definition
+   :qid internal_producer_comsumer_example!ConsumerState./Idle/0_invariant_definition
+   :skolemid skolem_internal_producer_comsumer_example!ConsumerState./Idle/0_invariant_definition
 )))
 (axiom (forall ((_0! Int)) (!
    (=>
     (<= 0 _0!)
-    (has_type (Poly%main!ConsumerState. (main!ConsumerState./Idle _0!)) TYPE%main!ConsumerState.)
-   )
-   :pattern ((has_type (Poly%main!ConsumerState. (main!ConsumerState./Idle _0!)) TYPE%main!ConsumerState.))
-   :qid internal_main!ConsumerState./Idle_constructor_definition
-   :skolemid skolem_internal_main!ConsumerState./Idle_constructor_definition
+    (has_type (Poly%producer_comsumer_example!ConsumerState. (producer_comsumer_example!ConsumerState./Consuming
+       _0!
+      )
+     ) TYPE%producer_comsumer_example!ConsumerState.
+   ))
+   :pattern ((has_type (Poly%producer_comsumer_example!ConsumerState. (producer_comsumer_example!ConsumerState./Consuming
+       _0!
+      )
+     ) TYPE%producer_comsumer_example!ConsumerState.
+   ))
+   :qid internal_producer_comsumer_example!ConsumerState./Consuming_constructor_definition
+   :skolemid skolem_internal_producer_comsumer_example!ConsumerState./Consuming_constructor_definition
 )))
-(axiom (forall ((x main!ConsumerState.)) (!
-   (= (main!ConsumerState./Idle/0 x) (main!ConsumerState./Idle/?0 x))
-   :pattern ((main!ConsumerState./Idle/0 x))
-   :qid internal_main!ConsumerState./Idle/0_accessor_definition
-   :skolemid skolem_internal_main!ConsumerState./Idle/0_accessor_definition
+(axiom (forall ((x producer_comsumer_example!ConsumerState.)) (!
+   (= (producer_comsumer_example!ConsumerState./Consuming/0 x) (producer_comsumer_example!ConsumerState./Consuming/?0
+     x
+   ))
+   :pattern ((producer_comsumer_example!ConsumerState./Consuming/0 x))
+   :qid internal_producer_comsumer_example!ConsumerState./Consuming/0_accessor_definition
+   :skolemid skolem_internal_producer_comsumer_example!ConsumerState./Consuming/0_accessor_definition
 )))
 (axiom (forall ((x Poly)) (!
    (=>
-    (has_type x TYPE%main!ConsumerState.)
-    (<= 0 (main!ConsumerState./Idle/0 (%Poly%main!ConsumerState. x)))
+    (has_type x TYPE%producer_comsumer_example!ConsumerState.)
+    (<= 0 (producer_comsumer_example!ConsumerState./Consuming/0 (%Poly%producer_comsumer_example!ConsumerState.
+       x
+   ))))
+   :pattern ((producer_comsumer_example!ConsumerState./Consuming/0 (%Poly%producer_comsumer_example!ConsumerState.
+      x
+     )
+    ) (has_type x TYPE%producer_comsumer_example!ConsumerState.)
    )
-   :pattern ((main!ConsumerState./Idle/0 (%Poly%main!ConsumerState. x)) (has_type x TYPE%main!ConsumerState.))
-   :qid internal_main!ConsumerState./Idle/0_invariant_definition
-   :skolemid skolem_internal_main!ConsumerState./Idle/0_invariant_definition
-)))
-(axiom (forall ((_0! Int)) (!
-   (=>
-    (<= 0 _0!)
-    (has_type (Poly%main!ConsumerState. (main!ConsumerState./Consuming _0!)) TYPE%main!ConsumerState.)
-   )
-   :pattern ((has_type (Poly%main!ConsumerState. (main!ConsumerState./Consuming _0!))
-     TYPE%main!ConsumerState.
-   ))
-   :qid internal_main!ConsumerState./Consuming_constructor_definition
-   :skolemid skolem_internal_main!ConsumerState./Consuming_constructor_definition
-)))
-(axiom (forall ((x main!ConsumerState.)) (!
-   (= (main!ConsumerState./Consuming/0 x) (main!ConsumerState./Consuming/?0 x))
-   :pattern ((main!ConsumerState./Consuming/0 x))
-   :qid internal_main!ConsumerState./Consuming/0_accessor_definition
-   :skolemid skolem_internal_main!ConsumerState./Consuming/0_accessor_definition
-)))
-(axiom (forall ((x Poly)) (!
-   (=>
-    (has_type x TYPE%main!ConsumerState.)
-    (<= 0 (main!ConsumerState./Consuming/0 (%Poly%main!ConsumerState. x)))
-   )
-   :pattern ((main!ConsumerState./Consuming/0 (%Poly%main!ConsumerState. x)) (has_type
-     x TYPE%main!ConsumerState.
-   ))
-   :qid internal_main!ConsumerState./Consuming/0_invariant_definition
-   :skolemid skolem_internal_main!ConsumerState./Consuming/0_invariant_definition
+   :qid internal_producer_comsumer_example!ConsumerState./Consuming/0_invariant_definition
+   :skolemid skolem_internal_producer_comsumer_example!ConsumerState./Consuming/0_invariant_definition
 )))
 (axiom (forall ((x tuple%0.)) (!
    (= x (%Poly%tuple%0. (Poly%tuple%0. x)))
@@ -1517,14 +1641,14 @@
 ;; Function-Decl vstd::cell::impl&%2::is_init
 (declare-fun vstd!cell.impl&%2.is_init.? (Dcr Type Poly) Bool)
 
-;; Function-Decl main::ProducerState::is_Idle
-(declare-fun main!impl&%0.is_Idle.? (Poly) Bool)
+;; Function-Decl producer_comsumer_example::ProducerState::arrow_Idle_0
+(declare-fun producer_comsumer_example!impl&%0.arrow_Idle_0.? (Poly) Int)
 
-;; Function-Decl main::ProducerState::get_Idle_0
-(declare-fun main!impl&%0.get_Idle_0.? (Poly) Int)
-
-;; Function-Decl main::FifoQueue::State::inc_wrap
-(declare-fun main!FifoQueue.impl&%19.inc_wrap.? (Dcr Type Poly Poly) Int)
+;; Function-Decl producer_comsumer_example::FifoQueue::State::inc_wrap
+(declare-fun producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.? (Dcr Type Poly
+  Poly
+ ) Int
+)
 
 ;; Function-Decl vstd::raw_ptr::impl&%6::is_uninit
 (declare-fun vstd!raw_ptr.impl&%6.is_uninit.? (Dcr Type Poly) Bool)
@@ -1532,49 +1656,57 @@
 ;; Function-Decl vstd::cell::impl&%2::is_uninit
 (declare-fun vstd!cell.impl&%2.is_uninit.? (Dcr Type Poly) Bool)
 
-;; Function-Decl main::FifoQueue::State::produce_start
-(declare-fun main!FifoQueue.impl&%19.produce_start.? (Dcr Type Poly Poly) Bool)
+;; Function-Decl producer_comsumer_example::FifoQueue::State::produce_start
+(declare-fun producer_comsumer_example!FifoQueue.impl&%19.produce_start.? (Dcr Type
+  Poly Poly
+ ) Bool
+)
 
-;; Function-Decl main::ProducerState::is_Producing
-(declare-fun main!impl&%0.is_Producing.? (Poly) Bool)
+;; Function-Decl producer_comsumer_example::ProducerState::arrow_Producing_0
+(declare-fun producer_comsumer_example!impl&%0.arrow_Producing_0.? (Poly) Int)
 
-;; Function-Decl main::ProducerState::get_Producing_0
-(declare-fun main!impl&%0.get_Producing_0.? (Poly) Int)
+;; Function-Decl producer_comsumer_example::FifoQueue::State::produce_end
+(declare-fun producer_comsumer_example!FifoQueue.impl&%19.produce_end.? (Dcr Type Poly
+  Poly Poly
+ ) Bool
+)
 
-;; Function-Decl main::FifoQueue::State::produce_end
-(declare-fun main!FifoQueue.impl&%19.produce_end.? (Dcr Type Poly Poly Poly) Bool)
-
-;; Function-Decl main::ConsumerState::is_Idle
-(declare-fun main!impl&%2.is_Idle.? (Poly) Bool)
-
-;; Function-Decl main::ConsumerState::get_Idle_0
-(declare-fun main!impl&%2.get_Idle_0.? (Poly) Int)
+;; Function-Decl producer_comsumer_example::ConsumerState::arrow_Idle_0
+(declare-fun producer_comsumer_example!impl&%1.arrow_Idle_0.? (Poly) Int)
 
 ;; Function-Decl vstd::map_lib::impl&%0::contains_pair
 (declare-fun vstd!map_lib.impl&%0.contains_pair.? (Dcr Type Dcr Type Poly Poly Poly)
  Bool
 )
 
-;; Function-Decl main::FifoQueue::State::consume_start
-(declare-fun main!FifoQueue.impl&%19.consume_start.? (Dcr Type Poly Poly) Bool)
+;; Function-Decl producer_comsumer_example::FifoQueue::State::consume_start
+(declare-fun producer_comsumer_example!FifoQueue.impl&%19.consume_start.? (Dcr Type
+  Poly Poly
+ ) Bool
+)
 
-;; Function-Decl main::ConsumerState::is_Consuming
-(declare-fun main!impl&%2.is_Consuming.? (Poly) Bool)
+;; Function-Decl producer_comsumer_example::ConsumerState::arrow_Consuming_0
+(declare-fun producer_comsumer_example!impl&%1.arrow_Consuming_0.? (Poly) Int)
 
-;; Function-Decl main::ConsumerState::get_Consuming_0
-(declare-fun main!impl&%2.get_Consuming_0.? (Poly) Int)
+;; Function-Decl producer_comsumer_example::FifoQueue::State::consume_end
+(declare-fun producer_comsumer_example!FifoQueue.impl&%19.consume_end.? (Dcr Type Poly
+  Poly Poly
+ ) Bool
+)
 
-;; Function-Decl main::FifoQueue::State::consume_end
-(declare-fun main!FifoQueue.impl&%19.consume_end.? (Dcr Type Poly Poly Poly) Bool)
+;; Function-Decl producer_comsumer_example::FifoQueue::State::next
+(declare-fun producer_comsumer_example!FifoQueue.impl&%19.next.? (Dcr Type Poly Poly)
+ Bool
+)
 
-;; Function-Decl main::FifoQueue::State::next
-(declare-fun main!FifoQueue.impl&%19.next.? (Dcr Type Poly Poly) Bool)
+;; Function-Decl producer_comsumer_example::FifoQueue::State::initialize
+(declare-fun producer_comsumer_example!FifoQueue.impl&%19.initialize.? (Dcr Type Poly
+  Poly Poly
+ ) Bool
+)
 
-;; Function-Decl main::FifoQueue::State::initialize
-(declare-fun main!FifoQueue.impl&%19.initialize.? (Dcr Type Poly Poly Poly) Bool)
-
-;; Function-Decl main::FifoQueue::State::init
-(declare-fun main!FifoQueue.impl&%19.init.? (Dcr Type Poly) Bool)
+;; Function-Decl producer_comsumer_example::FifoQueue::State::init
+(declare-fun producer_comsumer_example!FifoQueue.impl&%19.init.? (Dcr Type Poly) Bool)
 
 ;; Function-Axioms vstd::seq::Seq::len
 (axiom (forall ((A&. Dcr) (A& Type) (self! Poly)) (!
@@ -2387,54 +2519,41 @@
     :skolemid skolem_internal_vstd!cell.impl&__2.is_init.?_definition
 ))))
 
-;; Function-Axioms main::ProducerState::is_Idle
-(axiom (fuel_bool_default fuel%main!impl&%0.is_Idle.))
+;; Function-Axioms producer_comsumer_example::ProducerState::arrow_Idle_0
+(axiom (fuel_bool_default fuel%producer_comsumer_example!impl&%0.arrow_Idle_0.))
 (axiom (=>
-  (fuel_bool fuel%main!impl&%0.is_Idle.)
+  (fuel_bool fuel%producer_comsumer_example!impl&%0.arrow_Idle_0.)
   (forall ((self! Poly)) (!
-    (= (main!impl&%0.is_Idle.? self!) (is-main!ProducerState./Idle (%Poly%main!ProducerState.
-       self!
-    )))
-    :pattern ((main!impl&%0.is_Idle.? self!))
-    :qid internal_main!impl&__0.is_Idle.?_definition
-    :skolemid skolem_internal_main!impl&__0.is_Idle.?_definition
-))))
-
-;; Function-Axioms main::ProducerState::get_Idle_0
-(axiom (fuel_bool_default fuel%main!impl&%0.get_Idle_0.))
-(axiom (=>
-  (fuel_bool fuel%main!impl&%0.get_Idle_0.)
-  (forall ((self! Poly)) (!
-    (= (main!impl&%0.get_Idle_0.? self!) (main!ProducerState./Idle/0 (%Poly%main!ProducerState.
-       self!
-    )))
-    :pattern ((main!impl&%0.get_Idle_0.? self!))
-    :qid internal_main!impl&__0.get_Idle_0.?_definition
-    :skolemid skolem_internal_main!impl&__0.get_Idle_0.?_definition
+    (= (producer_comsumer_example!impl&%0.arrow_Idle_0.? self!) (producer_comsumer_example!ProducerState./Idle/0
+      (%Poly%producer_comsumer_example!ProducerState. self!)
+    ))
+    :pattern ((producer_comsumer_example!impl&%0.arrow_Idle_0.? self!))
+    :qid internal_producer_comsumer_example!impl&__0.arrow_Idle_0.?_definition
+    :skolemid skolem_internal_producer_comsumer_example!impl&__0.arrow_Idle_0.?_definition
 ))))
 (axiom (forall ((self! Poly)) (!
    (=>
-    (has_type self! TYPE%main!ProducerState.)
-    (<= 0 (main!impl&%0.get_Idle_0.? self!))
+    (has_type self! TYPE%producer_comsumer_example!ProducerState.)
+    (<= 0 (producer_comsumer_example!impl&%0.arrow_Idle_0.? self!))
    )
-   :pattern ((main!impl&%0.get_Idle_0.? self!))
-   :qid internal_main!impl&__0.get_Idle_0.?_pre_post_definition
-   :skolemid skolem_internal_main!impl&__0.get_Idle_0.?_pre_post_definition
+   :pattern ((producer_comsumer_example!impl&%0.arrow_Idle_0.? self!))
+   :qid internal_producer_comsumer_example!impl&__0.arrow_Idle_0.?_pre_post_definition
+   :skolemid skolem_internal_producer_comsumer_example!impl&__0.arrow_Idle_0.?_pre_post_definition
 )))
 
-;; Function-Axioms main::FifoQueue::State::inc_wrap
-(axiom (fuel_bool_default fuel%main!FifoQueue.impl&%19.inc_wrap.))
+;; Function-Axioms producer_comsumer_example::FifoQueue::State::inc_wrap
+(axiom (fuel_bool_default fuel%producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.))
 (axiom (=>
-  (fuel_bool fuel%main!FifoQueue.impl&%19.inc_wrap.)
+  (fuel_bool fuel%producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.)
   (forall ((T&. Dcr) (T& Type) (i! Poly) (len! Poly)) (!
-    (= (main!FifoQueue.impl&%19.inc_wrap.? T&. T& i! len!) (ite
+    (= (producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.? T&. T& i! len!) (ite
       (= (nClip (Add (%I i!) 1)) (%I len!))
       0
       (nClip (Add (%I i!) 1))
     ))
-    :pattern ((main!FifoQueue.impl&%19.inc_wrap.? T&. T& i! len!))
-    :qid internal_main!FifoQueue.impl&__19.inc_wrap.?_definition
-    :skolemid skolem_internal_main!FifoQueue.impl&__19.inc_wrap.?_definition
+    :pattern ((producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.? T&. T& i! len!))
+    :qid internal_producer_comsumer_example!FifoQueue.impl&__19.inc_wrap.?_definition
+    :skolemid skolem_internal_producer_comsumer_example!FifoQueue.impl&__19.inc_wrap.?_definition
 ))))
 (axiom (forall ((T&. Dcr) (T& Type) (i! Poly) (len! Poly)) (!
    (=>
@@ -2442,11 +2561,11 @@
      (has_type i! NAT)
      (has_type len! NAT)
     )
-    (<= 0 (main!FifoQueue.impl&%19.inc_wrap.? T&. T& i! len!))
+    (<= 0 (producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.? T&. T& i! len!))
    )
-   :pattern ((main!FifoQueue.impl&%19.inc_wrap.? T&. T& i! len!))
-   :qid internal_main!FifoQueue.impl&__19.inc_wrap.?_pre_post_definition
-   :skolemid skolem_internal_main!FifoQueue.impl&__19.inc_wrap.?_pre_post_definition
+   :pattern ((producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.? T&. T& i! len!))
+   :qid internal_producer_comsumer_example!FifoQueue.impl&__19.inc_wrap.?_pre_post_definition
+   :skolemid skolem_internal_producer_comsumer_example!FifoQueue.impl&__19.inc_wrap.?_pre_post_definition
 )))
 
 ;; Function-Axioms vstd::raw_ptr::impl&%6::is_uninit
@@ -2475,60 +2594,70 @@
     :skolemid skolem_internal_vstd!cell.impl&__2.is_uninit.?_definition
 ))))
 
-;; Function-Axioms main::FifoQueue::State::produce_start
-(axiom (fuel_bool_default fuel%main!FifoQueue.impl&%19.produce_start.))
+;; Function-Axioms producer_comsumer_example::FifoQueue::State::produce_start
+(axiom (fuel_bool_default fuel%producer_comsumer_example!FifoQueue.impl&%19.produce_start.))
 (axiom (=>
-  (fuel_bool fuel%main!FifoQueue.impl&%19.produce_start.)
+  (fuel_bool fuel%producer_comsumer_example!FifoQueue.impl&%19.produce_start.)
   (forall ((T&. Dcr) (T& Type) (pre! Poly) (post! Poly)) (!
-    (= (main!FifoQueue.impl&%19.produce_start.? T&. T& pre! post!) (let
+    (= (producer_comsumer_example!FifoQueue.impl&%19.produce_start.? T&. T& pre! post!)
+     (let
       ((tmp_assert$ true))
       (let
-       ((update_tmp_backing_cells$ (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State.
-           pre!
-       ))))
+       ((update_tmp_backing_cells$ (producer_comsumer_example!FifoQueue.State./State/backing_cells
+          (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+       )))
        (let
-        ((update_tmp_storage$ (main!FifoQueue.State./State/storage (%Poly%main!FifoQueue.State.
+        ((update_tmp_storage$ (producer_comsumer_example!FifoQueue.State./State/storage (%Poly%producer_comsumer_example!FifoQueue.State.
             pre!
         ))))
         (let
-         ((update_tmp_head$ (main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. pre!))))
+         ((update_tmp_head$ (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+             pre!
+         ))))
          (let
-          ((update_tmp_tail$ (main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. pre!))))
+          ((update_tmp_tail$ (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+              pre!
+          ))))
           (let
-           ((update_tmp_consumer$ (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State.
+           ((update_tmp_consumer$ (producer_comsumer_example!FifoQueue.State./State/consumer (%Poly%producer_comsumer_example!FifoQueue.State.
                pre!
            ))))
            (and
-            (is-main!ProducerState./Idle (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State.
-               pre!
-            )))
+            (is-producer_comsumer_example!ProducerState./Idle (producer_comsumer_example!FifoQueue.State./State/producer
+              (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+            ))
             (and
              (let
-              ((tail$ (main!ProducerState./Idle/0 (%Poly%main!ProducerState. (Poly%main!ProducerState.
-                   (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State. pre!))
-              )))))
+              ((tail$ (producer_comsumer_example!ProducerState./Idle/0 (%Poly%producer_comsumer_example!ProducerState.
+                  (Poly%producer_comsumer_example!ProducerState. (producer_comsumer_example!FifoQueue.State./State/producer
+                    (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+              ))))))
               (let
-               ((head$ (main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. pre!))))
+               ((head$ (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+                   pre!
+               ))))
                (let
                 ((tmp_assert$1 (and
                    tmp_assert$
                    (and
                     (<= 0 tail$)
                     (< tail$ (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
-                       (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. pre!))
-                )))))))
+                       (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                         pre!
+                )))))))))
                 (let
-                 ((next_tail$ (main!FifoQueue.impl&%19.inc_wrap.? T&. T& (I tail$) (I (vstd!seq.Seq.len.?
-                      $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                        (%Poly%main!FifoQueue.State. pre!)
-                 )))))))
+                 ((next_tail$ (producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.? T&. T& (I tail$)
+                    (I (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
+                       (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                         pre!
+                 ))))))))
                  (and
                   (=>
                    tmp_assert$1
                    (not (= next_tail$ head$))
                   )
                   (let
-                   ((update_tmp_producer$ (main!ProducerState./Producing (%I (I tail$)))))
+                   ((update_tmp_producer$ (producer_comsumer_example!ProducerState./Producing (%I (I tail$)))))
                    (let
                     ((tmp_assert$2 (and
                        tmp_assert$1
@@ -2552,8 +2681,8 @@
                            tmp_assert$2
                            (and
                             (= (vstd!cell.impl&%2.id.? T&. T& perm$) (%Poly%vstd!cell.CellId. (vstd!seq.Seq.index.?
-                               $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                                 (%Poly%main!FifoQueue.State. pre!)
+                               $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (producer_comsumer_example!FifoQueue.State./State/backing_cells
+                                 (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
                                 )
                                ) (I tail$)
                             )))
@@ -2561,8 +2690,11 @@
                         ))))
                         (=>
                          tmp_assert$3
-                         (= (main!FifoQueue.State./State/storage (%Poly%main!FifoQueue.State. post!)) update_tmp_storage$1)
-                     ))))
+                         (= (producer_comsumer_example!FifoQueue.State./State/storage (%Poly%producer_comsumer_example!FifoQueue.State.
+                            post!
+                           )
+                          ) update_tmp_storage$1
+                     )))))
                      (let
                       ((tmp_assert$4 (let
                          ((perm$ (vstd!map.impl&%0.index.? $ NAT $ (TYPE%vstd!cell.PointsTo. T&. T&) update_tmp_storage$
@@ -2578,8 +2710,8 @@
                               tmp_assert$2
                               (and
                                (= (vstd!cell.impl&%2.id.? T&. T& perm$) (%Poly%vstd!cell.CellId. (vstd!seq.Seq.index.?
-                                  $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                                    (%Poly%main!FifoQueue.State. pre!)
+                                  $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (producer_comsumer_example!FifoQueue.State./State/backing_cells
+                                    (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
                                    )
                                   ) (I tail$)
                                )))
@@ -2589,32 +2721,40 @@
                       )))))
                       (=>
                        tmp_assert$4
-                       (= (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State. post!)) update_tmp_producer$)
-             ))))))))))
+                       (= (producer_comsumer_example!FifoQueue.State./State/producer (%Poly%producer_comsumer_example!FifoQueue.State.
+                          post!
+                         )
+                        ) update_tmp_producer$
+             )))))))))))
              (let
               ((tmp_assert$6 (let
-                 ((tail$ (main!ProducerState./Idle/0 (%Poly%main!ProducerState. (Poly%main!ProducerState.
-                      (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State. pre!))
-                 )))))
+                 ((tail$ (producer_comsumer_example!ProducerState./Idle/0 (%Poly%producer_comsumer_example!ProducerState.
+                     (Poly%producer_comsumer_example!ProducerState. (producer_comsumer_example!FifoQueue.State./State/producer
+                       (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+                 ))))))
                  (let
                   ((tmp_assert$7 (let
-                     ((head$ (main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. pre!))))
+                     ((head$ (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+                         pre!
+                     ))))
                      (let
                       ((tmp_assert$8 (and
                          tmp_assert$
                          (and
                           (<= 0 tail$)
                           (< tail$ (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
-                             (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. pre!))
-                      )))))))
+                             (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                               pre!
+                      )))))))))
                       (let
                        ((tmp_assert$9 (let
-                          ((next_tail$ (main!FifoQueue.impl&%19.inc_wrap.? T&. T& (I tail$) (I (vstd!seq.Seq.len.?
-                               $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                                 (%Poly%main!FifoQueue.State. pre!)
-                          )))))))
+                          ((next_tail$ (producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.? T&. T& (I tail$)
+                             (I (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
+                                (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                                  pre!
+                          ))))))))
                           (let
-                           ((update_tmp_producer$ (main!ProducerState./Producing (%I (I tail$)))))
+                           ((update_tmp_producer$ (producer_comsumer_example!ProducerState./Producing (%I (I tail$)))))
                            (let
                             ((tmp_assert$10 (and
                                tmp_assert$8
@@ -2638,8 +2778,8 @@
                                      tmp_assert$10
                                      (and
                                       (= (vstd!cell.impl&%2.id.? T&. T& perm$) (%Poly%vstd!cell.CellId. (vstd!seq.Seq.index.?
-                                         $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                                           (%Poly%main!FifoQueue.State. pre!)
+                                         $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (producer_comsumer_example!FifoQueue.State./State/backing_cells
+                                           (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
                                           )
                                          ) (I tail$)
                                       )))
@@ -2656,120 +2796,126 @@
               (and
                (=>
                 tmp_assert$6
-                (= (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State. post!)) update_tmp_consumer$)
-               )
+                (= (producer_comsumer_example!FifoQueue.State./State/consumer (%Poly%producer_comsumer_example!FifoQueue.State.
+                   post!
+                  )
+                 ) update_tmp_consumer$
+               ))
                (and
                 (=>
                  tmp_assert$6
-                 (= (main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. post!)) update_tmp_tail$)
-                )
+                 (= (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+                    post!
+                   )
+                  ) update_tmp_tail$
+                ))
                 (and
                  (=>
                   tmp_assert$6
-                  (= (main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. post!)) update_tmp_head$)
-                 )
+                  (= (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+                     post!
+                    )
+                   ) update_tmp_head$
+                 ))
                  (=>
                   tmp_assert$6
-                  (= (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. post!))
-                   update_tmp_backing_cells$
+                  (= (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                     post!
+                    )
+                   ) update_tmp_backing_cells$
     )))))))))))))))
-    :pattern ((main!FifoQueue.impl&%19.produce_start.? T&. T& pre! post!))
-    :qid internal_main!FifoQueue.impl&__19.produce_start.?_definition
-    :skolemid skolem_internal_main!FifoQueue.impl&__19.produce_start.?_definition
+    :pattern ((producer_comsumer_example!FifoQueue.impl&%19.produce_start.? T&. T& pre!
+      post!
+    ))
+    :qid internal_producer_comsumer_example!FifoQueue.impl&__19.produce_start.?_definition
+    :skolemid skolem_internal_producer_comsumer_example!FifoQueue.impl&__19.produce_start.?_definition
 ))))
 
-;; Function-Axioms main::ProducerState::is_Producing
-(axiom (fuel_bool_default fuel%main!impl&%0.is_Producing.))
+;; Function-Axioms producer_comsumer_example::ProducerState::arrow_Producing_0
+(axiom (fuel_bool_default fuel%producer_comsumer_example!impl&%0.arrow_Producing_0.))
 (axiom (=>
-  (fuel_bool fuel%main!impl&%0.is_Producing.)
+  (fuel_bool fuel%producer_comsumer_example!impl&%0.arrow_Producing_0.)
   (forall ((self! Poly)) (!
-    (= (main!impl&%0.is_Producing.? self!) (is-main!ProducerState./Producing (%Poly%main!ProducerState.
-       self!
-    )))
-    :pattern ((main!impl&%0.is_Producing.? self!))
-    :qid internal_main!impl&__0.is_Producing.?_definition
-    :skolemid skolem_internal_main!impl&__0.is_Producing.?_definition
-))))
-
-;; Function-Axioms main::ProducerState::get_Producing_0
-(axiom (fuel_bool_default fuel%main!impl&%0.get_Producing_0.))
-(axiom (=>
-  (fuel_bool fuel%main!impl&%0.get_Producing_0.)
-  (forall ((self! Poly)) (!
-    (= (main!impl&%0.get_Producing_0.? self!) (main!ProducerState./Producing/0 (%Poly%main!ProducerState.
-       self!
-    )))
-    :pattern ((main!impl&%0.get_Producing_0.? self!))
-    :qid internal_main!impl&__0.get_Producing_0.?_definition
-    :skolemid skolem_internal_main!impl&__0.get_Producing_0.?_definition
+    (= (producer_comsumer_example!impl&%0.arrow_Producing_0.? self!) (producer_comsumer_example!ProducerState./Producing/0
+      (%Poly%producer_comsumer_example!ProducerState. self!)
+    ))
+    :pattern ((producer_comsumer_example!impl&%0.arrow_Producing_0.? self!))
+    :qid internal_producer_comsumer_example!impl&__0.arrow_Producing_0.?_definition
+    :skolemid skolem_internal_producer_comsumer_example!impl&__0.arrow_Producing_0.?_definition
 ))))
 (axiom (forall ((self! Poly)) (!
    (=>
-    (has_type self! TYPE%main!ProducerState.)
-    (<= 0 (main!impl&%0.get_Producing_0.? self!))
+    (has_type self! TYPE%producer_comsumer_example!ProducerState.)
+    (<= 0 (producer_comsumer_example!impl&%0.arrow_Producing_0.? self!))
    )
-   :pattern ((main!impl&%0.get_Producing_0.? self!))
-   :qid internal_main!impl&__0.get_Producing_0.?_pre_post_definition
-   :skolemid skolem_internal_main!impl&__0.get_Producing_0.?_pre_post_definition
+   :pattern ((producer_comsumer_example!impl&%0.arrow_Producing_0.? self!))
+   :qid internal_producer_comsumer_example!impl&__0.arrow_Producing_0.?_pre_post_definition
+   :skolemid skolem_internal_producer_comsumer_example!impl&__0.arrow_Producing_0.?_pre_post_definition
 )))
 
-;; Function-Axioms main::FifoQueue::State::produce_end
-(axiom (fuel_bool_default fuel%main!FifoQueue.impl&%19.produce_end.))
+;; Function-Axioms producer_comsumer_example::FifoQueue::State::produce_end
+(axiom (fuel_bool_default fuel%producer_comsumer_example!FifoQueue.impl&%19.produce_end.))
 (axiom (=>
-  (fuel_bool fuel%main!FifoQueue.impl&%19.produce_end.)
+  (fuel_bool fuel%producer_comsumer_example!FifoQueue.impl&%19.produce_end.)
   (forall ((T&. Dcr) (T& Type) (pre! Poly) (post! Poly) (perm! Poly)) (!
-    (= (main!FifoQueue.impl&%19.produce_end.? T&. T& pre! post! perm!) (let
+    (= (producer_comsumer_example!FifoQueue.impl&%19.produce_end.? T&. T& pre! post! perm!)
+     (let
       ((tmp_assert$ true))
       (let
-       ((update_tmp_backing_cells$ (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State.
-           pre!
-       ))))
+       ((update_tmp_backing_cells$ (producer_comsumer_example!FifoQueue.State./State/backing_cells
+          (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+       )))
        (let
-        ((update_tmp_storage$ (main!FifoQueue.State./State/storage (%Poly%main!FifoQueue.State.
+        ((update_tmp_storage$ (producer_comsumer_example!FifoQueue.State./State/storage (%Poly%producer_comsumer_example!FifoQueue.State.
             pre!
         ))))
         (let
-         ((update_tmp_head$ (main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. pre!))))
+         ((update_tmp_head$ (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+             pre!
+         ))))
          (let
-          ((update_tmp_consumer$ (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State.
+          ((update_tmp_consumer$ (producer_comsumer_example!FifoQueue.State./State/consumer (%Poly%producer_comsumer_example!FifoQueue.State.
               pre!
           ))))
           (and
-           (is-main!ProducerState./Producing (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State.
-              pre!
-           )))
+           (is-producer_comsumer_example!ProducerState./Producing (producer_comsumer_example!FifoQueue.State./State/producer
+             (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+           ))
            (and
             (let
-             ((tail$ (main!ProducerState./Producing/0 (%Poly%main!ProducerState. (Poly%main!ProducerState.
-                  (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State. pre!))
-             )))))
+             ((tail$ (producer_comsumer_example!ProducerState./Producing/0 (%Poly%producer_comsumer_example!ProducerState.
+                 (Poly%producer_comsumer_example!ProducerState. (producer_comsumer_example!FifoQueue.State./State/producer
+                   (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+             ))))))
              (let
               ((tmp_assert$1 (and
                  tmp_assert$
                  (and
                   (<= 0 tail$)
                   (< tail$ (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
-                     (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. pre!))
-              )))))))
+                     (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                       pre!
+              )))))))))
               (let
-               ((next_tail$ (main!FifoQueue.impl&%19.inc_wrap.? T&. T& (I tail$) (I (vstd!seq.Seq.len.?
-                    $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                      (%Poly%main!FifoQueue.State. pre!)
-               )))))))
+               ((next_tail$ (producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.? T&. T& (I tail$)
+                  (I (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
+                     (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                       pre!
+               ))))))))
                (and
                 (=>
                  tmp_assert$1
                  (and
                   (= (vstd!cell.impl&%2.id.? T&. T& perm!) (%Poly%vstd!cell.CellId. (vstd!seq.Seq.index.?
-                     $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                       (%Poly%main!FifoQueue.State. pre!)
+                     $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (producer_comsumer_example!FifoQueue.State./State/backing_cells
+                       (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
                       )
                      ) (I tail$)
                   )))
                   (is-vstd!raw_ptr.MemContents./Init (vstd!cell.impl&%2.mem_contents.? T&. T& perm!))
                 ))
                 (let
-                 ((update_tmp_producer$ (main!ProducerState./Idle (%I (I next_tail$)))))
+                 ((update_tmp_producer$ (producer_comsumer_example!ProducerState./Idle (%I (I next_tail$)))))
                  (let
                   ((update_tmp_tail$ next_tail$))
                   (let
@@ -2788,38 +2934,50 @@
                     (and
                      (=>
                       tmp_assert$2
-                      (= (main!FifoQueue.State./State/storage (%Poly%main!FifoQueue.State. post!)) update_tmp_storage$1)
-                     )
+                      (= (producer_comsumer_example!FifoQueue.State./State/storage (%Poly%producer_comsumer_example!FifoQueue.State.
+                         post!
+                        )
+                       ) update_tmp_storage$1
+                     ))
                      (and
                       (=>
                        tmp_assert$2
-                       (= (main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. post!)) update_tmp_tail$)
-                      )
+                       (= (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+                          post!
+                         )
+                        ) update_tmp_tail$
+                      ))
                       (=>
                        tmp_assert$2
-                       (= (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State. post!)) update_tmp_producer$)
-            )))))))))))
+                       (= (producer_comsumer_example!FifoQueue.State./State/producer (%Poly%producer_comsumer_example!FifoQueue.State.
+                          post!
+                         )
+                        ) update_tmp_producer$
+            ))))))))))))
             (let
              ((tmp_assert$3 (let
-                ((tail$ (main!ProducerState./Producing/0 (%Poly%main!ProducerState. (Poly%main!ProducerState.
-                     (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State. pre!))
-                )))))
+                ((tail$ (producer_comsumer_example!ProducerState./Producing/0 (%Poly%producer_comsumer_example!ProducerState.
+                    (Poly%producer_comsumer_example!ProducerState. (producer_comsumer_example!FifoQueue.State./State/producer
+                      (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+                ))))))
                 (let
                  ((tmp_assert$4 (and
                     tmp_assert$
                     (and
                      (<= 0 tail$)
                      (< tail$ (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
-                        (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. pre!))
-                 )))))))
+                        (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                          pre!
+                 )))))))))
                  (let
                   ((tmp_assert$5 (let
-                     ((next_tail$ (main!FifoQueue.impl&%19.inc_wrap.? T&. T& (I tail$) (I (vstd!seq.Seq.len.?
-                          $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                            (%Poly%main!FifoQueue.State. pre!)
-                     )))))))
+                     ((next_tail$ (producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.? T&. T& (I tail$)
+                        (I (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
+                           (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                             pre!
+                     ))))))))
                      (let
-                      ((update_tmp_producer$ (main!ProducerState./Idle (%I (I next_tail$)))))
+                      ((update_tmp_producer$ (producer_comsumer_example!ProducerState./Idle (%I (I next_tail$)))))
                       (let
                        ((update_tmp_tail$ next_tail$))
                        (let
@@ -2842,56 +3000,53 @@
              (and
               (=>
                tmp_assert$3
-               (= (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State. post!)) update_tmp_consumer$)
-              )
+               (= (producer_comsumer_example!FifoQueue.State./State/consumer (%Poly%producer_comsumer_example!FifoQueue.State.
+                  post!
+                 )
+                ) update_tmp_consumer$
+              ))
               (and
                (=>
                 tmp_assert$3
-                (= (main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. post!)) update_tmp_head$)
-               )
+                (= (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+                   post!
+                  )
+                 ) update_tmp_head$
+               ))
                (=>
                 tmp_assert$3
-                (= (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. post!))
-                 update_tmp_backing_cells$
+                (= (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                   post!
+                  )
+                 ) update_tmp_backing_cells$
     )))))))))))))
-    :pattern ((main!FifoQueue.impl&%19.produce_end.? T&. T& pre! post! perm!))
-    :qid internal_main!FifoQueue.impl&__19.produce_end.?_definition
-    :skolemid skolem_internal_main!FifoQueue.impl&__19.produce_end.?_definition
+    :pattern ((producer_comsumer_example!FifoQueue.impl&%19.produce_end.? T&. T& pre! post!
+      perm!
+    ))
+    :qid internal_producer_comsumer_example!FifoQueue.impl&__19.produce_end.?_definition
+    :skolemid skolem_internal_producer_comsumer_example!FifoQueue.impl&__19.produce_end.?_definition
 ))))
 
-;; Function-Axioms main::ConsumerState::is_Idle
-(axiom (fuel_bool_default fuel%main!impl&%2.is_Idle.))
+;; Function-Axioms producer_comsumer_example::ConsumerState::arrow_Idle_0
+(axiom (fuel_bool_default fuel%producer_comsumer_example!impl&%1.arrow_Idle_0.))
 (axiom (=>
-  (fuel_bool fuel%main!impl&%2.is_Idle.)
+  (fuel_bool fuel%producer_comsumer_example!impl&%1.arrow_Idle_0.)
   (forall ((self! Poly)) (!
-    (= (main!impl&%2.is_Idle.? self!) (is-main!ConsumerState./Idle (%Poly%main!ConsumerState.
-       self!
-    )))
-    :pattern ((main!impl&%2.is_Idle.? self!))
-    :qid internal_main!impl&__2.is_Idle.?_definition
-    :skolemid skolem_internal_main!impl&__2.is_Idle.?_definition
-))))
-
-;; Function-Axioms main::ConsumerState::get_Idle_0
-(axiom (fuel_bool_default fuel%main!impl&%2.get_Idle_0.))
-(axiom (=>
-  (fuel_bool fuel%main!impl&%2.get_Idle_0.)
-  (forall ((self! Poly)) (!
-    (= (main!impl&%2.get_Idle_0.? self!) (main!ConsumerState./Idle/0 (%Poly%main!ConsumerState.
-       self!
-    )))
-    :pattern ((main!impl&%2.get_Idle_0.? self!))
-    :qid internal_main!impl&__2.get_Idle_0.?_definition
-    :skolemid skolem_internal_main!impl&__2.get_Idle_0.?_definition
+    (= (producer_comsumer_example!impl&%1.arrow_Idle_0.? self!) (producer_comsumer_example!ConsumerState./Idle/0
+      (%Poly%producer_comsumer_example!ConsumerState. self!)
+    ))
+    :pattern ((producer_comsumer_example!impl&%1.arrow_Idle_0.? self!))
+    :qid internal_producer_comsumer_example!impl&__1.arrow_Idle_0.?_definition
+    :skolemid skolem_internal_producer_comsumer_example!impl&__1.arrow_Idle_0.?_definition
 ))))
 (axiom (forall ((self! Poly)) (!
    (=>
-    (has_type self! TYPE%main!ConsumerState.)
-    (<= 0 (main!impl&%2.get_Idle_0.? self!))
+    (has_type self! TYPE%producer_comsumer_example!ConsumerState.)
+    (<= 0 (producer_comsumer_example!impl&%1.arrow_Idle_0.? self!))
    )
-   :pattern ((main!impl&%2.get_Idle_0.? self!))
-   :qid internal_main!impl&__2.get_Idle_0.?_pre_post_definition
-   :skolemid skolem_internal_main!impl&__2.get_Idle_0.?_pre_post_definition
+   :pattern ((producer_comsumer_example!impl&%1.arrow_Idle_0.? self!))
+   :qid internal_producer_comsumer_example!impl&__1.arrow_Idle_0.?_pre_post_definition
+   :skolemid skolem_internal_producer_comsumer_example!impl&__1.arrow_Idle_0.?_pre_post_definition
 )))
 
 ;; Function-Axioms vstd::map_lib::impl&%0::contains_pair
@@ -2909,59 +3064,68 @@
     :skolemid skolem_internal_vstd!map_lib.impl&__0.contains_pair.?_definition
 ))))
 
-;; Function-Axioms main::FifoQueue::State::consume_start
-(axiom (fuel_bool_default fuel%main!FifoQueue.impl&%19.consume_start.))
+;; Function-Axioms producer_comsumer_example::FifoQueue::State::consume_start
+(axiom (fuel_bool_default fuel%producer_comsumer_example!FifoQueue.impl&%19.consume_start.))
 (axiom (=>
-  (fuel_bool fuel%main!FifoQueue.impl&%19.consume_start.)
+  (fuel_bool fuel%producer_comsumer_example!FifoQueue.impl&%19.consume_start.)
   (forall ((T&. Dcr) (T& Type) (pre! Poly) (post! Poly)) (!
-    (= (main!FifoQueue.impl&%19.consume_start.? T&. T& pre! post!) (let
+    (= (producer_comsumer_example!FifoQueue.impl&%19.consume_start.? T&. T& pre! post!)
+     (let
       ((tmp_assert$ true))
       (let
-       ((update_tmp_backing_cells$ (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State.
-           pre!
-       ))))
+       ((update_tmp_backing_cells$ (producer_comsumer_example!FifoQueue.State./State/backing_cells
+          (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+       )))
        (let
-        ((update_tmp_storage$ (main!FifoQueue.State./State/storage (%Poly%main!FifoQueue.State.
+        ((update_tmp_storage$ (producer_comsumer_example!FifoQueue.State./State/storage (%Poly%producer_comsumer_example!FifoQueue.State.
             pre!
         ))))
         (let
-         ((update_tmp_head$ (main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. pre!))))
+         ((update_tmp_head$ (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+             pre!
+         ))))
          (let
-          ((update_tmp_tail$ (main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. pre!))))
+          ((update_tmp_tail$ (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+              pre!
+          ))))
           (let
-           ((update_tmp_producer$ (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State.
+           ((update_tmp_producer$ (producer_comsumer_example!FifoQueue.State./State/producer (%Poly%producer_comsumer_example!FifoQueue.State.
                pre!
            ))))
            (and
-            (is-main!ConsumerState./Idle (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State.
-               pre!
-            )))
+            (is-producer_comsumer_example!ConsumerState./Idle (producer_comsumer_example!FifoQueue.State./State/consumer
+              (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+            ))
             (and
              (let
-              ((head$ (main!ConsumerState./Idle/0 (%Poly%main!ConsumerState. (Poly%main!ConsumerState.
-                   (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State. pre!))
-              )))))
+              ((head$ (producer_comsumer_example!ConsumerState./Idle/0 (%Poly%producer_comsumer_example!ConsumerState.
+                  (Poly%producer_comsumer_example!ConsumerState. (producer_comsumer_example!FifoQueue.State./State/consumer
+                    (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+              ))))))
               (let
-               ((tail$ (main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. pre!))))
+               ((tail$ (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+                   pre!
+               ))))
                (let
                 ((tmp_assert$1 (and
                    tmp_assert$
                    (and
                     (<= 0 head$)
                     (< head$ (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
-                       (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. pre!))
-                )))))))
+                       (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                         pre!
+                )))))))))
                 (and
                  (=>
                   tmp_assert$1
                   (not (= head$ tail$))
                  )
                  (let
-                  ((update_tmp_consumer$ (main!ConsumerState./Consuming (%I (I head$)))))
+                  ((update_tmp_consumer$ (producer_comsumer_example!ConsumerState./Consuming (%I (I head$)))))
                   (and
                    (let
-                    ((perm$ (vstd!map.impl&%0.index.? $ NAT $ (TYPE%vstd!cell.PointsTo. T&. T&) (main!FifoQueue.State./State/storage
-                        (%Poly%main!FifoQueue.State. pre!)
+                    ((perm$ (vstd!map.impl&%0.index.? $ NAT $ (TYPE%vstd!cell.PointsTo. T&. T&) (producer_comsumer_example!FifoQueue.State./State/storage
+                        (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
                        ) (I head$)
                     )))
                     (let
@@ -2979,8 +3143,8 @@
                        ((tmp_assert$3 (and
                           tmp_assert$2
                           (= (vstd!cell.impl&%2.id.? T&. T& perm$) (%Poly%vstd!cell.CellId. (vstd!seq.Seq.index.?
-                             $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                               (%Poly%main!FifoQueue.State. pre!)
+                             $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (producer_comsumer_example!FifoQueue.State./State/backing_cells
+                               (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
                               )
                              ) (I head$)
                        ))))))
@@ -2991,12 +3155,15 @@
                         )))
                         (=>
                          tmp_assert$4
-                         (= (main!FifoQueue.State./State/storage (%Poly%main!FifoQueue.State. post!)) update_tmp_storage$1)
-                   ))))))
+                         (= (producer_comsumer_example!FifoQueue.State./State/storage (%Poly%producer_comsumer_example!FifoQueue.State.
+                            post!
+                           )
+                          ) update_tmp_storage$1
+                   )))))))
                    (let
                     ((tmp_assert$5 (let
-                       ((perm$ (vstd!map.impl&%0.index.? $ NAT $ (TYPE%vstd!cell.PointsTo. T&. T&) (main!FifoQueue.State./State/storage
-                           (%Poly%main!FifoQueue.State. pre!)
+                       ((perm$ (vstd!map.impl&%0.index.? $ NAT $ (TYPE%vstd!cell.PointsTo. T&. T&) (producer_comsumer_example!FifoQueue.State./State/storage
+                           (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
                           ) (I head$)
                        )))
                        (let
@@ -3014,8 +3181,8 @@
                           ((tmp_assert$7 (and
                              tmp_assert$6
                              (= (vstd!cell.impl&%2.id.? T&. T& perm$) (%Poly%vstd!cell.CellId. (vstd!seq.Seq.index.?
-                                $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                                  (%Poly%main!FifoQueue.State. pre!)
+                                $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (producer_comsumer_example!FifoQueue.State./State/backing_cells
+                                  (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
                                  )
                                 ) (I head$)
                           ))))))
@@ -3028,30 +3195,37 @@
                     )))))))
                     (=>
                      tmp_assert$5
-                     (= (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State. post!)) update_tmp_consumer$)
-             ))))))))
+                     (= (producer_comsumer_example!FifoQueue.State./State/consumer (%Poly%producer_comsumer_example!FifoQueue.State.
+                        post!
+                       )
+                      ) update_tmp_consumer$
+             )))))))))
              (let
               ((tmp_assert$9 (let
-                 ((head$ (main!ConsumerState./Idle/0 (%Poly%main!ConsumerState. (Poly%main!ConsumerState.
-                      (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State. pre!))
-                 )))))
+                 ((head$ (producer_comsumer_example!ConsumerState./Idle/0 (%Poly%producer_comsumer_example!ConsumerState.
+                     (Poly%producer_comsumer_example!ConsumerState. (producer_comsumer_example!FifoQueue.State./State/consumer
+                       (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+                 ))))))
                  (let
                   ((tmp_assert$10 (let
-                     ((tail$ (main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. pre!))))
+                     ((tail$ (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+                         pre!
+                     ))))
                      (let
                       ((tmp_assert$11 (and
                          tmp_assert$
                          (and
                           (<= 0 head$)
                           (< head$ (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
-                             (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. pre!))
-                      )))))))
+                             (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                               pre!
+                      )))))))))
                       (let
-                       ((update_tmp_consumer$ (main!ConsumerState./Consuming (%I (I head$)))))
+                       ((update_tmp_consumer$ (producer_comsumer_example!ConsumerState./Consuming (%I (I head$)))))
                        (let
                         ((tmp_assert$12 (let
-                           ((perm$ (vstd!map.impl&%0.index.? $ NAT $ (TYPE%vstd!cell.PointsTo. T&. T&) (main!FifoQueue.State./State/storage
-                               (%Poly%main!FifoQueue.State. pre!)
+                           ((perm$ (vstd!map.impl&%0.index.? $ NAT $ (TYPE%vstd!cell.PointsTo. T&. T&) (producer_comsumer_example!FifoQueue.State./State/storage
+                               (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
                               ) (I head$)
                            )))
                            (let
@@ -3069,8 +3243,8 @@
                               ((tmp_assert$14 (and
                                  tmp_assert$13
                                  (= (vstd!cell.impl&%2.id.? T&. T& perm$) (%Poly%vstd!cell.CellId. (vstd!seq.Seq.index.?
-                                    $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                                      (%Poly%main!FifoQueue.State. pre!)
+                                    $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (producer_comsumer_example!FifoQueue.State./State/backing_cells
+                                      (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
                                      )
                                     ) (I head$)
                               ))))))
@@ -3088,108 +3262,114 @@
               (and
                (=>
                 tmp_assert$9
-                (= (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State. post!)) update_tmp_producer$)
-               )
+                (= (producer_comsumer_example!FifoQueue.State./State/producer (%Poly%producer_comsumer_example!FifoQueue.State.
+                   post!
+                  )
+                 ) update_tmp_producer$
+               ))
                (and
                 (=>
                  tmp_assert$9
-                 (= (main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. post!)) update_tmp_tail$)
-                )
+                 (= (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+                    post!
+                   )
+                  ) update_tmp_tail$
+                ))
                 (and
                  (=>
                   tmp_assert$9
-                  (= (main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. post!)) update_tmp_head$)
-                 )
+                  (= (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+                     post!
+                    )
+                   ) update_tmp_head$
+                 ))
                  (=>
                   tmp_assert$9
-                  (= (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. post!))
-                   update_tmp_backing_cells$
+                  (= (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                     post!
+                    )
+                   ) update_tmp_backing_cells$
     )))))))))))))))
-    :pattern ((main!FifoQueue.impl&%19.consume_start.? T&. T& pre! post!))
-    :qid internal_main!FifoQueue.impl&__19.consume_start.?_definition
-    :skolemid skolem_internal_main!FifoQueue.impl&__19.consume_start.?_definition
+    :pattern ((producer_comsumer_example!FifoQueue.impl&%19.consume_start.? T&. T& pre!
+      post!
+    ))
+    :qid internal_producer_comsumer_example!FifoQueue.impl&__19.consume_start.?_definition
+    :skolemid skolem_internal_producer_comsumer_example!FifoQueue.impl&__19.consume_start.?_definition
 ))))
 
-;; Function-Axioms main::ConsumerState::is_Consuming
-(axiom (fuel_bool_default fuel%main!impl&%2.is_Consuming.))
+;; Function-Axioms producer_comsumer_example::ConsumerState::arrow_Consuming_0
+(axiom (fuel_bool_default fuel%producer_comsumer_example!impl&%1.arrow_Consuming_0.))
 (axiom (=>
-  (fuel_bool fuel%main!impl&%2.is_Consuming.)
+  (fuel_bool fuel%producer_comsumer_example!impl&%1.arrow_Consuming_0.)
   (forall ((self! Poly)) (!
-    (= (main!impl&%2.is_Consuming.? self!) (is-main!ConsumerState./Consuming (%Poly%main!ConsumerState.
-       self!
-    )))
-    :pattern ((main!impl&%2.is_Consuming.? self!))
-    :qid internal_main!impl&__2.is_Consuming.?_definition
-    :skolemid skolem_internal_main!impl&__2.is_Consuming.?_definition
-))))
-
-;; Function-Axioms main::ConsumerState::get_Consuming_0
-(axiom (fuel_bool_default fuel%main!impl&%2.get_Consuming_0.))
-(axiom (=>
-  (fuel_bool fuel%main!impl&%2.get_Consuming_0.)
-  (forall ((self! Poly)) (!
-    (= (main!impl&%2.get_Consuming_0.? self!) (main!ConsumerState./Consuming/0 (%Poly%main!ConsumerState.
-       self!
-    )))
-    :pattern ((main!impl&%2.get_Consuming_0.? self!))
-    :qid internal_main!impl&__2.get_Consuming_0.?_definition
-    :skolemid skolem_internal_main!impl&__2.get_Consuming_0.?_definition
+    (= (producer_comsumer_example!impl&%1.arrow_Consuming_0.? self!) (producer_comsumer_example!ConsumerState./Consuming/0
+      (%Poly%producer_comsumer_example!ConsumerState. self!)
+    ))
+    :pattern ((producer_comsumer_example!impl&%1.arrow_Consuming_0.? self!))
+    :qid internal_producer_comsumer_example!impl&__1.arrow_Consuming_0.?_definition
+    :skolemid skolem_internal_producer_comsumer_example!impl&__1.arrow_Consuming_0.?_definition
 ))))
 (axiom (forall ((self! Poly)) (!
    (=>
-    (has_type self! TYPE%main!ConsumerState.)
-    (<= 0 (main!impl&%2.get_Consuming_0.? self!))
+    (has_type self! TYPE%producer_comsumer_example!ConsumerState.)
+    (<= 0 (producer_comsumer_example!impl&%1.arrow_Consuming_0.? self!))
    )
-   :pattern ((main!impl&%2.get_Consuming_0.? self!))
-   :qid internal_main!impl&__2.get_Consuming_0.?_pre_post_definition
-   :skolemid skolem_internal_main!impl&__2.get_Consuming_0.?_pre_post_definition
+   :pattern ((producer_comsumer_example!impl&%1.arrow_Consuming_0.? self!))
+   :qid internal_producer_comsumer_example!impl&__1.arrow_Consuming_0.?_pre_post_definition
+   :skolemid skolem_internal_producer_comsumer_example!impl&__1.arrow_Consuming_0.?_pre_post_definition
 )))
 
-;; Function-Axioms main::FifoQueue::State::consume_end
-(axiom (fuel_bool_default fuel%main!FifoQueue.impl&%19.consume_end.))
+;; Function-Axioms producer_comsumer_example::FifoQueue::State::consume_end
+(axiom (fuel_bool_default fuel%producer_comsumer_example!FifoQueue.impl&%19.consume_end.))
 (axiom (=>
-  (fuel_bool fuel%main!FifoQueue.impl&%19.consume_end.)
+  (fuel_bool fuel%producer_comsumer_example!FifoQueue.impl&%19.consume_end.)
   (forall ((T&. Dcr) (T& Type) (pre! Poly) (post! Poly) (perm! Poly)) (!
-    (= (main!FifoQueue.impl&%19.consume_end.? T&. T& pre! post! perm!) (let
+    (= (producer_comsumer_example!FifoQueue.impl&%19.consume_end.? T&. T& pre! post! perm!)
+     (let
       ((tmp_assert$ true))
       (let
-       ((update_tmp_backing_cells$ (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State.
-           pre!
-       ))))
+       ((update_tmp_backing_cells$ (producer_comsumer_example!FifoQueue.State./State/backing_cells
+          (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+       )))
        (let
-        ((update_tmp_storage$ (main!FifoQueue.State./State/storage (%Poly%main!FifoQueue.State.
+        ((update_tmp_storage$ (producer_comsumer_example!FifoQueue.State./State/storage (%Poly%producer_comsumer_example!FifoQueue.State.
             pre!
         ))))
         (let
-         ((update_tmp_tail$ (main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. pre!))))
+         ((update_tmp_tail$ (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+             pre!
+         ))))
          (let
-          ((update_tmp_producer$ (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State.
+          ((update_tmp_producer$ (producer_comsumer_example!FifoQueue.State./State/producer (%Poly%producer_comsumer_example!FifoQueue.State.
               pre!
           ))))
           (and
-           (is-main!ConsumerState./Consuming (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State.
-              pre!
-           )))
+           (is-producer_comsumer_example!ConsumerState./Consuming (producer_comsumer_example!FifoQueue.State./State/consumer
+             (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+           ))
            (and
             (let
-             ((head$ (main!ConsumerState./Consuming/0 (%Poly%main!ConsumerState. (Poly%main!ConsumerState.
-                  (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State. pre!))
-             )))))
+             ((head$ (producer_comsumer_example!ConsumerState./Consuming/0 (%Poly%producer_comsumer_example!ConsumerState.
+                 (Poly%producer_comsumer_example!ConsumerState. (producer_comsumer_example!FifoQueue.State./State/consumer
+                   (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+             ))))))
              (let
               ((tmp_assert$1 (and
                  tmp_assert$
                  (and
                   (<= 0 head$)
                   (< head$ (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
-                     (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. pre!))
-              )))))))
+                     (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                       pre!
+              )))))))))
               (let
-               ((next_head$ (main!FifoQueue.impl&%19.inc_wrap.? T&. T& (I head$) (I (vstd!seq.Seq.len.?
-                    $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                      (%Poly%main!FifoQueue.State. pre!)
-               )))))))
+               ((next_head$ (producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.? T&. T& (I head$)
+                  (I (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
+                     (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                       pre!
+               ))))))))
                (let
-                ((update_tmp_consumer$ (main!ConsumerState./Idle (%I (I next_head$)))))
+                ((update_tmp_consumer$ (producer_comsumer_example!ConsumerState./Idle (%I (I next_head$)))))
                 (let
                  ((update_tmp_head$ next_head$))
                  (and
@@ -3197,8 +3377,8 @@
                    tmp_assert$1
                    (and
                     (= (vstd!cell.impl&%2.id.? T&. T& perm!) (%Poly%vstd!cell.CellId. (vstd!seq.Seq.index.?
-                       $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                         (%Poly%main!FifoQueue.State. pre!)
+                       $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (producer_comsumer_example!FifoQueue.State./State/backing_cells
+                         (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
                         )
                        ) (I head$)
                     )))
@@ -3220,38 +3400,50 @@
                     (and
                      (=>
                       tmp_assert$2
-                      (= (main!FifoQueue.State./State/storage (%Poly%main!FifoQueue.State. post!)) update_tmp_storage$1)
-                     )
+                      (= (producer_comsumer_example!FifoQueue.State./State/storage (%Poly%producer_comsumer_example!FifoQueue.State.
+                         post!
+                        )
+                       ) update_tmp_storage$1
+                     ))
                      (and
                       (=>
                        tmp_assert$2
-                       (= (main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. post!)) update_tmp_head$)
-                      )
+                       (= (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+                          post!
+                         )
+                        ) update_tmp_head$
+                      ))
                       (=>
                        tmp_assert$2
-                       (= (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State. post!)) update_tmp_consumer$)
-            )))))))))))
+                       (= (producer_comsumer_example!FifoQueue.State./State/consumer (%Poly%producer_comsumer_example!FifoQueue.State.
+                          post!
+                         )
+                        ) update_tmp_consumer$
+            ))))))))))))
             (let
              ((tmp_assert$3 (let
-                ((head$ (main!ConsumerState./Consuming/0 (%Poly%main!ConsumerState. (Poly%main!ConsumerState.
-                     (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State. pre!))
-                )))))
+                ((head$ (producer_comsumer_example!ConsumerState./Consuming/0 (%Poly%producer_comsumer_example!ConsumerState.
+                    (Poly%producer_comsumer_example!ConsumerState. (producer_comsumer_example!FifoQueue.State./State/consumer
+                      (%Poly%producer_comsumer_example!FifoQueue.State. pre!)
+                ))))))
                 (let
                  ((tmp_assert$4 (and
                     tmp_assert$
                     (and
                      (<= 0 head$)
                      (< head$ (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
-                        (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. pre!))
-                 )))))))
+                        (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                          pre!
+                 )))))))))
                  (let
                   ((tmp_assert$5 (let
-                     ((next_head$ (main!FifoQueue.impl&%19.inc_wrap.? T&. T& (I head$) (I (vstd!seq.Seq.len.?
-                          $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>. (main!FifoQueue.State./State/backing_cells
-                            (%Poly%main!FifoQueue.State. pre!)
-                     )))))))
+                     ((next_head$ (producer_comsumer_example!FifoQueue.impl&%19.inc_wrap.? T&. T& (I head$)
+                        (I (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. (Poly%vstd!seq.Seq<vstd!cell.CellId.>.
+                           (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                             pre!
+                     ))))))))
                      (let
-                      ((update_tmp_consumer$ (main!ConsumerState./Idle (%I (I next_head$)))))
+                      ((update_tmp_consumer$ (producer_comsumer_example!ConsumerState./Idle (%I (I next_head$)))))
                       (let
                        ((update_tmp_head$ next_head$))
                        (let
@@ -3274,152 +3466,198 @@
              (and
               (=>
                tmp_assert$3
-               (= (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State. post!)) update_tmp_producer$)
-              )
+               (= (producer_comsumer_example!FifoQueue.State./State/producer (%Poly%producer_comsumer_example!FifoQueue.State.
+                  post!
+                 )
+                ) update_tmp_producer$
+              ))
               (and
                (=>
                 tmp_assert$3
-                (= (main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. post!)) update_tmp_tail$)
-               )
+                (= (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+                   post!
+                  )
+                 ) update_tmp_tail$
+               ))
                (=>
                 tmp_assert$3
-                (= (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. post!))
-                 update_tmp_backing_cells$
+                (= (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                   post!
+                  )
+                 ) update_tmp_backing_cells$
     )))))))))))))
-    :pattern ((main!FifoQueue.impl&%19.consume_end.? T&. T& pre! post! perm!))
-    :qid internal_main!FifoQueue.impl&__19.consume_end.?_definition
-    :skolemid skolem_internal_main!FifoQueue.impl&__19.consume_end.?_definition
+    :pattern ((producer_comsumer_example!FifoQueue.impl&%19.consume_end.? T&. T& pre! post!
+      perm!
+    ))
+    :qid internal_producer_comsumer_example!FifoQueue.impl&__19.consume_end.?_definition
+    :skolemid skolem_internal_producer_comsumer_example!FifoQueue.impl&__19.consume_end.?_definition
 ))))
 
-;; Function-Specs main::FifoQueue::show::produce_start
-(declare-fun req%main!FifoQueue.show.produce_start. (Dcr Type main!FifoQueue.State.
-  main!FifoQueue.State.
+;; Function-Specs producer_comsumer_example::FifoQueue::show::produce_start
+(declare-fun req%producer_comsumer_example!FifoQueue.show.produce_start. (Dcr Type
+  producer_comsumer_example!FifoQueue.State. producer_comsumer_example!FifoQueue.State.
  ) Bool
 )
-(axiom (forall ((T&. Dcr) (T& Type) (pre! main!FifoQueue.State.) (post! main!FifoQueue.State.))
-  (!
-   (= (req%main!FifoQueue.show.produce_start. T&. T& pre! post!) (axiom_location ("failed precondition")
-     (main!FifoQueue.show.produce_start.) (main!FifoQueue.impl&%19.produce_start.? T&.
-      T& (Poly%main!FifoQueue.State. pre!) (Poly%main!FifoQueue.State. post!)
+(axiom (forall ((T&. Dcr) (T& Type) (pre! producer_comsumer_example!FifoQueue.State.)
+   (post! producer_comsumer_example!FifoQueue.State.)
+  ) (!
+   (= (req%producer_comsumer_example!FifoQueue.show.produce_start. T&. T& pre! post!)
+    (axiom_location ("failed precondition") (producer_comsumer_example!FifoQueue.show.produce_start.)
+     (producer_comsumer_example!FifoQueue.impl&%19.produce_start.? T&. T& (Poly%producer_comsumer_example!FifoQueue.State.
+       pre!
+      ) (Poly%producer_comsumer_example!FifoQueue.State. post!)
    )))
-   :pattern ((req%main!FifoQueue.show.produce_start. T&. T& pre! post!))
-   :qid internal_req__main!FifoQueue.show.produce_start._definition
-   :skolemid skolem_internal_req__main!FifoQueue.show.produce_start._definition
+   :pattern ((req%producer_comsumer_example!FifoQueue.show.produce_start. T&. T& pre!
+     post!
+   ))
+   :qid internal_req__producer_comsumer_example!FifoQueue.show.produce_start._definition
+   :skolemid skolem_internal_req__producer_comsumer_example!FifoQueue.show.produce_start._definition
 )))
-(declare-fun ens%main!FifoQueue.show.produce_start. (Dcr Type main!FifoQueue.State.
-  main!FifoQueue.State.
+(declare-fun ens%producer_comsumer_example!FifoQueue.show.produce_start. (Dcr Type
+  producer_comsumer_example!FifoQueue.State. producer_comsumer_example!FifoQueue.State.
  ) Bool
 )
-(axiom (forall ((T&. Dcr) (T& Type) (pre! main!FifoQueue.State.) (post! main!FifoQueue.State.))
-  (!
-   (= (ens%main!FifoQueue.show.produce_start. T&. T& pre! post!) (main!FifoQueue.impl&%19.next.?
-     T&. T& (Poly%main!FifoQueue.State. pre!) (Poly%main!FifoQueue.State. post!)
+(axiom (forall ((T&. Dcr) (T& Type) (pre! producer_comsumer_example!FifoQueue.State.)
+   (post! producer_comsumer_example!FifoQueue.State.)
+  ) (!
+   (= (ens%producer_comsumer_example!FifoQueue.show.produce_start. T&. T& pre! post!)
+    (producer_comsumer_example!FifoQueue.impl&%19.next.? T&. T& (Poly%producer_comsumer_example!FifoQueue.State.
+      pre!
+     ) (Poly%producer_comsumer_example!FifoQueue.State. post!)
    ))
-   :pattern ((ens%main!FifoQueue.show.produce_start. T&. T& pre! post!))
-   :qid internal_ens__main!FifoQueue.show.produce_start._definition
-   :skolemid skolem_internal_ens__main!FifoQueue.show.produce_start._definition
+   :pattern ((ens%producer_comsumer_example!FifoQueue.show.produce_start. T&. T& pre!
+     post!
+   ))
+   :qid internal_ens__producer_comsumer_example!FifoQueue.show.produce_start._definition
+   :skolemid skolem_internal_ens__producer_comsumer_example!FifoQueue.show.produce_start._definition
 )))
 
-;; Function-Specs main::FifoQueue::show::produce_end
-(declare-fun req%main!FifoQueue.show.produce_end. (Dcr Type main!FifoQueue.State. main!FifoQueue.State.
-  Poly
+;; Function-Specs producer_comsumer_example::FifoQueue::show::produce_end
+(declare-fun req%producer_comsumer_example!FifoQueue.show.produce_end. (Dcr Type producer_comsumer_example!FifoQueue.State.
+  producer_comsumer_example!FifoQueue.State. Poly
  ) Bool
 )
-(axiom (forall ((T&. Dcr) (T& Type) (pre! main!FifoQueue.State.) (post! main!FifoQueue.State.)
-   (perm! Poly)
+(axiom (forall ((T&. Dcr) (T& Type) (pre! producer_comsumer_example!FifoQueue.State.)
+   (post! producer_comsumer_example!FifoQueue.State.) (perm! Poly)
   ) (!
-   (= (req%main!FifoQueue.show.produce_end. T&. T& pre! post! perm!) (axiom_location (
-      "failed precondition"
-     ) (main!FifoQueue.show.produce_end.) (main!FifoQueue.impl&%19.produce_end.? T&. T&
-      (Poly%main!FifoQueue.State. pre!) (Poly%main!FifoQueue.State. post!) perm!
+   (= (req%producer_comsumer_example!FifoQueue.show.produce_end. T&. T& pre! post! perm!)
+    (axiom_location ("failed precondition") (producer_comsumer_example!FifoQueue.show.produce_end.)
+     (producer_comsumer_example!FifoQueue.impl&%19.produce_end.? T&. T& (Poly%producer_comsumer_example!FifoQueue.State.
+       pre!
+      ) (Poly%producer_comsumer_example!FifoQueue.State. post!) perm!
    )))
-   :pattern ((req%main!FifoQueue.show.produce_end. T&. T& pre! post! perm!))
-   :qid internal_req__main!FifoQueue.show.produce_end._definition
-   :skolemid skolem_internal_req__main!FifoQueue.show.produce_end._definition
+   :pattern ((req%producer_comsumer_example!FifoQueue.show.produce_end. T&. T& pre! post!
+     perm!
+   ))
+   :qid internal_req__producer_comsumer_example!FifoQueue.show.produce_end._definition
+   :skolemid skolem_internal_req__producer_comsumer_example!FifoQueue.show.produce_end._definition
 )))
-(declare-fun ens%main!FifoQueue.show.produce_end. (Dcr Type main!FifoQueue.State. main!FifoQueue.State.
-  Poly
+(declare-fun ens%producer_comsumer_example!FifoQueue.show.produce_end. (Dcr Type producer_comsumer_example!FifoQueue.State.
+  producer_comsumer_example!FifoQueue.State. Poly
  ) Bool
 )
-(axiom (forall ((T&. Dcr) (T& Type) (pre! main!FifoQueue.State.) (post! main!FifoQueue.State.)
-   (perm! Poly)
+(axiom (forall ((T&. Dcr) (T& Type) (pre! producer_comsumer_example!FifoQueue.State.)
+   (post! producer_comsumer_example!FifoQueue.State.) (perm! Poly)
   ) (!
-   (= (ens%main!FifoQueue.show.produce_end. T&. T& pre! post! perm!) (main!FifoQueue.impl&%19.next.?
-     T&. T& (Poly%main!FifoQueue.State. pre!) (Poly%main!FifoQueue.State. post!)
+   (= (ens%producer_comsumer_example!FifoQueue.show.produce_end. T&. T& pre! post! perm!)
+    (producer_comsumer_example!FifoQueue.impl&%19.next.? T&. T& (Poly%producer_comsumer_example!FifoQueue.State.
+      pre!
+     ) (Poly%producer_comsumer_example!FifoQueue.State. post!)
    ))
-   :pattern ((ens%main!FifoQueue.show.produce_end. T&. T& pre! post! perm!))
-   :qid internal_ens__main!FifoQueue.show.produce_end._definition
-   :skolemid skolem_internal_ens__main!FifoQueue.show.produce_end._definition
+   :pattern ((ens%producer_comsumer_example!FifoQueue.show.produce_end. T&. T& pre! post!
+     perm!
+   ))
+   :qid internal_ens__producer_comsumer_example!FifoQueue.show.produce_end._definition
+   :skolemid skolem_internal_ens__producer_comsumer_example!FifoQueue.show.produce_end._definition
 )))
 
-;; Function-Specs main::FifoQueue::show::consume_start
-(declare-fun req%main!FifoQueue.show.consume_start. (Dcr Type main!FifoQueue.State.
-  main!FifoQueue.State.
+;; Function-Specs producer_comsumer_example::FifoQueue::show::consume_start
+(declare-fun req%producer_comsumer_example!FifoQueue.show.consume_start. (Dcr Type
+  producer_comsumer_example!FifoQueue.State. producer_comsumer_example!FifoQueue.State.
  ) Bool
 )
-(axiom (forall ((T&. Dcr) (T& Type) (pre! main!FifoQueue.State.) (post! main!FifoQueue.State.))
-  (!
-   (= (req%main!FifoQueue.show.consume_start. T&. T& pre! post!) (axiom_location ("failed precondition")
-     (main!FifoQueue.show.consume_start.) (main!FifoQueue.impl&%19.consume_start.? T&.
-      T& (Poly%main!FifoQueue.State. pre!) (Poly%main!FifoQueue.State. post!)
+(axiom (forall ((T&. Dcr) (T& Type) (pre! producer_comsumer_example!FifoQueue.State.)
+   (post! producer_comsumer_example!FifoQueue.State.)
+  ) (!
+   (= (req%producer_comsumer_example!FifoQueue.show.consume_start. T&. T& pre! post!)
+    (axiom_location ("failed precondition") (producer_comsumer_example!FifoQueue.show.consume_start.)
+     (producer_comsumer_example!FifoQueue.impl&%19.consume_start.? T&. T& (Poly%producer_comsumer_example!FifoQueue.State.
+       pre!
+      ) (Poly%producer_comsumer_example!FifoQueue.State. post!)
    )))
-   :pattern ((req%main!FifoQueue.show.consume_start. T&. T& pre! post!))
-   :qid internal_req__main!FifoQueue.show.consume_start._definition
-   :skolemid skolem_internal_req__main!FifoQueue.show.consume_start._definition
+   :pattern ((req%producer_comsumer_example!FifoQueue.show.consume_start. T&. T& pre!
+     post!
+   ))
+   :qid internal_req__producer_comsumer_example!FifoQueue.show.consume_start._definition
+   :skolemid skolem_internal_req__producer_comsumer_example!FifoQueue.show.consume_start._definition
 )))
-(declare-fun ens%main!FifoQueue.show.consume_start. (Dcr Type main!FifoQueue.State.
-  main!FifoQueue.State.
+(declare-fun ens%producer_comsumer_example!FifoQueue.show.consume_start. (Dcr Type
+  producer_comsumer_example!FifoQueue.State. producer_comsumer_example!FifoQueue.State.
  ) Bool
 )
-(axiom (forall ((T&. Dcr) (T& Type) (pre! main!FifoQueue.State.) (post! main!FifoQueue.State.))
-  (!
-   (= (ens%main!FifoQueue.show.consume_start. T&. T& pre! post!) (main!FifoQueue.impl&%19.next.?
-     T&. T& (Poly%main!FifoQueue.State. pre!) (Poly%main!FifoQueue.State. post!)
+(axiom (forall ((T&. Dcr) (T& Type) (pre! producer_comsumer_example!FifoQueue.State.)
+   (post! producer_comsumer_example!FifoQueue.State.)
+  ) (!
+   (= (ens%producer_comsumer_example!FifoQueue.show.consume_start. T&. T& pre! post!)
+    (producer_comsumer_example!FifoQueue.impl&%19.next.? T&. T& (Poly%producer_comsumer_example!FifoQueue.State.
+      pre!
+     ) (Poly%producer_comsumer_example!FifoQueue.State. post!)
    ))
-   :pattern ((ens%main!FifoQueue.show.consume_start. T&. T& pre! post!))
-   :qid internal_ens__main!FifoQueue.show.consume_start._definition
-   :skolemid skolem_internal_ens__main!FifoQueue.show.consume_start._definition
+   :pattern ((ens%producer_comsumer_example!FifoQueue.show.consume_start. T&. T& pre!
+     post!
+   ))
+   :qid internal_ens__producer_comsumer_example!FifoQueue.show.consume_start._definition
+   :skolemid skolem_internal_ens__producer_comsumer_example!FifoQueue.show.consume_start._definition
 )))
 
-;; Function-Specs main::FifoQueue::show::consume_end
-(declare-fun req%main!FifoQueue.show.consume_end. (Dcr Type main!FifoQueue.State. main!FifoQueue.State.
-  Poly
+;; Function-Specs producer_comsumer_example::FifoQueue::show::consume_end
+(declare-fun req%producer_comsumer_example!FifoQueue.show.consume_end. (Dcr Type producer_comsumer_example!FifoQueue.State.
+  producer_comsumer_example!FifoQueue.State. Poly
  ) Bool
 )
-(axiom (forall ((T&. Dcr) (T& Type) (pre! main!FifoQueue.State.) (post! main!FifoQueue.State.)
-   (perm! Poly)
+(axiom (forall ((T&. Dcr) (T& Type) (pre! producer_comsumer_example!FifoQueue.State.)
+   (post! producer_comsumer_example!FifoQueue.State.) (perm! Poly)
   ) (!
-   (= (req%main!FifoQueue.show.consume_end. T&. T& pre! post! perm!) (axiom_location (
-      "failed precondition"
-     ) (main!FifoQueue.show.consume_end.) (main!FifoQueue.impl&%19.consume_end.? T&. T&
-      (Poly%main!FifoQueue.State. pre!) (Poly%main!FifoQueue.State. post!) perm!
+   (= (req%producer_comsumer_example!FifoQueue.show.consume_end. T&. T& pre! post! perm!)
+    (axiom_location ("failed precondition") (producer_comsumer_example!FifoQueue.show.consume_end.)
+     (producer_comsumer_example!FifoQueue.impl&%19.consume_end.? T&. T& (Poly%producer_comsumer_example!FifoQueue.State.
+       pre!
+      ) (Poly%producer_comsumer_example!FifoQueue.State. post!) perm!
    )))
-   :pattern ((req%main!FifoQueue.show.consume_end. T&. T& pre! post! perm!))
-   :qid internal_req__main!FifoQueue.show.consume_end._definition
-   :skolemid skolem_internal_req__main!FifoQueue.show.consume_end._definition
+   :pattern ((req%producer_comsumer_example!FifoQueue.show.consume_end. T&. T& pre! post!
+     perm!
+   ))
+   :qid internal_req__producer_comsumer_example!FifoQueue.show.consume_end._definition
+   :skolemid skolem_internal_req__producer_comsumer_example!FifoQueue.show.consume_end._definition
 )))
-(declare-fun ens%main!FifoQueue.show.consume_end. (Dcr Type main!FifoQueue.State. main!FifoQueue.State.
-  Poly
+(declare-fun ens%producer_comsumer_example!FifoQueue.show.consume_end. (Dcr Type producer_comsumer_example!FifoQueue.State.
+  producer_comsumer_example!FifoQueue.State. Poly
  ) Bool
 )
-(axiom (forall ((T&. Dcr) (T& Type) (pre! main!FifoQueue.State.) (post! main!FifoQueue.State.)
-   (perm! Poly)
+(axiom (forall ((T&. Dcr) (T& Type) (pre! producer_comsumer_example!FifoQueue.State.)
+   (post! producer_comsumer_example!FifoQueue.State.) (perm! Poly)
   ) (!
-   (= (ens%main!FifoQueue.show.consume_end. T&. T& pre! post! perm!) (main!FifoQueue.impl&%19.next.?
-     T&. T& (Poly%main!FifoQueue.State. pre!) (Poly%main!FifoQueue.State. post!)
+   (= (ens%producer_comsumer_example!FifoQueue.show.consume_end. T&. T& pre! post! perm!)
+    (producer_comsumer_example!FifoQueue.impl&%19.next.? T&. T& (Poly%producer_comsumer_example!FifoQueue.State.
+      pre!
+     ) (Poly%producer_comsumer_example!FifoQueue.State. post!)
    ))
-   :pattern ((ens%main!FifoQueue.show.consume_end. T&. T& pre! post! perm!))
-   :qid internal_ens__main!FifoQueue.show.consume_end._definition
-   :skolemid skolem_internal_ens__main!FifoQueue.show.consume_end._definition
+   :pattern ((ens%producer_comsumer_example!FifoQueue.show.consume_end. T&. T& pre! post!
+     perm!
+   ))
+   :qid internal_ens__producer_comsumer_example!FifoQueue.show.consume_end._definition
+   :skolemid skolem_internal_ens__producer_comsumer_example!FifoQueue.show.consume_end._definition
 )))
 
-;; Function-Axioms main::FifoQueue::State::initialize
-(axiom (fuel_bool_default fuel%main!FifoQueue.impl&%19.initialize.))
+;; Function-Axioms producer_comsumer_example::FifoQueue::State::initialize
+(axiom (fuel_bool_default fuel%producer_comsumer_example!FifoQueue.impl&%19.initialize.))
 (axiom (=>
-  (fuel_bool fuel%main!FifoQueue.impl&%19.initialize.)
+  (fuel_bool fuel%producer_comsumer_example!FifoQueue.impl&%19.initialize.)
   (forall ((T&. Dcr) (T& Type) (post! Poly) (backing_cells! Poly) (storage! Poly)) (
     !
-    (= (main!FifoQueue.impl&%19.initialize.? T&. T& post! backing_cells! storage!) (and
+    (= (producer_comsumer_example!FifoQueue.impl&%19.initialize.? T&. T& post! backing_cells!
+      storage!
+     ) (and
       (forall ((i$ Poly)) (!
         (=>
          (has_type i$ NAT)
@@ -3450,8 +3688,8 @@
            ) storage!
           ) i$
         ))
-        :qid user_main__FifoQueue__State__initialize_26
-        :skolemid skolem_user_main__FifoQueue__State__initialize_26
+        :qid user_producer_comsumer_example__FifoQueue__State__initialize_26
+        :skolemid skolem_user_producer_comsumer_example__FifoQueue__State__initialize_26
       ))
       (and
        (> (vstd!seq.Seq.len.? $ TYPE%vstd!cell.CellId. backing_cells!) 0)
@@ -3464,55 +3702,87 @@
           (let
            ((update_tmp_tail$ 0))
            (let
-            ((update_tmp_producer$ (main!ProducerState./Idle (%I (I 0)))))
+            ((update_tmp_producer$ (producer_comsumer_example!ProducerState./Idle (%I (I 0)))))
             (let
-             ((update_tmp_consumer$ (main!ConsumerState./Idle (%I (I 0)))))
+             ((update_tmp_consumer$ (producer_comsumer_example!ConsumerState./Idle (%I (I 0)))))
              (and
-              (= (main!FifoQueue.State./State/consumer (%Poly%main!FifoQueue.State. post!)) update_tmp_consumer$)
+              (= (producer_comsumer_example!FifoQueue.State./State/consumer (%Poly%producer_comsumer_example!FifoQueue.State.
+                 post!
+                )
+               ) update_tmp_consumer$
+              )
               (and
-               (= (main!FifoQueue.State./State/producer (%Poly%main!FifoQueue.State. post!)) update_tmp_producer$)
+               (= (producer_comsumer_example!FifoQueue.State./State/producer (%Poly%producer_comsumer_example!FifoQueue.State.
+                  post!
+                 )
+                ) update_tmp_producer$
+               )
                (and
-                (= (main!FifoQueue.State./State/tail (%Poly%main!FifoQueue.State. post!)) update_tmp_tail$)
+                (= (producer_comsumer_example!FifoQueue.State./State/tail (%Poly%producer_comsumer_example!FifoQueue.State.
+                   post!
+                  )
+                 ) update_tmp_tail$
+                )
                 (and
-                 (= (main!FifoQueue.State./State/head (%Poly%main!FifoQueue.State. post!)) update_tmp_head$)
+                 (= (producer_comsumer_example!FifoQueue.State./State/head (%Poly%producer_comsumer_example!FifoQueue.State.
+                    post!
+                   )
+                  ) update_tmp_head$
+                 )
                  (and
-                  (= (main!FifoQueue.State./State/storage (%Poly%main!FifoQueue.State. post!)) update_tmp_storage$)
-                  (= (main!FifoQueue.State./State/backing_cells (%Poly%main!FifoQueue.State. post!))
-                   update_tmp_backing_cells$
+                  (= (producer_comsumer_example!FifoQueue.State./State/storage (%Poly%producer_comsumer_example!FifoQueue.State.
+                     post!
+                    )
+                   ) update_tmp_storage$
+                  )
+                  (= (producer_comsumer_example!FifoQueue.State./State/backing_cells (%Poly%producer_comsumer_example!FifoQueue.State.
+                     post!
+                    )
+                   ) update_tmp_backing_cells$
     )))))))))))))))
-    :pattern ((main!FifoQueue.impl&%19.initialize.? T&. T& post! backing_cells! storage!))
-    :qid internal_main!FifoQueue.impl&__19.initialize.?_definition
-    :skolemid skolem_internal_main!FifoQueue.impl&__19.initialize.?_definition
+    :pattern ((producer_comsumer_example!FifoQueue.impl&%19.initialize.? T&. T& post! backing_cells!
+      storage!
+    ))
+    :qid internal_producer_comsumer_example!FifoQueue.impl&__19.initialize.?_definition
+    :skolemid skolem_internal_producer_comsumer_example!FifoQueue.impl&__19.initialize.?_definition
 ))))
 
-;; Function-Specs main::FifoQueue::show::initialize
-(declare-fun req%main!FifoQueue.show.initialize. (Dcr Type main!FifoQueue.State. vstd!seq.Seq<vstd!cell.CellId.>.
-  Poly
+;; Function-Specs producer_comsumer_example::FifoQueue::show::initialize
+(declare-fun req%producer_comsumer_example!FifoQueue.show.initialize. (Dcr Type producer_comsumer_example!FifoQueue.State.
+  vstd!seq.Seq<vstd!cell.CellId.>. Poly
  ) Bool
 )
-(axiom (forall ((T&. Dcr) (T& Type) (post! main!FifoQueue.State.) (backing_cells! vstd!seq.Seq<vstd!cell.CellId.>.)
-   (storage! Poly)
+(axiom (forall ((T&. Dcr) (T& Type) (post! producer_comsumer_example!FifoQueue.State.)
+   (backing_cells! vstd!seq.Seq<vstd!cell.CellId.>.) (storage! Poly)
   ) (!
-   (= (req%main!FifoQueue.show.initialize. T&. T& post! backing_cells! storage!) (axiom_location
-     ("failed precondition") (main!FifoQueue.show.initialize.) (main!FifoQueue.impl&%19.initialize.?
-      T&. T& (Poly%main!FifoQueue.State. post!) (Poly%vstd!seq.Seq<vstd!cell.CellId.>. backing_cells!)
-      storage!
+   (= (req%producer_comsumer_example!FifoQueue.show.initialize. T&. T& post! backing_cells!
+     storage!
+    ) (axiom_location ("failed precondition") (producer_comsumer_example!FifoQueue.show.initialize.)
+     (producer_comsumer_example!FifoQueue.impl&%19.initialize.? T&. T& (Poly%producer_comsumer_example!FifoQueue.State.
+       post!
+      ) (Poly%vstd!seq.Seq<vstd!cell.CellId.>. backing_cells!) storage!
    )))
-   :pattern ((req%main!FifoQueue.show.initialize. T&. T& post! backing_cells! storage!))
-   :qid internal_req__main!FifoQueue.show.initialize._definition
-   :skolemid skolem_internal_req__main!FifoQueue.show.initialize._definition
+   :pattern ((req%producer_comsumer_example!FifoQueue.show.initialize. T&. T& post! backing_cells!
+     storage!
+   ))
+   :qid internal_req__producer_comsumer_example!FifoQueue.show.initialize._definition
+   :skolemid skolem_internal_req__producer_comsumer_example!FifoQueue.show.initialize._definition
 )))
-(declare-fun ens%main!FifoQueue.show.initialize. (Dcr Type main!FifoQueue.State. vstd!seq.Seq<vstd!cell.CellId.>.
-  Poly
+(declare-fun ens%producer_comsumer_example!FifoQueue.show.initialize. (Dcr Type producer_comsumer_example!FifoQueue.State.
+  vstd!seq.Seq<vstd!cell.CellId.>. Poly
  ) Bool
 )
-(axiom (forall ((T&. Dcr) (T& Type) (post! main!FifoQueue.State.) (backing_cells! vstd!seq.Seq<vstd!cell.CellId.>.)
-   (storage! Poly)
+(axiom (forall ((T&. Dcr) (T& Type) (post! producer_comsumer_example!FifoQueue.State.)
+   (backing_cells! vstd!seq.Seq<vstd!cell.CellId.>.) (storage! Poly)
   ) (!
-   (= (ens%main!FifoQueue.show.initialize. T&. T& post! backing_cells! storage!) (main!FifoQueue.impl&%19.init.?
-     T&. T& (Poly%main!FifoQueue.State. post!)
+   (= (ens%producer_comsumer_example!FifoQueue.show.initialize. T&. T& post! backing_cells!
+     storage!
+    ) (producer_comsumer_example!FifoQueue.impl&%19.init.? T&. T& (Poly%producer_comsumer_example!FifoQueue.State.
+      post!
+   )))
+   :pattern ((ens%producer_comsumer_example!FifoQueue.show.initialize. T&. T& post! backing_cells!
+     storage!
    ))
-   :pattern ((ens%main!FifoQueue.show.initialize. T&. T& post! backing_cells! storage!))
-   :qid internal_ens__main!FifoQueue.show.initialize._definition
-   :skolemid skolem_internal_ens__main!FifoQueue.show.initialize._definition
+   :qid internal_ens__producer_comsumer_example!FifoQueue.show.initialize._definition
+   :skolemid skolem_internal_ens__producer_comsumer_example!FifoQueue.show.initialize._definition
 )))
