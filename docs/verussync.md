@@ -79,6 +79,13 @@ error: missing inductiveness proofs for 3 transition(s); try adding the followin
 
 
 ### PCell もやりたい
+3.4.1 に &mut を返す関数へのサポートが限定的である記述がある。
+RustHornとかCreusotでは預言でサポートしているらしい。
+
+PCell は CellId と PointsTo でできている。
+箱の PointsTo は CellId と opt_value を持っている。
+
+
 
 
 ### Sharding Strategy について
@@ -92,7 +99,9 @@ count だと return に含まれるとかを一応書いてくれている。
 
 https://verus-lang.github.io/verus/state_machines/strategy-reference.html
 
-atomic_with_ghost の返り値は
+
+### atomic_with_ghost の返り値
+atomic_with_ghost の返り値もオペレーションによって異なる。
 
 https://verus-lang.github.io/verus/verusdoc/vstd/macro.atomic_with_ghost.html
 
