@@ -1,4 +1,5 @@
 use state_machines_macros::tokenized_state_machine;
+use vstd::atomic_ghost::*;
 use vstd::cell::*;
 use vstd::map::*;
 use vstd::{prelude::*, *};
@@ -13,6 +14,34 @@ tokenized_state_machine!{VBQueue<T> {
 
         #[sharding(storage_map)]
         pub storage: Map<nat, cell::PointsTo<T>>,
+
+        #[sharding(variable)]
+        pub start: nat,
+    }
+
+    pub open spec fn len(&self) -> nat {
+        self.backing_cells.len()
+    }
+
+
+    pub open spec fn valid_storage_at_idx(&self, i: nat) -> bool {
+        if !self.storage.dom().contains(i) {
+            true
+        } else {
+            // Permission is stored
+            self.storage.dom().contains(i)
+
+            // Permission must be for the correct cell:
+            && self.storage.index(i).id() === self.backing_cells.index(i as int)
+
+            && self.storage.index(i).is_uninit()
+        }
+    }
+
+    #[invariant]
+    pub fn valid_storage_all(&self) -> bool {
+        forall|i: nat| 0 <= i && i < self.len() ==>
+            self.valid_storage_at_idx(i)
     }
 
     init!{
@@ -31,14 +60,15 @@ tokenized_state_machine!{VBQueue<T> {
 
             init backing_cells = backing_cells;
             init storage = storage;
+            init start = 0;
         }
     }
 
-    /*
     transition!{
-        reserve(sz: nat) {
-            withdraw storage -= [tail => let perm] by {
-                assert(pre.valid_storage_at_idx(tail));
+        checkout_first() {
+            /*
+            withdraw storage -= [0 => let perm] by {
+                assert(pre.valid_storage_at_idx(0));
             };
 
             // The transition needs to guarantee to the client that the
@@ -46,29 +76,79 @@ tokenized_state_machine!{VBQueue<T> {
             //  (i) is for the cell at index `tail` (the IDs match)
             //  (ii) the permission indicates that the cell is empty
             assert(
-                perm.id() === pre.backing_cells.index(tail as int)
+                perm.id() === pre.backing_cells.index(0)
                 && perm.is_uninit()
             ) by {
-                assert(!pre.in_active_range(tail));
-                assert(pre.valid_storage_at_idx(tail));
+                assert(pre.valid_storage_at_idx(0));
             };
+             */
         }
     }
-     */
+
+    #[inductive(initialize)]
+    fn initialize_inductive(post: Self, backing_cells: Seq<CellId>, storage: Map<nat, cell::PointsTo<T>>) {
+        assert forall|i: nat|
+            0 <= i && i < post.len() implies post.valid_storage_at_idx(i)
+        by {
+            assert(post.storage.dom().contains(i));
+        }
+    }
+
+    #[inductive(checkout_first)]
+    fn checkout_first_inductive(pre: Self, post: Self) {
+        /*
+        assert forall|i: nat|
+            0 <= i && i < pre.len() implies pre.valid_storage_at_idx(i)
+        by {
+            assert(pre.storage.dom().contains(i));
+        }
+        assert(forall|i| pre.valid_storage_at_idx(i) ==> post.valid_storage_at_idx(i));
+        assert forall|i: nat|
+            0 <= i && i < post.len() implies post.valid_storage_at_idx(i)
+        by {
+            assert(post.storage.dom().contains(i));
+        } */
+    }
 }} // tokenized_state_machine
 
-pub struct VBBuffer<T> {
-    buffer: Vec<PCell<T>>,
-    instance: Tracked<VBQueue::Instance<T>>,
+struct_with_invariants!{
+    pub struct VBBuffer<T> {
+        buffer: Vec<PCell<T>>,
+        start: AtomicU64<_, VBQueue::start<T>, _>,
+        instance: Tracked<VBQueue::Instance<T>>,
+    }
+
+    pub closed spec fn wf(&self) -> bool {
+        predicate {
+            &&& self.instance@.backing_cells().len() == self.buffer@.len()
+            &&& forall|i: int| 0 <= i && i < self.buffer@.len() as int ==>
+                self.instance@.backing_cells().index(i) === self.buffer@.index(i).id()
+        }
+
+        invariant on start with (instance) is (v: u64, g: VBQueue::start<T>) {
+            &&& g.instance_id() === instance@.id()
+            &&& g.value() == v as int
+        }
+    }
 }
 
 impl<T> VBBuffer<T> {
-    pub closed spec fn wf(&self) -> bool {
-        &&& self.instance@.backing_cells().len() == self.buffer@.len()
-        &&& forall|i: int| 0 <= i && i < self.buffer@.len() as int ==>
-            self.instance@.backing_cells().index(i) === self.buffer@.index(i).id()
+    fn checkout_first(&mut self)
+        requires
+            old(self).wf(),
+        ensures
+            self.wf(),
+    {
+        let start =
+            atomic_with_ghost!(&self.start => load();
+            returning start;
+            ghost start_token => {
+                let tracked _ = self.instance.borrow().checkout_first();
+            }
+        );
     }
 }
+
 
 pub fn new_buf<T>(len: usize) -> (vbuf: VBBuffer<T>)
     requires
@@ -108,17 +188,25 @@ pub fn new_buf<T>(len: usize) -> (vbuf: VBBuffer<T>)
         backing_cells_vec@.len(),
         |i: int| backing_cells_vec@.index(i).id(),
     );
-    // Initialize an instance of the FIFO queue
-    let tracked instance = VBQueue::Instance::initialize(backing_cells_ids, perms /* storage */, perms /* param token storage */);
+    // Initialize an instance of the VBQueue
+    let tracked (
+        Tracked(instance),
+        Tracked(start_token),
+    ) = VBQueue::Instance::initialize(backing_cells_ids, perms /* storage */, perms /* param token storage */);
+
+    let tracked_inst: Tracked<VBQueue::Instance<T>> = Tracked(instance.clone());
+    let start_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(start_token));
 
     // Initialize the queue
     VBBuffer::<T> {
         instance: Tracked(instance),
+        start: start_atomic,
         buffer: backing_cells_vec,
     }
 }
 
 fn main() {
-    let _ : VBBuffer<u32> = new_buf(5);
+    let mut vbuf : VBBuffer<u32> = new_buf(5);
+    let _ = vbuf.checkout_first();
 }
 } // verus
