@@ -104,603 +104,479 @@ fn main() {}
 
 
 
-trait T374_AtomicInvariantPredicate<A339_K, A328_V, A340_G, > where A339_K: , A328_V: , A340_G: ,  {
+trait T187_AtomicInvariantPredicate<A162_K, A151_V, A163_G, > where A162_K: , A151_V: , A163_G: ,  {
 }
 
-trait T375_InvariantPredicate<A339_K, A328_V, > where A339_K: , A328_V: ,  {
+trait T188_InvariantPredicate<A162_K, A151_V, > where A162_K: , A151_V: ,  {
 }
 
-trait T378_FnWithRequiresEnsures<A376_Args, A377_Output, > where Self: Sized, A376_Args: , A377_Output: ,  {
+trait T190_SliceAdditionalSpecFns<A153_T, > where Self: T189_View, Self: T189_View<A151_V = D175_Seq<A153_T, >>, A153_T: ,  {
 }
 
-trait T380_SliceAdditionalSpecFns<A330_T, > where Self: T379_View, Self: T379_View<A328_V = D352_Seq<A330_T, >>, A330_T: ,  {
+trait T192_ValueToken<A191_Value, > where Self: Sized, A191_Value: ,  {
 }
 
-trait T382_ValueToken<A381_Value, > where Self: Sized, A381_Value: ,  {
+trait T193_UniqueValueToken<A191_Value, > where Self: T192_ValueToken<A191_Value, >, A191_Value: ,  {
 }
 
-trait T383_UniqueValueToken<A381_Value, > where Self: T382_ValueToken<A381_Value, >, A381_Value: ,  {
+trait T189_View {
+    type A151_V : ;
 }
 
-trait T379_View {
-    type A328_V : ;
+trait T194_DeepView {
+    type A151_V : ;
 }
 
-trait T384_DeepView {
-    type A328_V : ;
+trait T195_Clone where Self: Sized,  {
 }
 
-trait T385_Clone where Self: Sized,  {
+trait T155_Allocator {
 }
 
-trait T332_Allocator {
+trait T196_OptionAdditionalFns<A153_T, > where Self: Sized, A153_T: ,  {
 }
 
-trait T386_OptionAdditionalFns<A330_T, > where Self: Sized, A330_T: ,  {
+trait T197_VecAdditionalSpecFns<A153_T, > where Self: T189_View, Self: T189_View<A151_V = D175_Seq<A153_T, >>, A153_T: ,  {
 }
 
-trait T387_VecAdditionalSpecFns<A330_T, > where Self: T379_View, Self: T379_View<A328_V = D352_Seq<A330_T, >>, A330_T: ,  {
-}
-
-struct D272_PAtomicU64(
+struct D123_PAtomicU64(
 );
 
-struct D254_JoinHandle<A264_Ret, >(
-    PhantomData<A264_Ret>,
-) where A264_Ret: , ;
+struct D73_PCell<A109_V, >(
+    PhantomData<A109_V>,
+) where A109_V: , ;
 
-struct D183_PermissionU64(
+struct D74_Vec<A4_T, A113_A, >(
+    PhantomData<A4_T>,
+    PhantomData<A113_A>,
+) where A4_T: , A113_A: , A113_A: Allocator, ;
+
+struct D57_PermissionU64(
 );
 
-struct D181_OpenInvariantCredit(
+struct D55_OpenInvariantCredit(
 );
 
-enum D176_Option<A4_T, > where A4_T: ,  {
-    C195_None(
+struct D52_AtomicU64<A102_K, A103_G, A104_Pred, > where A102_K: , A103_G: , A104_Pred: ,  {
+    y65_patomic: D123_PAtomicU64,
+    y59_atomic_inv: Tracked<D127_AtomicInvariant<(A102_K, int, ), (D57_PermissionU64, A103_G, ), D126_AtomicPredU64<A104_Pred, >, >, >,
+}
+
+struct D126_AtomicPredU64<A104_Pred, > where A104_Pred: ,  {
+    y128_p: A104_Pred,
+}
+
+struct D127_AtomicInvariant<A102_K, A109_V, A104_Pred, >(
+    PhantomData<A102_K>,
+    PhantomData<A109_V>,
+    PhantomData<A104_Pred>,
+) where A102_K: , A109_V: , A104_Pred: , ;
+
+struct D51_InvariantPredicate_auto_VBBuffer_start {
+}
+
+struct D71_VBBuffer<A4_T, > where A4_T: ,  {
+    y95_buffer: D74_Vec<D73_PCell<A4_T, >, Global, >,
+    y53_start: D52_AtomicU64<Tracked<D31_Instance<A4_T, >, >, D23_start<A4_T, >, D51_InvariantPredicate_auto_VBBuffer_start, >,
+    y67_instance: Tracked<D31_Instance<A4_T, >, >,
+}
+
+struct D35_PointsTo<A109_V, >(
+    PhantomData<A109_V>,
+) where A109_V: , ;
+
+struct D36_Map<A102_K, A109_V, > where A102_K: , A109_V: ,  {
+    y129_mapping: FnSpec<(A102_K, ), D130_Option<A109_V, >, >,
+}
+
+enum D130_Option<A4_T, > where A4_T: ,  {
+    C131_None(
     ),
-    C194_Some(
+    C132_Some(
         A4_T,
     ),
 }
 
-struct D151_AtomicU64<A284_K, A285_G, A286_Pred, > where A284_K: , A285_G: , A286_Pred: ,  {
-    y191_patomic: D272_PAtomicU64,
-    y185_atomic_inv: Tracked<D304_AtomicInvariant<(A284_K, int, ), (D183_PermissionU64, A285_G, ), D303_AtomicPredU64<A286_Pred, >, >, >,
+struct D23_start<A4_T, > where A4_T: ,  {
+    y133_dummy_instance: D31_Instance<A4_T, >,
+    y134_no_copy: D135_NoCopy,
 }
 
-struct D303_AtomicPredU64<A286_Pred, > where A286_Pred: ,  {
-    y305_p: A286_Pred,
-}
-
-struct D304_AtomicInvariant<A284_K, A269_V, A286_Pred, >(
-    PhantomData<A284_K>,
-    PhantomData<A269_V>,
-    PhantomData<A286_Pred>,
-) where A284_K: , A269_V: , A286_Pred: , ;
-
-struct D123_PCell<A269_V, >(
-    PhantomData<A269_V>,
-) where A269_V: , ;
-
-struct D124_Vec<A4_T, A276_A, >(
-    PhantomData<A4_T>,
-    PhantomData<A276_A>,
-) where A4_T: , A276_A: , A276_A: Allocator, ;
-
-struct D168_Consumer<A4_T, > where A4_T: ,  {
-    y165_queue: Arc<D156_Queue<A4_T, >, Global, >,
-    y158_head: usize,
-    y169_consumer: Tracked<D59_consumer<A4_T, >, >,
-}
-
-struct D164_Producer<A4_T, > where A4_T: ,  {
-    y165_queue: Arc<D156_Queue<A4_T, >, Global, >,
-    y159_tail: usize,
-    y166_producer: Tracked<D52_producer<A4_T, >, >,
-}
-
-struct D154_InvariantPredicate_auto_Queue_tail {
-}
-
-struct D150_InvariantPredicate_auto_Queue_head {
-}
-
-struct D156_Queue<A4_T, > where A4_T: ,  {
-    y160_buffer: D124_Vec<D123_PCell<A4_T, >, Global, >,
-    y158_head: D151_AtomicU64<Tracked<D66_Instance<A4_T, >, >, D37_head<A4_T, >, D150_InvariantPredicate_auto_Queue_head, >,
-    y159_tail: D151_AtomicU64<Tracked<D66_Instance<A4_T, >, >, D45_tail<A4_T, >, D154_InvariantPredicate_auto_Queue_tail, >,
-    y157_instance: Tracked<D66_Instance<A4_T, >, >,
-}
-
-struct D70_PointsTo<A269_V, >(
-    PhantomData<A269_V>,
-) where A269_V: , ;
-
-struct D71_Map<A284_K, A269_V, > where A284_K: , A269_V: ,  {
-    y306_mapping: FnSpec<(A284_K, ), D176_Option<A269_V, >, >,
-}
-
-struct D59_consumer<A4_T, > where A4_T: ,  {
-    y307_dummy_instance: D66_Instance<A4_T, >,
-    y308_no_copy: D309_NoCopy,
-}
-
-struct D309_NoCopy(
+struct D135_NoCopy(
 );
 
-struct D52_producer<A4_T, > where A4_T: ,  {
-    y307_dummy_instance: D66_Instance<A4_T, >,
-    y308_no_copy: D309_NoCopy,
+struct D31_Instance<A4_T, > where A4_T: ,  {
+    y136_send_sync: PhantomData<D137_SyncSendIfSyncSend<D35_PointsTo<A4_T, >, >>,
+    y138_state: PhantomData<D130_Option<Ghost<D139_State<A4_T, >, >, >>,
+    y140_location: PhantomData<int>,
 }
 
-struct D45_tail<A4_T, > where A4_T: ,  {
-    y307_dummy_instance: D66_Instance<A4_T, >,
-    y308_no_copy: D309_NoCopy,
-}
-
-struct D37_head<A4_T, > where A4_T: ,  {
-    y307_dummy_instance: D66_Instance<A4_T, >,
-    y308_no_copy: D309_NoCopy,
-}
-
-struct D66_Instance<A4_T, > where A4_T: ,  {
-    y310_send_sync: PhantomData<D311_SyncSendIfSyncSend<D70_PointsTo<A4_T, >, >>,
-    y312_state: PhantomData<D176_Option<Ghost<D313_State<A4_T, >, >, >>,
-    y314_location: PhantomData<int>,
-}
-
-struct D311_SyncSendIfSyncSend<A4_T, >(
+struct D137_SyncSendIfSyncSend<A4_T, >(
     PhantomData<A4_T>,
 ) where A4_T: , ;
 
-enum D319_Config<A4_T, > where A4_T: ,  {
-    C315_initialize(
-        D317_Seq<D316_CellId, >,
-        D71_Map<nat, D70_PointsTo<A4_T, >, >,
+enum D145_Config<A4_T, > where A4_T: ,  {
+    C141_initialize(
+        D143_Seq<D142_CellId, >,
+        D36_Map<nat, D35_PointsTo<A4_T, >, >,
     ),
-    C318_dummy_to_use_type_params(
-        D313_State<A4_T, >,
-    ),
-}
-
-struct D316_CellId(
-);
-
-struct D317_Seq<A276_A, >(
-    PhantomData<A276_A>,
-) where A276_A: , ;
-
-enum D324_Step<A4_T, > where A4_T: ,  {
-    C320_produce_start(
-    ),
-    C321_produce_end(
-        D70_PointsTo<A4_T, >,
-    ),
-    C322_consume_start(
-    ),
-    C323_consume_end(
-        D70_PointsTo<A4_T, >,
-    ),
-    C318_dummy_to_use_type_params(
-        D313_State<A4_T, >,
+    C144_dummy_to_use_type_params(
+        D139_State<A4_T, >,
     ),
 }
 
-struct D313_State<A4_T, > where A4_T: ,  {
-    y325_backing_cells: D317_Seq<D316_CellId, >,
-    y326_storage: D71_Map<nat, D70_PointsTo<A4_T, >, >,
-    y158_head: nat,
-    y159_tail: nat,
-    y166_producer: D109_ProducerState,
-    y169_consumer: D111_ConsumerState,
-}
+struct D142_CellId(
+);
 
-enum D111_ConsumerState {
-    C112_Idle(
-        nat,
+struct D143_Seq<A113_A, >(
+    PhantomData<A113_A>,
+) where A113_A: , ;
+
+enum D147_Step<A4_T, > where A4_T: ,  {
+    C146_checkout_first(
     ),
-    C113_Consuming(
-        nat,
+    C144_dummy_to_use_type_params(
+        D139_State<A4_T, >,
     ),
 }
 
-enum D109_ProducerState {
-    C112_Idle(
-        nat,
-    ),
-    C110_Producing(
-        nat,
-    ),
+struct D139_State<A4_T, > where A4_T: ,  {
+    y148_backing_cells: D143_Seq<D142_CellId, >,
+    y149_storage: D36_Map<nat, D35_PointsTo<A4_T, >, >,
+    y53_start: nat,
 }
 
-struct D329_Option<A328_V, >(
-    Box<A328_V, >,
-) where A328_V: , ;
+struct D152_Option<A151_V, >(
+    Box<A151_V, >,
+) where A151_V: , ;
 
-struct D333_Vec<A330_T, A331_A, >(
-    Box<A330_T, >,
-    Box<A331_A, >,
-) where A330_T: , A331_A: , A331_A: T332_Allocator, ;
+struct D156_Vec<A153_T, A154_A, >(
+    Box<A153_T, >,
+    Box<A154_A, >,
+) where A153_T: , A154_A: , A154_A: T155_Allocator, ;
 
-struct D334_PAtomicU64(
+struct D157_PAtomicU64(
 );
 
-struct D335_PermissionU64(
+struct D158_PermissionU64(
 );
 
-struct D336_PermissionDataU64(
+struct D159_PermissionDataU64(
 );
 
-struct D338_AtomicPredU64<A337_Pred, >(
-    Box<A337_Pred, >,
-) where A337_Pred: , ;
+struct D161_AtomicPredU64<A160_Pred, >(
+    Box<A160_Pred, >,
+) where A160_Pred: , ;
 
-struct D341_AtomicU64<A339_K, A340_G, A337_Pred, >(
-    Box<A339_K, >,
-    Box<A340_G, >,
-    Box<A337_Pred, >,
-) where A339_K: , A340_G: , A337_Pred: , ;
+struct D164_AtomicU64<A162_K, A163_G, A160_Pred, >(
+    Box<A162_K, >,
+    Box<A163_G, >,
+    Box<A160_Pred, >,
+) where A162_K: , A163_G: , A160_Pred: , ;
 
-struct D342_PCell<A328_V, >(
-    Box<A328_V, >,
-) where A328_V: , ;
+struct D165_PCell<A151_V, >(
+    Box<A151_V, >,
+) where A151_V: , ;
 
-struct D343_PointsTo<A328_V, >(
-    Box<A328_V, >,
-) where A328_V: , ;
+struct D166_PointsTo<A151_V, >(
+    Box<A151_V, >,
+) where A151_V: , ;
 
-struct D344_PointsToData<A328_V, >(
-    Box<A328_V, >,
-) where A328_V: , ;
+struct D167_PointsToData<A151_V, >(
+    Box<A151_V, >,
+) where A151_V: , ;
 
-struct D345_CellId(
+struct D168_CellId(
 );
 
-struct D346_AtomicInvariant<A339_K, A328_V, A337_Pred, >(
-    Box<A339_K, >,
-    Box<A328_V, >,
-    Box<A337_Pred, >,
-) where A339_K: , A328_V: , A337_Pred: , ;
+struct D169_AtomicInvariant<A162_K, A151_V, A160_Pred, >(
+    Box<A162_K, >,
+    Box<A151_V, >,
+    Box<A160_Pred, >,
+) where A162_K: , A151_V: , A160_Pred: , ;
 
-struct D347_OpenInvariantCredit(
+struct D170_OpenInvariantCredit(
 );
 
-struct D348_Map<A339_K, A328_V, >(
-    Box<A339_K, >,
-    Box<A328_V, >,
-) where A339_K: , A328_V: , ;
+struct D171_Map<A162_K, A151_V, >(
+    Box<A162_K, >,
+    Box<A151_V, >,
+) where A162_K: , A151_V: , ;
 
-struct D349_Provenance(
+struct D172_Provenance(
 );
 
-struct D350_PtrData<A330_T, >(
-    Box<A330_T, >,
-) where A330_T : ?Sized, ;
+struct D173_PtrData<A153_T, >(
+    Box<A153_T, >,
+) where A153_T : ?Sized, ;
 
-struct D351_MemContents<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
+struct D174_MemContents<A153_T, >(
+    Box<A153_T, >,
+) where A153_T: , ;
 
-struct D352_Seq<A331_A, >(
-    Box<A331_A, >,
-) where A331_A: , ;
+struct D175_Seq<A154_A, >(
+    Box<A154_A, >,
+) where A154_A: , ;
 
-struct D353_Set<A331_A, >(
-    Box<A331_A, >,
-) where A331_A: , ;
+struct D176_Set<A154_A, >(
+    Box<A154_A, >,
+) where A154_A: , ;
 
-struct D354_SyncSendIfSyncSend<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
+struct D177_SyncSendIfSyncSend<A153_T, >(
+    Box<A153_T, >,
+) where A153_T: , ;
 
-struct D355_NoCopy(
+struct D178_NoCopy(
 );
 
-struct D357_JoinHandle<A356_Ret, >(
-    Box<A356_Ret, >,
-) where A356_Ret: , ;
-
-struct D358_InstanceId(
+struct D179_InstanceId(
 );
 
-struct D359_State<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
+struct D180_State<A153_T, >(
+    Box<A153_T, >,
+) where A153_T: , ;
 
-struct D360_Step<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
+struct D181_Step<A153_T, >(
+    Box<A153_T, >,
+) where A153_T: , ;
 
-struct D361_Config<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
+struct D182_Config<A153_T, >(
+    Box<A153_T, >,
+) where A153_T: , ;
 
-struct D362_Instance<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
+struct D183_Instance<A153_T, >(
+    Box<A153_T, >,
+) where A153_T: , ;
 
-struct D363_head<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
+struct D184_start<A153_T, >(
+    Box<A153_T, >,
+) where A153_T: , ;
 
-struct D364_tail<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
+struct D185_VBBuffer<A153_T, >(
+    Box<A153_T, >,
+) where A153_T: , ;
 
-struct D365_producer<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
-
-struct D366_consumer<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
-
-struct D367_ProducerState(
+struct D186_InvariantPredicate_auto_VBBuffer_start(
 );
 
-struct D368_ConsumerState(
-);
-
-struct D369_Queue<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
-
-struct D370_InvariantPredicate_auto_Queue_head(
-);
-
-struct D371_InvariantPredicate_auto_Queue_tail(
-);
-
-struct D372_Producer<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
-
-struct D373_Consumer<A330_T, >(
-    Box<A330_T, >,
-) where A330_T: , ;
-
-impl<A4_T, > Copy for D311_SyncSendIfSyncSend<A4_T, > where A4_T: ,  {
+impl<A4_T, > Copy for D137_SyncSendIfSyncSend<A4_T, > where A4_T: ,  {
 }
 
-impl<A4_T, > Clone for D311_SyncSendIfSyncSend<A4_T, > where A4_T: ,  {
+impl<A4_T, > Clone for D137_SyncSendIfSyncSend<A4_T, > where A4_T: ,  {
     fn clone(&self) -> Self { panic!() }
 }
 
-impl<A4_T, > Copy for D176_Option<A4_T, > where A4_T: , A4_T: Copy,  {
+impl<A4_T, > Copy for D130_Option<A4_T, > where A4_T: , A4_T: Copy,  {
 }
 
-impl<A4_T, > Clone for D176_Option<A4_T, > where A4_T: , A4_T: Clone,  {
+impl<A4_T, > Clone for D130_Option<A4_T, > where A4_T: , A4_T: Clone,  {
     fn clone(&self) -> Self { panic!() }
 }
 
-impl<A4_T, A276_A, > Clone for D124_Vec<A4_T, A276_A, > where A4_T: , A276_A: , A4_T: Clone, A276_A: Allocator, A276_A: Clone,  {
+impl<A4_T, A113_A, > Clone for D74_Vec<A4_T, A113_A, > where A4_T: , A113_A: , A4_T: Clone, A113_A: Allocator, A113_A: Clone,  {
     fn clone(&self) -> Self { panic!() }
 }
 
-impl<A4_T, > Copy for D66_Instance<A4_T, > where A4_T: ,  {
+impl<A4_T, > Copy for D31_Instance<A4_T, > where A4_T: ,  {
 }
 
-impl<A4_T, > Clone for D66_Instance<A4_T, > where A4_T: ,  {
+impl<A4_T, > Clone for D31_Instance<A4_T, > where A4_T: ,  {
     fn clone(&self) -> Self { panic!() }
 }
 
-impl<A339_K, A340_G, A337_Pred, > T375_InvariantPredicate<(Box<A339_K, >, Box<int, >, ), (Box<D335_PermissionU64, >, Box<A340_G, >, ), > for D338_AtomicPredU64<A337_Pred, > where A339_K: , A340_G: , A337_Pred: , A337_Pred: T374_AtomicInvariantPredicate<A339_K, u64, A340_G, >,  {
+impl<A162_K, A163_G, A160_Pred, > T188_InvariantPredicate<(Box<A162_K, >, Box<int, >, ), (Box<D158_PermissionU64, >, Box<A163_G, >, ), > for D161_AtomicPredU64<A160_Pred, > where A162_K: , A163_G: , A160_Pred: , A160_Pred: T187_AtomicInvariantPredicate<A162_K, u64, A163_G, >,  {
 }
 
-impl<A376_Args, A377_Output, A388_F, > T378_FnWithRequiresEnsures<A376_Args, A377_Output, > for A388_F where A377_Output: , A388_F: , A376_Args: ,  {
+impl<A153_T, > T189_View for C<3, (Box<A153_T, >, ), > where A153_T : ?Sized,  {
+    type A151_V = D173_PtrData<A153_T, >;
 }
 
-impl<A330_T, > T379_View for C<3, (Box<A330_T, >, ), > where A330_T : ?Sized,  {
-    type A328_V = D350_PtrData<A330_T, >;
+impl<A153_T, > T189_View for C<12, (Box<C<3, (Box<A153_T, >, ), >, >, ), > where A153_T : ?Sized,  {
+    type A151_V = D173_PtrData<A153_T, >;
 }
 
-impl<A330_T, > T379_View for C<12, (Box<C<3, (Box<A330_T, >, ), >, >, ), > where A330_T : ?Sized,  {
-    type A328_V = D350_PtrData<A330_T, >;
+impl<A153_T, > T189_View for C<1, (Box<A153_T, >, ), > where A153_T: ,  {
+    type A151_V = D175_Seq<A153_T, >;
 }
 
-impl<A330_T, > T379_View for C<1, (Box<A330_T, >, ), > where A330_T: ,  {
-    type A328_V = D352_Seq<A330_T, >;
+impl<A153_T, > T194_DeepView for C<1, (Box<A153_T, >, ), > where A153_T: , A153_T: T194_DeepView,  {
+    type A151_V = D175_Seq<<A153_T as T194_DeepView>::A151_V, >;
 }
 
-impl<A330_T, > T384_DeepView for C<1, (Box<A330_T, >, ), > where A330_T: , A330_T: T384_DeepView,  {
-    type A328_V = D352_Seq<<A330_T as T384_DeepView>::A328_V, >;
+impl<A153_T, > T190_SliceAdditionalSpecFns<A153_T, > for C<1, (Box<A153_T, >, ), > where A153_T: ,  {
 }
 
-impl<A330_T, > T380_SliceAdditionalSpecFns<A330_T, > for C<1, (Box<A330_T, >, ), > where A330_T: ,  {
+impl<A153_T, > T195_Clone for D177_SyncSendIfSyncSend<A153_T, > where A153_T: ,  {
 }
 
-impl<A330_T, > T385_Clone for D354_SyncSendIfSyncSend<A330_T, > where A330_T: ,  {
+impl<A154_A, > T189_View for C<4, (Box<A154_A, >, ), > where A154_A: T189_View, A154_A : ?Sized,  {
+    type A151_V = <A154_A as T189_View>::A151_V;
 }
 
-impl<A331_A, > T379_View for C<4, (Box<A331_A, >, ), > where A331_A: T379_View, A331_A : ?Sized,  {
-    type A328_V = <A331_A as T379_View>::A328_V;
+impl<A154_A, > T194_DeepView for C<4, (Box<A154_A, >, ), > where A154_A: T194_DeepView, A154_A : ?Sized,  {
+    type A151_V = <A154_A as T194_DeepView>::A151_V;
 }
 
-impl<A331_A, > T384_DeepView for C<4, (Box<A331_A, >, ), > where A331_A: T384_DeepView, A331_A : ?Sized,  {
-    type A328_V = <A331_A as T384_DeepView>::A328_V;
+impl<A154_A, > T189_View for C<6, (Box<A154_A, >, Box<C<13, (), >, >, ), > where A154_A: T189_View, A154_A : ?Sized,  {
+    type A151_V = <A154_A as T189_View>::A151_V;
 }
 
-impl<A331_A, > T379_View for C<6, (Box<A331_A, >, Box<C<13, (), >, >, ), > where A331_A: T379_View, A331_A : ?Sized,  {
-    type A328_V = <A331_A as T379_View>::A328_V;
+impl<A154_A, > T194_DeepView for C<6, (Box<A154_A, >, Box<C<13, (), >, >, ), > where A154_A: T194_DeepView, A154_A : ?Sized,  {
+    type A151_V = <A154_A as T194_DeepView>::A151_V;
 }
 
-impl<A331_A, > T384_DeepView for C<6, (Box<A331_A, >, Box<C<13, (), >, >, ), > where A331_A: T384_DeepView, A331_A : ?Sized,  {
-    type A328_V = <A331_A as T384_DeepView>::A328_V;
+impl<A154_A, > T189_View for C<7, (Box<A154_A, >, Box<C<13, (), >, >, ), > where A154_A: , A154_A: T189_View,  {
+    type A151_V = <A154_A as T189_View>::A151_V;
 }
 
-impl<A331_A, > T379_View for C<7, (Box<A331_A, >, Box<C<13, (), >, >, ), > where A331_A: , A331_A: T379_View,  {
-    type A328_V = <A331_A as T379_View>::A328_V;
+impl<A154_A, > T194_DeepView for C<7, (Box<A154_A, >, Box<C<13, (), >, >, ), > where A154_A: , A154_A: T194_DeepView,  {
+    type A151_V = <A154_A as T194_DeepView>::A151_V;
 }
 
-impl<A331_A, > T384_DeepView for C<7, (Box<A331_A, >, Box<C<13, (), >, >, ), > where A331_A: , A331_A: T384_DeepView,  {
-    type A328_V = <A331_A as T384_DeepView>::A328_V;
+impl<A154_A, > T189_View for C<8, (Box<A154_A, >, Box<C<13, (), >, >, ), > where A154_A: , A154_A: T189_View,  {
+    type A151_V = <A154_A as T189_View>::A151_V;
 }
 
-impl<A331_A, > T379_View for C<8, (Box<A331_A, >, Box<C<13, (), >, >, ), > where A331_A: , A331_A: T379_View,  {
-    type A328_V = <A331_A as T379_View>::A328_V;
+impl<A154_A, > T194_DeepView for C<8, (Box<A154_A, >, Box<C<13, (), >, >, ), > where A154_A: , A154_A: T194_DeepView,  {
+    type A151_V = <A154_A as T194_DeepView>::A151_V;
 }
 
-impl<A331_A, > T384_DeepView for C<8, (Box<A331_A, >, Box<C<13, (), >, >, ), > where A331_A: , A331_A: T384_DeepView,  {
-    type A328_V = <A331_A as T384_DeepView>::A328_V;
+impl<A153_T, A154_A, > T189_View for D156_Vec<A153_T, A154_A, > where A153_T: , A154_A: , A154_A: T155_Allocator,  {
+    type A151_V = D175_Seq<A153_T, >;
 }
 
-impl<A330_T, A331_A, > T379_View for D333_Vec<A330_T, A331_A, > where A330_T: , A331_A: , A331_A: T332_Allocator,  {
-    type A328_V = D352_Seq<A330_T, >;
+impl<A153_T, A154_A, > T194_DeepView for D156_Vec<A153_T, A154_A, > where A153_T: , A154_A: , A153_T: T194_DeepView, A154_A: T155_Allocator,  {
+    type A151_V = D175_Seq<<A153_T as T194_DeepView>::A151_V, >;
 }
 
-impl<A330_T, A331_A, > T384_DeepView for D333_Vec<A330_T, A331_A, > where A330_T: , A331_A: , A330_T: T384_DeepView, A331_A: T332_Allocator,  {
-    type A328_V = D352_Seq<<A330_T as T384_DeepView>::A328_V, >;
+impl T189_View for () {
+    type A151_V = ();
 }
 
-impl T379_View for () {
-    type A328_V = ();
+impl T194_DeepView for () {
+    type A151_V = ();
 }
 
-impl T384_DeepView for () {
-    type A328_V = ();
+impl T189_View for bool {
+    type A151_V = bool;
 }
 
-impl T379_View for bool {
-    type A328_V = bool;
+impl T194_DeepView for bool {
+    type A151_V = bool;
 }
 
-impl T384_DeepView for bool {
-    type A328_V = bool;
+impl T189_View for u32 {
+    type A151_V = u32;
 }
 
-impl T379_View for u64 {
-    type A328_V = u64;
+impl T194_DeepView for u32 {
+    type A151_V = u32;
 }
 
-impl T384_DeepView for u64 {
-    type A328_V = u64;
+impl T189_View for u64 {
+    type A151_V = u64;
 }
 
-impl T379_View for usize {
-    type A328_V = usize;
+impl T194_DeepView for u64 {
+    type A151_V = u64;
 }
 
-impl T384_DeepView for usize {
-    type A328_V = usize;
+impl T189_View for usize {
+    type A151_V = usize;
 }
 
-impl T379_View for i32 {
-    type A328_V = i32;
+impl T194_DeepView for usize {
+    type A151_V = usize;
 }
 
-impl T384_DeepView for i32 {
-    type A328_V = i32;
+impl<A198_A0, > T189_View for (Box<A198_A0, >, ) where A198_A0: , A198_A0: T189_View,  {
+    type A151_V = (Box<<A198_A0 as T189_View>::A151_V, >, );
 }
 
-impl<A389_A0, > T379_View for (Box<A389_A0, >, ) where A389_A0: , A389_A0: T379_View,  {
-    type A328_V = (Box<<A389_A0 as T379_View>::A328_V, >, );
+impl<A198_A0, > T194_DeepView for (Box<A198_A0, >, ) where A198_A0: , A198_A0: T194_DeepView,  {
+    type A151_V = (Box<<A198_A0 as T194_DeepView>::A151_V, >, );
 }
 
-impl<A389_A0, > T384_DeepView for (Box<A389_A0, >, ) where A389_A0: , A389_A0: T384_DeepView,  {
-    type A328_V = (Box<<A389_A0 as T384_DeepView>::A328_V, >, );
+impl<A198_A0, A199_A1, > T189_View for (Box<A198_A0, >, Box<A199_A1, >, ) where A198_A0: , A199_A1: , A198_A0: T189_View, A199_A1: T189_View,  {
+    type A151_V = (Box<<A198_A0 as T189_View>::A151_V, >, Box<<A199_A1 as T189_View>::A151_V, >, );
 }
 
-impl<A389_A0, A390_A1, > T379_View for (Box<A389_A0, >, Box<A390_A1, >, ) where A389_A0: , A390_A1: , A389_A0: T379_View, A390_A1: T379_View,  {
-    type A328_V = (Box<<A389_A0 as T379_View>::A328_V, >, Box<<A390_A1 as T379_View>::A328_V, >, );
+impl<A198_A0, A199_A1, > T194_DeepView for (Box<A198_A0, >, Box<A199_A1, >, ) where A198_A0: , A199_A1: , A198_A0: T194_DeepView, A199_A1: T194_DeepView,  {
+    type A151_V = (Box<<A198_A0 as T194_DeepView>::A151_V, >, Box<<A199_A1 as T194_DeepView>::A151_V, >, );
 }
 
-impl<A389_A0, A390_A1, > T384_DeepView for (Box<A389_A0, >, Box<A390_A1, >, ) where A389_A0: , A390_A1: , A389_A0: T384_DeepView, A390_A1: T384_DeepView,  {
-    type A328_V = (Box<<A389_A0 as T384_DeepView>::A328_V, >, Box<<A390_A1 as T384_DeepView>::A328_V, >, );
+impl<A153_T, > T189_View for D152_Option<A153_T, > where A153_T: ,  {
+    type A151_V = D152_Option<A153_T, >;
 }
 
-impl<A330_T, > T379_View for D329_Option<A330_T, > where A330_T: ,  {
-    type A328_V = D329_Option<A330_T, >;
+impl<A153_T, > T194_DeepView for D152_Option<A153_T, > where A153_T: , A153_T: T194_DeepView,  {
+    type A151_V = D152_Option<<A153_T as T194_DeepView>::A151_V, >;
 }
 
-impl<A330_T, > T384_DeepView for D329_Option<A330_T, > where A330_T: , A330_T: T384_DeepView,  {
-    type A328_V = D329_Option<<A330_T as T384_DeepView>::A328_V, >;
+impl<A153_T, > T196_OptionAdditionalFns<A153_T, > for D152_Option<A153_T, > where A153_T: ,  {
 }
 
-impl<A330_T, > T386_OptionAdditionalFns<A330_T, > for D329_Option<A330_T, > where A330_T: ,  {
+impl<A153_T, A154_A, > T197_VecAdditionalSpecFns<A153_T, > for D156_Vec<A153_T, A154_A, > where A153_T: , A154_A: , A154_A: T155_Allocator,  {
 }
 
-impl<A330_T, A331_A, > T387_VecAdditionalSpecFns<A330_T, > for D333_Vec<A330_T, A331_A, > where A330_T: , A331_A: , A331_A: T332_Allocator,  {
+impl T195_Clone for usize {
 }
 
-impl T385_Clone for usize {
+impl T195_Clone for u32 {
 }
 
-impl T385_Clone for u64 {
+impl T195_Clone for u64 {
 }
 
-impl T385_Clone for i32 {
+impl T195_Clone for bool {
 }
 
-impl T385_Clone for bool {
+impl<A153_T, > T195_Clone for C<12, (Box<C<3, (Box<A153_T, >, ), >, >, ), > where A153_T : ?Sized,  {
 }
 
-impl<A330_T, > T385_Clone for C<12, (Box<C<3, (Box<A330_T, >, ), >, >, ), > where A330_T : ?Sized,  {
+impl<A153_T, > T195_Clone for C<3, (Box<A153_T, >, ), > where A153_T : ?Sized,  {
 }
 
-impl<A330_T, > T385_Clone for C<3, (Box<A330_T, >, ), > where A330_T : ?Sized,  {
+impl<A153_T, > T195_Clone for C<4, (Box<A153_T, >, ), > where A153_T : ?Sized,  {
 }
 
-impl<A330_T, > T385_Clone for C<4, (Box<A330_T, >, ), > where A330_T : ?Sized,  {
+impl<A153_T, > T195_Clone for D152_Option<A153_T, > where A153_T: , A153_T: T195_Clone,  {
 }
 
-impl<A330_T, > T385_Clone for D329_Option<A330_T, > where A330_T: , A330_T: T385_Clone,  {
+impl T195_Clone for C<13, (), > {
 }
 
-impl T385_Clone for C<13, (), > {
+impl<A153_T, A154_A, > T195_Clone for D156_Vec<A153_T, A154_A, > where A153_T: , A154_A: , A153_T: T195_Clone, A154_A: T155_Allocator, A154_A: T195_Clone,  {
 }
 
-impl<A330_T, A331_A, > T385_Clone for D333_Vec<A330_T, A331_A, > where A330_T: , A331_A: , A330_T: T385_Clone, A331_A: T332_Allocator, A331_A: T385_Clone,  {
+impl<A154_A, > T155_Allocator for C<4, (Box<A154_A, >, ), > where A154_A: T155_Allocator, A154_A : ?Sized,  {
 }
 
-impl<A331_A, > T332_Allocator for C<4, (Box<A331_A, >, ), > where A331_A: T332_Allocator, A331_A : ?Sized,  {
+impl T155_Allocator for C<13, (), > {
 }
 
-impl T332_Allocator for C<13, (), > {
+impl<A154_A, > T195_Clone for C<10, (Box<A154_A, >, ), > where A154_A: ,  {
 }
 
-impl<A331_A, > T385_Clone for C<10, (Box<A331_A, >, ), > where A331_A: ,  {
+impl<A154_A, > T195_Clone for C<9, (Box<A154_A, >, ), > where A154_A: ,  {
 }
 
-impl<A331_A, > T385_Clone for C<9, (Box<A331_A, >, ), > where A331_A: ,  {
+impl<A153_T, A154_A, > T195_Clone for C<6, (Box<A153_T, >, Box<A154_A, >, ), > where A153_T: , A154_A: , A153_T: T195_Clone, A154_A: T155_Allocator, A154_A: T195_Clone,  {
 }
 
-impl<A330_T, A331_A, > T385_Clone for C<6, (Box<A330_T, >, Box<A331_A, >, ), > where A330_T: , A331_A: , A330_T: T385_Clone, A331_A: T332_Allocator, A331_A: T385_Clone,  {
+impl<A153_T, > T192_ValueToken<nat, > for D184_start<A153_T, > where A153_T: ,  {
 }
 
-impl<A330_T, > T382_ValueToken<nat, > for D363_head<A330_T, > where A330_T: ,  {
+impl<A153_T, > T193_UniqueValueToken<nat, > for D184_start<A153_T, > where A153_T: ,  {
 }
 
-impl<A330_T, > T383_UniqueValueToken<nat, > for D363_head<A330_T, > where A330_T: ,  {
+impl<A153_T, > T195_Clone for D183_Instance<A153_T, > where A153_T: ,  {
 }
 
-impl<A330_T, > T382_ValueToken<nat, > for D364_tail<A330_T, > where A330_T: ,  {
+impl<A153_T, > T187_AtomicInvariantPredicate<C<10, (Box<D183_Instance<A153_T, >, >, ), >, u64, D184_start<A153_T, >, > for D186_InvariantPredicate_auto_VBBuffer_start where A153_T: ,  {
 }
 
-impl<A330_T, > T383_UniqueValueToken<nat, > for D364_tail<A330_T, > where A330_T: ,  {
-}
-
-impl<A330_T, > T382_ValueToken<D367_ProducerState, > for D365_producer<A330_T, > where A330_T: ,  {
-}
-
-impl<A330_T, > T383_UniqueValueToken<D367_ProducerState, > for D365_producer<A330_T, > where A330_T: ,  {
-}
-
-impl<A330_T, > T382_ValueToken<D368_ConsumerState, > for D366_consumer<A330_T, > where A330_T: ,  {
-}
-
-impl<A330_T, > T383_UniqueValueToken<D368_ConsumerState, > for D366_consumer<A330_T, > where A330_T: ,  {
-}
-
-impl<A330_T, > T385_Clone for D362_Instance<A330_T, > where A330_T: ,  {
-}
-
-impl<A330_T, > T374_AtomicInvariantPredicate<C<10, (Box<D362_Instance<A330_T, >, >, ), >, u64, D363_head<A330_T, >, > for D370_InvariantPredicate_auto_Queue_head where A330_T: ,  {
-}
-
-impl<A330_T, > T374_AtomicInvariantPredicate<C<10, (Box<D362_Instance<A330_T, >, >, ), >, u64, D364_tail<A330_T, >, > for D371_InvariantPredicate_auto_Queue_tail where A330_T: ,  {
-}
-
-fn f3_produce_start<A4_T, >(
+fn f3_checkout_first<A4_T, >(
     x5_pre: (),
     x6_post: (),
 ) where A4_T: , 
@@ -708,800 +584,275 @@ fn f3_produce_start<A4_T, >(
     panic!()
 }
 
-fn f8_produce_end<A4_T, >(
-    x5_pre: (),
-    x6_post: (),
-    x9_perm: (),
+fn f8_initialize<A4_T, >(
+    x9_post: (),
+    x10_backing_cells: (),
+    x11_storage: (),
 ) where A4_T: , 
 {
     panic!()
 }
 
-fn f11_consume_start<A4_T, >(
-    x5_pre: (),
-    x6_post: (),
+fn f13_initialize<A4_T, >(
+    x14_backing_cells: (),
+    x15_storage: (),
 ) where A4_T: , 
 {
     panic!()
 }
 
-fn f13_consume_end<A4_T, >(
-    x5_pre: (),
-    x6_post: (),
-    x9_perm: (),
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f15_initialize<A4_T, >(
-    x16_post: (),
-    x17_backing_cells: (),
-    x18_storage: (),
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f20_initialize<A4_T, >(
-    x21_backing_cells: (),
-    x22_storage: (),
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f24_produce_start<A4_T, >(
+fn f17_checkout_first<A4_T, >(
     x5_pre: (),
 ) where A4_T: , 
 {
     panic!()
 }
 
-fn f26_produce_end<A4_T, >(
-    x5_pre: (),
-    x27_perm: (),
+fn f19_agree<'a20__, 'a21__, A4_T, >(
+    x22_self: &'a20__ D23_start<A4_T, >,
+    x24_other: &'a21__ D23_start<A4_T, >,
 ) where A4_T: , 
 {
     panic!()
 }
 
-fn f29_consume_start<A4_T, >(
-    x5_pre: (),
+fn f26_arbitrary<A4_T, >(
+) -> D23_start<A4_T, > where A4_T: , 
+{
+    panic!()
+}
+
+fn f28_unique<'a20__, 'a21__, A4_T, >(
+    x22_self: &'a20__  mut D23_start<A4_T, >,
+    x24_other: &'a21__ D23_start<A4_T, >,
 ) where A4_T: , 
 {
     panic!()
 }
 
-fn f31_consume_end<A4_T, >(
-    x5_pre: (),
-    x27_perm: (),
+fn f30_clone<'a20__, A4_T, >(
+    x22_self: &'a20__ D31_Instance<A4_T, >,
+) -> D31_Instance<A4_T, > where A4_T: , 
+{
+    panic!()
+}
+
+fn f33_initialize<A4_T, >(
+    x14_backing_cells: (),
+    x15_storage: (),
+    x34_param_token_storage: D36_Map<nat, D35_PointsTo<A4_T, >, >,
+) -> (Tracked<D31_Instance<A4_T, >, >, Tracked<D23_start<A4_T, >, >, ) where A4_T: , 
+{
+    panic!()
+}
+
+fn f38_checkout_first<'a20__, A4_T, >(
+    x22_self: &'a20__ D31_Instance<A4_T, >,
 ) where A4_T: , 
 {
     panic!()
 }
 
-fn f33_agree<'a34__, 'a35__, A4_T, >(
-    x36_self: &'a34__ D37_head<A4_T, >,
-    x38_other: &'a35__ D37_head<A4_T, >,
+fn f40_clone<'a20__, A4_T, >(
+    x22_self: &'a20__ D31_Instance<A4_T, >,
+) -> D31_Instance<A4_T, > where A4_T: , 
+{
+    panic!()
+}
+
+fn f42_lemma_msg_valid_storage_all<A4_T, >(
+    x43_s: (),
 ) where A4_T: , 
 {
     panic!()
 }
 
-fn f40_arbitrary<A4_T, >(
-) -> D37_head<A4_T, > where A4_T: , 
-{
-    panic!()
-}
-
-fn f42_unique<'a34__, 'a35__, A4_T, >(
-    x36_self: &'a34__  mut D37_head<A4_T, >,
-    x38_other: &'a35__ D37_head<A4_T, >,
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f44_agree<'a34__, 'a35__, A4_T, >(
-    x36_self: &'a34__ D45_tail<A4_T, >,
-    x38_other: &'a35__ D45_tail<A4_T, >,
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f47_arbitrary<A4_T, >(
-) -> D45_tail<A4_T, > where A4_T: , 
-{
-    panic!()
-}
-
-fn f49_unique<'a34__, 'a35__, A4_T, >(
-    x36_self: &'a34__  mut D45_tail<A4_T, >,
-    x38_other: &'a35__ D45_tail<A4_T, >,
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f51_agree<'a34__, 'a35__, A4_T, >(
-    x36_self: &'a34__ D52_producer<A4_T, >,
-    x38_other: &'a35__ D52_producer<A4_T, >,
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f54_arbitrary<A4_T, >(
-) -> D52_producer<A4_T, > where A4_T: , 
-{
-    panic!()
-}
-
-fn f56_unique<'a34__, 'a35__, A4_T, >(
-    x36_self: &'a34__  mut D52_producer<A4_T, >,
-    x38_other: &'a35__ D52_producer<A4_T, >,
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f58_agree<'a34__, 'a35__, A4_T, >(
-    x36_self: &'a34__ D59_consumer<A4_T, >,
-    x38_other: &'a35__ D59_consumer<A4_T, >,
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f61_arbitrary<A4_T, >(
-) -> D59_consumer<A4_T, > where A4_T: , 
-{
-    panic!()
-}
-
-fn f63_unique<'a34__, 'a35__, A4_T, >(
-    x36_self: &'a34__  mut D59_consumer<A4_T, >,
-    x38_other: &'a35__ D59_consumer<A4_T, >,
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f65_clone<'a34__, A4_T, >(
-    x36_self: &'a34__ D66_Instance<A4_T, >,
-) -> D66_Instance<A4_T, > where A4_T: , 
-{
-    panic!()
-}
-
-fn f68_initialize<A4_T, >(
-    x21_backing_cells: (),
-    x22_storage: (),
-    x69_param_token_storage: D71_Map<nat, D70_PointsTo<A4_T, >, >,
-) -> (Tracked<D66_Instance<A4_T, >, >, Tracked<D37_head<A4_T, >, >, Tracked<D45_tail<A4_T, >, >, Tracked<D52_producer<A4_T, >, >, Tracked<D59_consumer<A4_T, >, >, ) where A4_T: , 
-{
-    panic!()
-}
-
-fn f73_produce_start<'a34__, 'a35__, 'a74__, A4_T, >(
-    x36_self: &'a34__ D66_Instance<A4_T, >,
-    x75_param_token_head: &'a35__ D37_head<A4_T, >,
-    x76_param_token_producer: &'a74__  mut D52_producer<A4_T, >,
-) -> D70_PointsTo<A4_T, > where A4_T: , 
-{
-    panic!()
-}
-
-fn f78_produce_end<'a34__, 'a35__, 'a74__, A4_T, >(
-    x36_self: &'a34__ D66_Instance<A4_T, >,
-    x27_perm: (),
-    x79_param_token_0_storage: D70_PointsTo<A4_T, >,
-    x80_param_token_tail: &'a35__  mut D45_tail<A4_T, >,
-    x81_param_token_producer: &'a74__  mut D52_producer<A4_T, >,
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f83_consume_start<'a34__, 'a35__, 'a74__, A4_T, >(
-    x36_self: &'a34__ D66_Instance<A4_T, >,
-    x84_param_token_tail: &'a35__ D45_tail<A4_T, >,
-    x85_param_token_consumer: &'a74__  mut D59_consumer<A4_T, >,
-) -> (Ghost<D71_Map<nat, D70_PointsTo<A4_T, >, >, >, Tracked<D70_PointsTo<A4_T, >, >, ) where A4_T: , 
-{
-    panic!()
-}
-
-fn f87_consume_end<'a34__, 'a35__, 'a74__, A4_T, >(
-    x36_self: &'a34__ D66_Instance<A4_T, >,
-    x27_perm: (),
-    x79_param_token_0_storage: D70_PointsTo<A4_T, >,
-    x88_param_token_head: &'a35__  mut D37_head<A4_T, >,
-    x89_param_token_consumer: &'a74__  mut D59_consumer<A4_T, >,
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f91_clone<'a34__, A4_T, >(
-    x36_self: &'a34__ D66_Instance<A4_T, >,
-) -> D66_Instance<A4_T, > where A4_T: , 
-{
-    panic!()
-}
-
-fn f93_produce_start_asserts<A4_T, >(
-    x5_pre: (),
+fn f45_initialize_inductive<A4_T, >(
+    x9_post: (),
+    x10_backing_cells: (),
+    x11_storage: (),
 ) where A4_T: , 
 {
 }
 
-fn f95_produce_end_asserts<A4_T, >(
-    x5_pre: (),
-    x27_perm: (),
-) where A4_T: , 
-{
-}
-
-fn f97_consume_start_asserts<A4_T, >(
-    x5_pre: (),
-) where A4_T: , 
-{
-}
-
-fn f99_consume_end_asserts<A4_T, >(
-    x5_pre: (),
-    x27_perm: (),
-) where A4_T: , 
-{
-}
-
-fn f101_lemma_msg_not_overlapping<A4_T, >(
-    x102_s: (),
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f104_lemma_msg_in_bounds<A4_T, >(
-    x102_s: (),
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f106_lemma_msg_valid_storage_all<A4_T, >(
-    x102_s: (),
-) where A4_T: , 
-{
-    panic!()
-}
-
-fn f108_initialize_inductive<A4_T, >(
-    x16_post: (),
-    x17_backing_cells: (),
-    x18_storage: (),
-) where A4_T: , 
-{
-}
-
-fn f115_produce_start_inductive<A4_T, >(
+fn f47_checkout_first_inductive<A4_T, >(
     x5_pre: (),
     x6_post: (),
 ) where A4_T: , 
 {
 }
 
-fn f117_produce_end_inductive<A4_T, >(
-    x5_pre: (),
-    x6_post: (),
-    x9_perm: (),
+fn f70_checkout_first<'a20__, A4_T, >(
+    x22_self: &'a20__  mut D71_VBBuffer<A4_T, >,
 ) where A4_T: , 
 {
-}
-
-fn f119_consume_start_inductive<A4_T, >(
-    x5_pre: (),
-    x6_post: (),
-) where A4_T: , 
-{
-}
-
-fn f121_consume_end_inductive<A4_T, >(
-    x5_pre: (),
-    x6_post: (),
-    x9_perm: (),
-) where A4_T: , 
-{
-}
-
-fn f171_new_queue<A4_T, >(
-    x131_len: usize,
-) -> (D164_Producer<A4_T, >, D168_Consumer<A4_T, >, ) where A4_T: , 
-{
-    let mut x122_backing_cells_vec: D124_Vec<D123_PCell<A4_T, >, Global, > = f125_new::<D123_PCell<A4_T, >, >();
-    let x126_verus_tmp: D71_Map<nat, D70_PointsTo<A4_T, >, >;
+    let x48_start: u64 = 
     {
-        (x126_verus_tmp) = (f127_tracked_empty::<nat, D70_PointsTo<A4_T, >, >())
-    };
-    let mut x128_perms: D71_Map<nat, D70_PointsTo<A4_T, >, >;
-    {
-        let mut x129_verus_tmp_perms: D71_Map<nat, D70_PointsTo<A4_T, >, > = x126_verus_tmp;
-        (x128_perms) = (x129_verus_tmp_perms);
-    };
-    while op::<_, bool>((&(f130_len::<D123_PCell<A4_T, >, Global, >(&(x122_backing_cells_vec), )), &(x131_len), )) 
-    {
-        let (x132_cell, x133_cell_perm, ): (D123_PCell<A4_T, >, Tracked<D70_PointsTo<A4_T, >, >, ) = f134_empty::<A4_T, >();
-        f135_push::<D123_PCell<A4_T, >, Global, >(&mut(x122_backing_cells_vec), x132_cell, );
+        let x49_result: u64;
+        let x50_atomic: &&D52_AtomicU64<Tracked<D31_Instance<A4_T, >, >, D23_start<A4_T, >, D51_InvariantPredicate_auto_VBBuffer_start, > = &(&((x22_self).y53_start));
+        let x54_credit: Tracked<D55_OpenInvariantCredit, > = f56_create_open_invariant_credit();
         {
-            f136_tracked_insert::<nat, D70_PointsTo<A4_T, >, >(&mut(x128_perms), op::<_, ()>(()), x133_cell_perm.get(), );
-        };
-        {
-            (|| 
+            f68_spend_open_invariant_credit(x54_credit, );
             {
-            });
-        };
-        {
-            (|| 
-            {
-            });
-        };
-        {
-            (|| 
-            {
-            });
-        };
-    };
-    let x137_verus_tmp: (Tracked<D66_Instance<A4_T, >, >, Tracked<D37_head<A4_T, >, >, Tracked<D45_tail<A4_T, >, >, Tracked<D52_producer<A4_T, >, >, Tracked<D59_consumer<A4_T, >, >, );
-    {
-        (x137_verus_tmp) = (f68_initialize::<A4_T, >(op::<_, ()>(()), op::<_, ()>(()), x128_perms, ))
-    };
-    let mut x138_instance: D66_Instance<A4_T, >;
-    let mut x139_head_token: D37_head<A4_T, >;
-    let mut x140_tail_token: D45_tail<A4_T, >;
-    let mut x141_producer_token: D52_producer<A4_T, >;
-    let mut x142_consumer_token: D59_consumer<A4_T, >;
-    {
-        let (x143_verus_tmp_instance, x144_verus_tmp_head_token, x145_verus_tmp_tail_token, x146_verus_tmp_producer_token, x147_verus_tmp_consumer_token, ): (Tracked<D66_Instance<A4_T, >, >, Tracked<D37_head<A4_T, >, >, Tracked<D45_tail<A4_T, >, >, Tracked<D52_producer<A4_T, >, >, Tracked<D59_consumer<A4_T, >, >, ) = x137_verus_tmp;
-        (x138_instance) = (x143_verus_tmp_instance.get());
-        (x139_head_token) = (x144_verus_tmp_head_token.get());
-        (x140_tail_token) = (x145_verus_tmp_tail_token.get());
-        (x141_producer_token) = (x146_verus_tmp_producer_token.get());
-        (x142_consumer_token) = (x147_verus_tmp_consumer_token.get());
-    };
-    let x148_tracked_inst: Tracked<D66_Instance<A4_T, >, > = tracked_new::<D66_Instance<A4_T, >, >(f65_clone::<A4_T, >(&(x138_instance), ), );
-    let x149_head_atomic: D151_AtomicU64<Tracked<D66_Instance<A4_T, >, >, D37_head<A4_T, >, D150_InvariantPredicate_auto_Queue_head, > = f152_new::<Tracked<D66_Instance<A4_T, >, >, D37_head<A4_T, >, D150_InvariantPredicate_auto_Queue_head, >(op::<_, Ghost<Tracked<D66_Instance<A4_T, >, >, >>(()), op::<_, u64>(()), tracked_new::<D37_head<A4_T, >, >(x139_head_token, ), );
-    let x153_tail_atomic: D151_AtomicU64<Tracked<D66_Instance<A4_T, >, >, D45_tail<A4_T, >, D154_InvariantPredicate_auto_Queue_tail, > = f152_new::<Tracked<D66_Instance<A4_T, >, >, D45_tail<A4_T, >, D154_InvariantPredicate_auto_Queue_tail, >(op::<_, Ghost<Tracked<D66_Instance<A4_T, >, >, >>(()), op::<_, u64>(()), tracked_new::<D45_tail<A4_T, >, >(x140_tail_token, ), );
-    let x155_queue: D156_Queue<A4_T, > = D156_Queue::<A4_T, > { y157_instance: tracked_new::<D66_Instance<A4_T, >, >(x138_instance, ), y158_head: x149_head_atomic, y159_tail: x153_tail_atomic, y160_buffer: x122_backing_cells_vec,  } ;
-    let x161_queue_arc: Arc<D156_Queue<A4_T, >, Global, > = f162_new::<D156_Queue<A4_T, >, >(x155_queue, );
-    let x163_prod: D164_Producer<A4_T, > = D164_Producer::<A4_T, > { y165_queue: x161_queue_arc.clone(), y159_tail: op::<_, usize>(()), y166_producer: tracked_new::<D52_producer<A4_T, >, >(x141_producer_token, ),  } ;
-    let x167_cons: D168_Consumer<A4_T, > = D168_Consumer::<A4_T, > { y165_queue: x161_queue_arc, y158_head: op::<_, usize>(()), y169_consumer: tracked_new::<D59_consumer<A4_T, >, >(x142_consumer_token, ),  } ;
-    (x163_prod, x167_cons, )
-}
-
-fn f213_enqueue<'a34__, A4_T, >(
-    x36_self: &'a34__  mut D164_Producer<A4_T, >,
-    x202_t: A4_T,
-) where A4_T: , 
-{
-    loop 
-    {
-        let x172_queue: &D156_Queue<A4_T, > = &(*((x36_self).y165_queue));
-        let x173_len: usize = f130_len::<D123_PCell<A4_T, >, Global, >(&((x172_queue).y160_buffer), );
-        {
-            (|| 
-            {
-            });
-        };
-        let x174_next_tail: usize = if op::<_, bool>((&(op::<_, usize>(((x36_self).y159_tail, op::<_, usize>(()), ))), &(x173_len), )) 
-        {
-            op::<_, usize>(())
-        } else 
-        {
-            op::<_, usize>(((x36_self).y159_tail, op::<_, usize>(()), ))
-        };
-        let x175_cell_perm: D176_Option<D70_PointsTo<A4_T, >, >;
-        let x177_head: u64 = 
-        {
-            let x178_result: u64;
-            let x179_atomic: &&D151_AtomicU64<Tracked<D66_Instance<A4_T, >, >, D37_head<A4_T, >, D150_InvariantPredicate_auto_Queue_head, > = &(&((x172_queue).y158_head));
-            let x180_credit: Tracked<D181_OpenInvariantCredit, > = f182_create_open_invariant_credit();
-            {
-                f196_spend_open_invariant_credit(x180_credit, );
+                let (guard, mut x58_pair): (_, (D57_PermissionU64, D23_start<A4_T, >, )) = open_atomic_invariant_begin((x50_atomic).y59_atomic_inv.borrow());
+                
                 {
-                    let (guard, mut x184_pair): (_, (D183_PermissionU64, D37_head<A4_T, >, )) = open_atomic_invariant_begin((x179_atomic).y185_atomic_inv.borrow());
-                    
+                    let x60_verus_tmp: (D57_PermissionU64, D23_start<A4_T, >, );
                     {
-                        let x186_verus_tmp: (D183_PermissionU64, D37_head<A4_T, >, );
+                        (x60_verus_tmp) = (x58_pair)
+                    };
+                    let mut x61_perm: D57_PermissionU64;
+                    let mut x62_start_token: D23_start<A4_T, >;
+                    {
+                        let (x63_verus_tmp_perm, mut x64_verus_tmp_start_token, ): (D57_PermissionU64, D23_start<A4_T, >, ) = x60_verus_tmp;
+                        (x61_perm) = (x63_verus_tmp_perm);
+                        (x62_start_token) = (x64_verus_tmp_start_token);
+                    };
+                    (x49_result) = (f66_load(&((x50_atomic).y65_patomic), tracked_new::<&D57_PermissionU64, >(&(x61_perm), ), ));
+                    {
                         {
-                            (x186_verus_tmp) = (x184_pair)
-                        };
-                        let mut x187_perm: D183_PermissionU64;
-                        let mut x188_head_token: D37_head<A4_T, >;
-                        {
-                            let (x189_verus_tmp_perm, mut x190_verus_tmp_head_token, ): (D183_PermissionU64, D37_head<A4_T, >, ) = x186_verus_tmp;
-                            (x187_perm) = (x189_verus_tmp_perm);
-                            (x188_head_token) = (x190_verus_tmp_head_token);
-                        };
-                        (x178_result) = (f192_load(&((x179_atomic).y191_patomic), tracked_new::<&D183_PermissionU64, >(&(x187_perm), ), ));
-                        {
-                            {
-                                (x175_cell_perm) = (if op::<_, bool>(()) 
-                                {
-                                    let x193_cp: D70_PointsTo<A4_T, > = f73_produce_start::<A4_T, >(&(*((x172_queue).y157_instance.borrow())), &(x188_head_token), (x36_self).y166_producer.borrow_mut(), );
-                                    D176_Option::C194_Some::<D70_PointsTo<A4_T, >, >(x193_cp, )
-                                } else 
-                                {
-                                    D176_Option::C195_None::<D70_PointsTo<A4_T, >, >()
-                                });
-                            }
-                        };
-                        {
-                            (x184_pair) = ((x187_perm, x188_head_token, ));
+                            let _: () = f38_checkout_first::<A4_T, >(&(*((x22_self).y67_instance.borrow())), );
                         }
                     };
-                    open_invariant_end(guard, x184_pair);
-                }
-            };
-            x178_result
-        };
-        if op::<_, bool>((&(x177_head), &(op::<_, u64>((x174_next_tail, ))), )) 
-        {
-            let x197_verus_tmp: D70_PointsTo<A4_T, >;
-            {
-                (x197_verus_tmp) = (
-                match x175_cell_perm {
-                    D176_Option::C194_Some(x198_cp, ) => 
                     {
-                        x198_cp
-                    }
-                    D176_Option::C195_None() => 
-                    {
-                        f199_proof_from_false::<D70_PointsTo<A4_T, >, >()
-                    }
-                })
-            };
-            let mut x200_cell_perm: D70_PointsTo<A4_T, >;
-            {
-                let mut x201_verus_tmp_cell_perm: D70_PointsTo<A4_T, > = x197_verus_tmp;
-                (x200_cell_perm) = (x201_verus_tmp_cell_perm);
-            };
-            f203_put::<A4_T, >(&((*index::<D124_Vec<D123_PCell<A4_T, >, Global, >, usize, D123_PCell<A4_T, >>(&((x172_queue).y160_buffer), (x36_self).y159_tail))), tracked_new::<& mut D70_PointsTo<A4_T, >, >(&mut(x200_cell_perm), ), x202_t, );
-            {
-                let x204_atomic: &&D151_AtomicU64<Tracked<D66_Instance<A4_T, >, >, D45_tail<A4_T, >, D154_InvariantPredicate_auto_Queue_tail, > = &(&((x172_queue).y159_tail));
-                let x205_credit: Tracked<D181_OpenInvariantCredit, > = f182_create_open_invariant_credit();
-                {
-                    f196_spend_open_invariant_credit(x205_credit, );
-                    {
-                        let (guard, mut x206_pair): (_, (D183_PermissionU64, D45_tail<A4_T, >, )) = open_atomic_invariant_begin((x204_atomic).y185_atomic_inv.borrow());
-                        
-                        {
-                            let x207_verus_tmp: (D183_PermissionU64, D45_tail<A4_T, >, );
-                            {
-                                (x207_verus_tmp) = (x206_pair)
-                            };
-                            let mut x208_perm: D183_PermissionU64;
-                            let mut x140_tail_token: D45_tail<A4_T, >;
-                            {
-                                let (mut x209_verus_tmp_perm, mut x210_verus_tmp_tail_token, ): (D183_PermissionU64, D45_tail<A4_T, >, ) = x207_verus_tmp;
-                                (x208_perm) = (x209_verus_tmp_perm);
-                                (x140_tail_token) = (x210_verus_tmp_tail_token);
-                            };
-                            f211_store(&((x204_atomic).y191_patomic), tracked_new::<& mut D183_PermissionU64, >(&mut(x208_perm), ), op::<_, u64>((x174_next_tail, )), );
-                            {
-                                {
-                                    f78_produce_end::<A4_T, >(&(*((x172_queue).y157_instance.borrow())), op::<_, ()>(()), x200_cell_perm, &mut(x140_tail_token), (x36_self).y166_producer.borrow_mut(), );
-                                }
-                            };
-                            {
-                                (x206_pair) = ((x208_perm, x140_tail_token, ));
-                            }
-                        };
-                        open_invariant_end(guard, x206_pair);
+                        (x58_pair) = ((x61_perm, x62_start_token, ));
                     }
                 };
-            };
-            ((x36_self).y159_tail) = (x174_next_tail);
-            return;
-        } else 
-        {
-        }
-    }
+                open_invariant_end(guard, x58_pair);
+            }
+        };
+        x49_result
+    };
 }
 
-fn f245_dequeue<'a34__, A4_T, >(
-    x36_self: &'a34__  mut D168_Consumer<A4_T, >,
-) -> A4_T where A4_T: , 
+fn f97_new_buf<A4_T, >(
+    x81_len: usize,
+) -> D71_VBBuffer<A4_T, > where A4_T: , 
 {
-    loop 
+    let mut x72_backing_cells_vec: D74_Vec<D73_PCell<A4_T, >, Global, > = f75_new::<D73_PCell<A4_T, >, >();
+    let x76_verus_tmp: D36_Map<nat, D35_PointsTo<A4_T, >, >;
     {
-        let x214_queue: &D156_Queue<A4_T, > = &(*((x36_self).y165_queue));
-        let x215_len: usize = f130_len::<D123_PCell<A4_T, >, Global, >(&((x214_queue).y160_buffer), );
+        (x76_verus_tmp) = (f77_tracked_empty::<nat, D35_PointsTo<A4_T, >, >())
+    };
+    let mut x78_perms: D36_Map<nat, D35_PointsTo<A4_T, >, >;
+    {
+        let mut x79_verus_tmp_perms: D36_Map<nat, D35_PointsTo<A4_T, >, > = x76_verus_tmp;
+        (x78_perms) = (x79_verus_tmp_perms);
+    };
+    while op::<_, bool>((&(f80_len::<D73_PCell<A4_T, >, Global, >(&(x72_backing_cells_vec), )), &(x81_len), )) 
+    {
+        let (x82_cell, x83_cell_perm, ): (D73_PCell<A4_T, >, Tracked<D35_PointsTo<A4_T, >, >, ) = f84_empty::<A4_T, >();
+        f85_push::<D73_PCell<A4_T, >, Global, >(&mut(x72_backing_cells_vec), x82_cell, );
+        {
+            f86_tracked_insert::<nat, D35_PointsTo<A4_T, >, >(&mut(x78_perms), op::<_, ()>(()), x83_cell_perm.get(), );
+        };
         {
             (|| 
             {
             });
         };
-        let x216_next_head: usize = if op::<_, bool>((&(op::<_, usize>(((x36_self).y158_head, op::<_, usize>(()), ))), &(x215_len), )) 
         {
-            op::<_, usize>(())
-        } else 
-        {
-            op::<_, usize>(((x36_self).y158_head, op::<_, usize>(()), ))
+            (|| 
+            {
+            });
         };
-        let x217_cell_perm: D176_Option<D70_PointsTo<A4_T, >, >;
-        let x218_tail: u64 = 
         {
-            let x219_result: u64;
-            let x220_atomic: &&D151_AtomicU64<Tracked<D66_Instance<A4_T, >, >, D45_tail<A4_T, >, D154_InvariantPredicate_auto_Queue_tail, > = &(&((x214_queue).y159_tail));
-            let x221_credit: Tracked<D181_OpenInvariantCredit, > = f182_create_open_invariant_credit();
+            (|| 
             {
-                f196_spend_open_invariant_credit(x221_credit, );
-                {
-                    let (guard, mut x222_pair): (_, (D183_PermissionU64, D45_tail<A4_T, >, )) = open_atomic_invariant_begin((x220_atomic).y185_atomic_inv.borrow());
-                    
-                    {
-                        let x223_verus_tmp: (D183_PermissionU64, D45_tail<A4_T, >, );
-                        {
-                            (x223_verus_tmp) = (x222_pair)
-                        };
-                        let mut x224_perm: D183_PermissionU64;
-                        let mut x225_tail_token: D45_tail<A4_T, >;
-                        {
-                            let (x226_verus_tmp_perm, mut x227_verus_tmp_tail_token, ): (D183_PermissionU64, D45_tail<A4_T, >, ) = x223_verus_tmp;
-                            (x224_perm) = (x226_verus_tmp_perm);
-                            (x225_tail_token) = (x227_verus_tmp_tail_token);
-                        };
-                        (x219_result) = (f192_load(&((x220_atomic).y191_patomic), tracked_new::<&D183_PermissionU64, >(&(x224_perm), ), ));
-                        {
-                            {
-                                (x217_cell_perm) = (if op::<_, bool>(()) 
-                                {
-                                    let (_, x228_verus_tmp_cp, ): (Ghost<D71_Map<nat, D70_PointsTo<A4_T, >, >, >, Tracked<D70_PointsTo<A4_T, >, >, ) = f83_consume_start::<A4_T, >(&(*((x214_queue).y157_instance.borrow())), &(x225_tail_token), (x36_self).y169_consumer.borrow_mut(), );
-                                    let x229_cp: D70_PointsTo<A4_T, > = x228_verus_tmp_cp.get();
-                                    D176_Option::C194_Some::<D70_PointsTo<A4_T, >, >(x229_cp, )
-                                } else 
-                                {
-                                    D176_Option::C195_None::<D70_PointsTo<A4_T, >, >()
-                                });
-                            }
-                        };
-                        {
-                            (x222_pair) = ((x224_perm, x225_tail_token, ));
-                        }
-                    };
-                    open_invariant_end(guard, x222_pair);
-                }
-            };
-            x219_result
+            });
         };
-        if op::<_, bool>((&(op::<_, u64>(((x36_self).y158_head, ))), &(x218_tail), )) 
-        {
-            let x230_verus_tmp: D70_PointsTo<A4_T, >;
-            {
-                (x230_verus_tmp) = (
-                match x217_cell_perm {
-                    D176_Option::C194_Some(x231_cp, ) => 
-                    {
-                        x231_cp
-                    }
-                    D176_Option::C195_None() => 
-                    {
-                        f199_proof_from_false::<D70_PointsTo<A4_T, >, >()
-                    }
-                })
-            };
-            let mut x232_cell_perm: D70_PointsTo<A4_T, >;
-            {
-                let mut x233_verus_tmp_cell_perm: D70_PointsTo<A4_T, > = x230_verus_tmp;
-                (x232_cell_perm) = (x233_verus_tmp_cell_perm);
-            };
-            let x234_t: A4_T = f235_take::<A4_T, >(&((*index::<D124_Vec<D123_PCell<A4_T, >, Global, >, usize, D123_PCell<A4_T, >>(&((x214_queue).y160_buffer), (x36_self).y158_head))), tracked_new::<& mut D70_PointsTo<A4_T, >, >(&mut(x232_cell_perm), ), );
-            {
-                let x236_atomic: &&D151_AtomicU64<Tracked<D66_Instance<A4_T, >, >, D37_head<A4_T, >, D150_InvariantPredicate_auto_Queue_head, > = &(&((x214_queue).y158_head));
-                let x237_credit: Tracked<D181_OpenInvariantCredit, > = f182_create_open_invariant_credit();
-                {
-                    f196_spend_open_invariant_credit(x237_credit, );
-                    {
-                        let (guard, mut x238_pair): (_, (D183_PermissionU64, D37_head<A4_T, >, )) = open_atomic_invariant_begin((x236_atomic).y185_atomic_inv.borrow());
-                        
-                        {
-                            let x239_verus_tmp: (D183_PermissionU64, D37_head<A4_T, >, );
-                            {
-                                (x239_verus_tmp) = (x238_pair)
-                            };
-                            let mut x240_perm: D183_PermissionU64;
-                            let mut x241_head_token: D37_head<A4_T, >;
-                            {
-                                let (mut x242_verus_tmp_perm, mut x243_verus_tmp_head_token, ): (D183_PermissionU64, D37_head<A4_T, >, ) = x239_verus_tmp;
-                                (x240_perm) = (x242_verus_tmp_perm);
-                                (x241_head_token) = (x243_verus_tmp_head_token);
-                            };
-                            f211_store(&((x236_atomic).y191_patomic), tracked_new::<& mut D183_PermissionU64, >(&mut(x240_perm), ), op::<_, u64>((x216_next_head, )), );
-                            {
-                                {
-                                    f87_consume_end::<A4_T, >(&(*((x214_queue).y157_instance.borrow())), op::<_, ()>(()), x232_cell_perm, &mut(x241_head_token), (x36_self).y169_consumer.borrow_mut(), );
-                                }
-                            };
-                            {
-                                (x238_pair) = ((x240_perm, x241_head_token, ));
-                            }
-                        };
-                        open_invariant_end(guard, x238_pair);
-                    }
-                };
-            };
-            ((x36_self).y158_head) = (x216_next_head);
-            return x234_t;
-        } else 
-        {
-        }
-    }
+    };
+    let x87_verus_tmp: (Tracked<D31_Instance<A4_T, >, >, Tracked<D23_start<A4_T, >, >, );
+    {
+        (x87_verus_tmp) = (f33_initialize::<A4_T, >(op::<_, ()>(()), op::<_, ()>(()), x78_perms, ))
+    };
+    let mut x88_instance: D31_Instance<A4_T, >;
+    let mut x89_start_token: D23_start<A4_T, >;
+    {
+        let (x90_verus_tmp_instance, x91_verus_tmp_start_token, ): (Tracked<D31_Instance<A4_T, >, >, Tracked<D23_start<A4_T, >, >, ) = x87_verus_tmp;
+        (x88_instance) = (x90_verus_tmp_instance.get());
+        (x89_start_token) = (x91_verus_tmp_start_token.get());
+    };
+    let x92_tracked_inst: Tracked<D31_Instance<A4_T, >, > = tracked_new::<D31_Instance<A4_T, >, >(f30_clone::<A4_T, >(&(x88_instance), ), );
+    let x93_start_atomic: D52_AtomicU64<Tracked<D31_Instance<A4_T, >, >, D23_start<A4_T, >, D51_InvariantPredicate_auto_VBBuffer_start, > = f94_new::<Tracked<D31_Instance<A4_T, >, >, D23_start<A4_T, >, D51_InvariantPredicate_auto_VBBuffer_start, >(op::<_, Ghost<Tracked<D31_Instance<A4_T, >, >, >>(()), op::<_, u64>(()), tracked_new::<D23_start<A4_T, >, >(x89_start_token, ), );
+    D71_VBBuffer::<A4_T, > { y67_instance: tracked_new::<D31_Instance<A4_T, >, >(x88_instance, ), y53_start: x93_start_atomic, y95_buffer: x72_backing_cells_vec,  } 
 }
 
-fn f261_main(
+fn f100_main(
 )
 {
-    let (mut x246_producer, mut x247_consumer, ): (D164_Producer<u64, >, D168_Consumer<u64, >, ) = f171_new_queue::<u64, >(op::<_, usize>(()), );
-    f213_enqueue::<u64, >(&mut(x246_producer), op::<_, u64>(()), );
-    f213_enqueue::<u64, >(&mut(x246_producer), op::<_, u64>(()), );
-    f213_enqueue::<u64, >(&mut(x246_producer), op::<_, u64>(()), );
-    let x248_x: u64 = f245_dequeue::<u64, >(&mut(x247_consumer), );
-    f249_print_u64(x248_x, );
-    let x250_x: u64 = f245_dequeue::<u64, >(&mut(x247_consumer), );
-    f249_print_u64(x250_x, );
-    let x251_x: u64 = f245_dequeue::<u64, >(&mut(x247_consumer), );
-    f249_print_u64(x251_x, );
-    let x252_producer: D164_Producer<u64, > = x246_producer;
-    let x253__join_handle: D254_JoinHandle<(), > = f257_spawn::<_, (), >((move || 
-    {
-        let mut x255_producer: D164_Producer<u64, > = x252_producer;
-        let mut x256_i: u64 = op::<_, u64>(());
-        while op::<_, bool>((&(x256_i), &(op::<_, u64>(())), )) 
-        {
-            f213_enqueue::<u64, >(&mut(x255_producer), x256_i, );
-            (x256_i) = (op::<_, u64>((x256_i, op::<_, u64>(()), )));
-        }
-    }), );
-    let mut x258_i: i32 = op::<_, i32>(());
-    while op::<_, bool>((&(x258_i), &(op::<_, i32>(())), )) 
-    {
-        let x259_x: u64 = f245_dequeue::<u64, >(&mut(x247_consumer), );
-        f249_print_u64(x259_x, );
-        (x258_i) = (op::<_, i32>((x258_i, op::<_, i32>(()), )));
-    }
+    let mut x98_vbuf: D71_VBBuffer<u32, > = f97_new_buf::<u32, >(op::<_, usize>(()), );
+    let _: () = f70_checkout_first::<u32, >(&mut(x98_vbuf), );
 }
 
-fn f257_spawn<A263_F, A264_Ret, >(
-    x265_f: A263_F,
-) -> D254_JoinHandle<A264_Ret, > where A263_F: , A264_Ret: , A263_F: 'static, A264_Ret: 'static, A263_F: FnOnce() -> A264_Ret, 
+fn f94_new<A102_K, A103_G, A104_Pred, >(
+    x105_verus_tmp_k: Ghost<A102_K, >,
+    x106_u: u64,
+    x107_verus_tmp_g: Tracked<A103_G, >,
+) -> D52_AtomicU64<A102_K, A103_G, A104_Pred, > where A102_K: , A103_G: , A104_Pred: , 
 {
     panic!()
 }
 
-fn f249_print_u64(
-    x267_i: u64,
+fn f86_tracked_insert<'a20__, A102_K, A109_V, >(
+    x22_self: &'a20__  mut D36_Map<A102_K, A109_V, >,
+    x110_key: (),
+    x111_value: A109_V,
+) -> () where A102_K: , A109_V: , 
+{
+    panic!()
+}
+
+fn f85_push<'a20__, A4_T, A113_A, >(
+    x114_vec: &'a20__  mut D74_Vec<A4_T, A113_A, >,
+    x115_value: A4_T,
+) -> () where A4_T: , A113_A: , A113_A: Allocator, 
+{
+    panic!()
+}
+
+fn f84_empty<A109_V, >(
+) -> (D73_PCell<A109_V, >, Tracked<D35_PointsTo<A109_V, >, >, ) where A109_V: , 
+{
+    panic!()
+}
+
+fn f80_len<'a20__, A4_T, A113_A, >(
+    x114_vec: &'a20__ D74_Vec<A4_T, A113_A, >,
+) -> usize where A4_T: , A113_A: , A113_A: Allocator, 
+{
+    panic!()
+}
+
+fn f77_tracked_empty<A102_K, A109_V, >(
+) -> D36_Map<A102_K, A109_V, > where A102_K: , A109_V: , 
+{
+    panic!()
+}
+
+fn f75_new<A4_T, >(
+) -> D74_Vec<A4_T, Global, > where A4_T: , 
+{
+    panic!()
+}
+
+fn f68_spend_open_invariant_credit(
+    x121_credit: Tracked<D55_OpenInvariantCredit, >,
 ) -> ()
 {
     panic!()
 }
 
-fn f235_take<'a34__, 'a35__, A269_V, >(
-    x36_self: &'a34__ D123_PCell<A269_V, >,
-    x270_verus_tmp_perm: Tracked<&'a35__  mut D70_PointsTo<A269_V, >, >,
-) -> A269_V where A269_V: , 
-{
-    panic!()
-}
-
-fn f211_store<'a34__, 'a35__, >(
-    x36_self: &'a34__ D272_PAtomicU64,
-    x270_verus_tmp_perm: Tracked<&'a35__  mut D183_PermissionU64, >,
-    x273_v: u64,
-) -> () where 
-{
-    panic!()
-}
-
-fn f203_put<'a34__, 'a35__, A269_V, >(
-    x36_self: &'a34__ D123_PCell<A269_V, >,
-    x270_verus_tmp_perm: Tracked<&'a35__  mut D70_PointsTo<A269_V, >, >,
-    x273_v: A269_V,
-) -> () where A269_V: , 
-{
-    panic!()
-}
-
-fn f199_proof_from_false<A276_A, >(
-) -> A276_A where A276_A: , 
-{
-    panic!()
-}
-
-fn f196_spend_open_invariant_credit(
-    x278_credit: Tracked<D181_OpenInvariantCredit, >,
-) -> ()
-{
-    panic!()
-}
-
-fn f192_load<'a34__, 'a35__, >(
-    x36_self: &'a34__ D272_PAtomicU64,
-    x270_verus_tmp_perm: Tracked<&'a35__ D183_PermissionU64, >,
+fn f66_load<'a20__, 'a21__, >(
+    x22_self: &'a20__ D123_PAtomicU64,
+    x124_verus_tmp_perm: Tracked<&'a21__ D57_PermissionU64, >,
 ) -> u64 where 
 {
     panic!()
 }
 
-fn f182_create_open_invariant_credit(
-) -> Tracked<D181_OpenInvariantCredit, >
-{
-    panic!()
-}
-
-fn f162_new<A4_T, >(
-    x282_t: A4_T,
-) -> Arc<A4_T, Global, > where A4_T: , 
-{
-    panic!()
-}
-
-fn f152_new<A284_K, A285_G, A286_Pred, >(
-    x287_verus_tmp_k: Ghost<A284_K, >,
-    x288_u: u64,
-    x289_verus_tmp_g: Tracked<A285_G, >,
-) -> D151_AtomicU64<A284_K, A285_G, A286_Pred, > where A284_K: , A285_G: , A286_Pred: , 
-{
-    panic!()
-}
-
-fn f136_tracked_insert<'a34__, A284_K, A269_V, >(
-    x36_self: &'a34__  mut D71_Map<A284_K, A269_V, >,
-    x291_key: (),
-    x292_value: A269_V,
-) -> () where A284_K: , A269_V: , 
-{
-    panic!()
-}
-
-fn f135_push<'a34__, A4_T, A276_A, >(
-    x294_vec: &'a34__  mut D124_Vec<A4_T, A276_A, >,
-    x295_value: A4_T,
-) -> () where A4_T: , A276_A: , A276_A: Allocator, 
-{
-    panic!()
-}
-
-fn f134_empty<A269_V, >(
-) -> (D123_PCell<A269_V, >, Tracked<D70_PointsTo<A269_V, >, >, ) where A269_V: , 
-{
-    panic!()
-}
-
-fn f130_len<'a34__, A4_T, A276_A, >(
-    x294_vec: &'a34__ D124_Vec<A4_T, A276_A, >,
-) -> usize where A4_T: , A276_A: , A276_A: Allocator, 
-{
-    panic!()
-}
-
-fn f127_tracked_empty<A284_K, A269_V, >(
-) -> D71_Map<A284_K, A269_V, > where A284_K: , A269_V: , 
-{
-    panic!()
-}
-
-fn f125_new<A4_T, >(
-) -> D124_Vec<A4_T, Global, > where A4_T: , 
-{
-    panic!()
-}
-
-fn f301_assert_safety(
-    x302_b: (),
-) -> ()
+fn f56_create_open_invariant_credit(
+) -> Tracked<D55_OpenInvariantCredit, >
 {
     panic!()
 }

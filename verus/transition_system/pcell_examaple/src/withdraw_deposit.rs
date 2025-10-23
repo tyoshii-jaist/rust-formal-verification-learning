@@ -96,18 +96,14 @@ tokenized_state_machine!{VBQueue<T> {
 
     #[inductive(checkout_first)]
     fn checkout_first_inductive(pre: Self, post: Self) {
-        /*
-        assert forall|i: nat|
-            0 <= i && i < pre.len() implies pre.valid_storage_at_idx(i)
-        by {
-            assert(pre.storage.dom().contains(i));
-        }
+        assert(forall|i: nat|
+            0 <= i && i < pre.len() ==> pre.valid_storage_at_idx(i)
+        );
         assert(forall|i| pre.valid_storage_at_idx(i) ==> post.valid_storage_at_idx(i));
-        assert forall|i: nat|
-            0 <= i && i < post.len() implies post.valid_storage_at_idx(i)
-        by {
-            assert(post.storage.dom().contains(i));
-        } */
+        
+        assert(forall|i: nat|
+            0 <= i && i < post.len() ==> post.valid_storage_at_idx(i)
+        );
     }
 }} // tokenized_state_machine
 

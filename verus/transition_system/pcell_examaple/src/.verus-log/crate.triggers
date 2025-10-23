@@ -1,5 +1,5 @@
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 61716,
@@ -29,7 +29,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 62109,
@@ -73,7 +73,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 62109,
@@ -117,7 +117,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 62119,
@@ -147,7 +147,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 62145,
@@ -191,7 +191,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 62145,
@@ -235,7 +235,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 62155,
@@ -265,7 +265,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 46355,
@@ -295,7 +295,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 46376,
@@ -325,157 +325,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46436,
-        data: [
-            14062242596622603807,
-            1483632028239279,
-        ],
-        as_string: "vstd/map.rs:212:1: 212:85 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46409,
-                    data: [
-                        14062242596622603807,
-                        1484130244445673,
-                    ],
-                    as_string: "vstd/map.rs:214:20: 214:46 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46408, data: [14062242596622603807, 1484130244445667], as_string: \"vstd/map.rs:214:20: 214:40 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"insert\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46405, data: [14062242596622603807, 1484130244445648], as_string: \"vstd/map.rs:214:20: 214:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46406, data: [14062242596622603807, 1484168899151323], as_string: \"vstd/map.rs:214:29: 214:32 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46407, data: [14062242596622603807, 1484190373987810], as_string: \"vstd/map.rs:214:34: 214:39 (#0)\" }, typ: TypParam(\"V\"), x: Var(VarIdent(\"value\", VirParam)) }]) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46452,
-        data: [
-            14062242596622603807,
-            1485208281237276,
-        ],
-        as_string: "vstd/map.rs:222:1: 222:83 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46445,
-                    data: [
-                        14062242596622603807,
-                        1485650662868821,
-                    ],
-                    as_string: "vstd/map.rs:224:9: 224:45 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46443, data: [14062242596622603807, 1485697907509072], as_string: \"vstd/map.rs:224:20: 224:40 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"insert\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46440, data: [14062242596622603807, 1485697907509053], as_string: \"vstd/map.rs:224:20: 224:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46441, data: [14062242596622603807, 1485736562214728], as_string: \"vstd/map.rs:224:29: 224:32 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46442, data: [14062242596622603807, 1485758037051215], as_string: \"vstd/map.rs:224:34: 224:39 (#0)\" }, typ: TypParam(\"V\"), x: Var(VarIdent(\"value\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46444, data: [14062242596622603807, 1485788101822292], as_string: \"vstd/map.rs:224:41: 224:44 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46477,
-        data: [
-            14062242596622603807,
-            1486273433126947,
-        ],
-        as_string: "vstd/map.rs:229:1: 229:98 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46468,
-                    data: [
-                        14062242596622603807,
-                        1486930563123329,
-                    ],
-                    as_string: "vstd/map.rs:233:9: 233:47 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46466, data: [14062242596622603807, 1486977807763579], as_string: \"vstd/map.rs:233:20: 233:41 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"insert\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46463, data: [14062242596622603807, 1486977807763559], as_string: \"vstd/map.rs:233:20: 233:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46464, data: [14062242596622603807, 1487016462469235], as_string: \"vstd/map.rs:233:29: 233:33 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key2\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46465, data: [14062242596622603807, 1487042232273018], as_string: \"vstd/map.rs:233:35: 233:40 (#0)\" }, typ: TypParam(\"V\"), x: Var(VarIdent(\"value\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46467, data: [14062242596622603807, 1487072297044096], as_string: \"vstd/map.rs:233:42: 233:46 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key1\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46509,
-        data: [
-            14062242596622603807,
-            1487729427040607,
-        ],
-        as_string: "vstd/map.rs:239:1: 239:75 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46483,
-                    data: [
-                        14062242596622603807,
-                        1488184693574034,
-                    ],
-                    as_string: "vstd/map.rs:241:20: 241:39 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46482, data: [14062242596622603807, 1488184693574028], as_string: \"vstd/map.rs:241:20: 241:33 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"remove\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46480, data: [14062242596622603807, 1488184693574016], as_string: \"vstd/map.rs:241:20: 241:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46481, data: [14062242596622603807, 1488223348279691], as_string: \"vstd/map.rs:241:29: 241:32 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key\", VirParam)) }]) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46532,
-        data: [
-            14062242596622603807,
-            1489327154875104,
-        ],
-        as_string: "vstd/map.rs:250:1: 250:88 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46523,
-                    data: [
-                        14062242596622603807,
-                        1489941335198519,
-                    ],
-                    as_string: "vstd/map.rs:254:9: 254:40 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46521, data: [14062242596622603807, 1489988579838769], as_string: \"vstd/map.rs:254:20: 254:34 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"remove\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46519, data: [14062242596622603807, 1489988579838756], as_string: \"vstd/map.rs:254:20: 254:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46520, data: [14062242596622603807, 1490027234544432], as_string: \"vstd/map.rs:254:29: 254:33 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key2\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46522, data: [14062242596622603807, 1490053004348214], as_string: \"vstd/map.rs:254:35: 254:39 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key1\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 46555,
@@ -519,7 +369,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 46555,
@@ -563,7 +413,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 46678,
@@ -593,7 +443,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 46701,
@@ -637,7 +487,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 46701,
@@ -681,7 +531,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 46713,
@@ -711,157 +561,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75620,
-        data: [
-            14062242596622603807,
-            2927045982709346,
-        ],
-        as_string: "vstd/set.rs:647:1: 647:65 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75615,
-                    data: [
-                        14062242596622603807,
-                        2927458299569817,
-                    ],
-                    as_string: "vstd/set.rs:649:20: 649:43 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75613, data: [14062242596622603807, 2927458299569805], as_string: \"vstd/set.rs:649:20: 649:31 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"insert\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75611, data: [14062242596622603807, 2927458299569795], as_string: \"vstd/set.rs:649:20: 649:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75612, data: [14062242596622603807, 2927496954275468], as_string: \"vstd/set.rs:649:29: 649:30 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75614, data: [14062242596622603807, 2927548493883032], as_string: \"vstd/set.rs:649:41: 649:42 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75643,
-        data: [
-            14062242596622603807,
-            2928351652767647,
-        ],
-        as_string: "vstd/set.rs:655:1: 655:78 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75634,
-                    data: [
-                        14062242596622603807,
-                        2928952948189175,
-                    ],
-                    as_string: "vstd/set.rs:659:20: 659:45 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75632, data: [14062242596622603807, 2928952948189162], as_string: \"vstd/set.rs:659:20: 659:32 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"insert\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75630, data: [14062242596622603807, 2928952948189151], as_string: \"vstd/set.rs:659:20: 659:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75631, data: [14062242596622603807, 2928991602894825], as_string: \"vstd/set.rs:659:29: 659:31 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a2\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75633, data: [14062242596622603807, 2929047437469686], as_string: \"vstd/set.rs:659:42: 659:44 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a1\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75656,
-        data: [
-            14062242596622603807,
-            2929485524134042,
-        ],
-        as_string: "vstd/set.rs:664:1: 664:65 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75650,
-                    data: [
-                        14062242596622603807,
-                        2929854891321556,
-                    ],
-                    as_string: "vstd/set.rs:666:10: 666:46 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75648, data: [14062242596622603807, 2929906430929095], as_string: \"vstd/set.rs:666:22: 666:33 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"remove\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75646, data: [14062242596622603807, 2929906430929085], as_string: \"vstd/set.rs:666:22: 666:23 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75647, data: [14062242596622603807, 2929945085634758], as_string: \"vstd/set.rs:666:31: 666:32 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75649, data: [14062242596622603807, 2929996625242322], as_string: \"vstd/set.rs:666:43: 666:44 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75763,
-        data: [
-            14062242596622603807,
-            2930589330729373,
-        ],
-        as_string: "vstd/set.rs:672:1: 672:67 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75666,
-                    data: [
-                        14062242596622603807,
-                        2931117611706862,
-                    ],
-                    as_string: "vstd/set.rs:676:9: 676:33 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"remove\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75664, data: [14062242596622603807, 2931169151314403], as_string: \"vstd/set.rs:676:21: 676:22 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75665, data: [14062242596622603807, 2931207806020076], as_string: \"vstd/set.rs:676:30: 676:31 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75786,
-        data: [
-            14062242596622603807,
-            2934927247699354,
-        ],
-        as_string: "vstd/set.rs:702:1: 702:78 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75777,
-                    data: [
-                        14062242596622603807,
-                        2935528543120882,
-                    ],
-                    as_string: "vstd/set.rs:706:20: 706:45 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75775, data: [14062242596622603807, 2935528543120869], as_string: \"vstd/set.rs:706:20: 706:32 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"remove\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75773, data: [14062242596622603807, 2935528543120858], as_string: \"vstd/set.rs:706:20: 706:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75774, data: [14062242596622603807, 2935567197826532], as_string: \"vstd/set.rs:706:29: 706:31 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a2\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75776, data: [14062242596622603807, 2935623032401393], as_string: \"vstd/set.rs:706:42: 706:44 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a1\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 75879,
@@ -905,7 +605,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 75879,
@@ -949,7 +649,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 75965,
@@ -979,7 +679,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
         id: 75979,
@@ -1009,29 +709,29 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "show"]),
     span: Span {
         raw_span: "ANY",
-        id: 76187,
+        id: 360,
         data: [
-            14062242596622603807,
-            2947155019593902,
+            1758585418759771416,
+            6193342842548,
         ],
-        as_string: "vstd/set.rs:790:1: 790:67 (#0)",
+        as_string: "withdraw_deposit.rs:53:20: 58:14 (#0)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 76047,
+                    id: 344,
                     data: [
-                        14062242596622603807,
-                        2947717660309763,
+                        1758585418759771416,
+                        6635724473890,
                     ],
-                    as_string: "vstd/set.rs:794:20: 794:40 (#0)",
+                    as_string: "withdraw_deposit.rs:55:32: 55:57 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"impl&%0\" :: \"finite\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 76046, data: [14062242596622603807, 2947717660309754], as_string: \"vstd/set.rs:794:20: 794:31 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"insert\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 76044, data: [14062242596622603807, 2947717660309744], as_string: \"vstd/set.rs:794:20: 794:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 76045, data: [14062242596622603807, 2947756315015417], as_string: \"vstd/set.rs:794:29: 794:30 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }]) }])",
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 342, data: [1758585418759771416, 6635724473878], as_string: \"withdraw_deposit.rs:55:32: 55:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 341, data: [1758585418759771416, 6635724473872], as_string: \"withdraw_deposit.rs:55:32: 55:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 343, data: [1758585418759771416, 6734508721697], as_string: \"withdraw_deposit.rs:55:55: 55:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
             ),
         ],
     ],
@@ -1039,67 +739,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 76321,
-        data: [
-            14062242596622603807,
-            2951634670484673,
-        ],
-        as_string: "vstd/set.rs:827:1: 827:67 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 76197,
-                    data: [
-                        14062242596622603807,
-                        2952197311200534,
-                    ],
-                    as_string: "vstd/set.rs:831:20: 831:40 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"impl&%0\" :: \"finite\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 76196, data: [14062242596622603807, 2952197311200525], as_string: \"vstd/set.rs:831:20: 831:31 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"remove\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 76194, data: [14062242596622603807, 2952197311200515], as_string: \"vstd/set.rs:831:20: 831:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 76195, data: [14062242596622603807, 2952235965906188], as_string: \"vstd/set.rs:831:29: 831:30 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }]) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "show"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 1342,
-        data: [
-            3792875986564049357,
-            22518513538445,
-        ],
-        as_string: "producer_comsumer_example.rs:173:20: 178:14 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 1326,
-                    data: [
-                        3792875986564049357,
-                        22960895169787,
-                    ],
-                    as_string: "producer_comsumer_example.rs:175:32: 175:57 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1324, data: [3792875986564049357, 22960895169775], as_string: \"producer_comsumer_example.rs:175:32: 175:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1323, data: [3792875986564049357, 22960895169769], as_string: \"producer_comsumer_example.rs:175:32: 175:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 1325, data: [3792875986564049357, 23059679417594], as_string: \"producer_comsumer_example.rs:175:55: 175:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 61716,
@@ -1129,7 +769,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 62109,
@@ -1173,7 +813,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 62109,
@@ -1217,7 +857,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 62119,
@@ -1247,7 +887,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 62145,
@@ -1291,7 +931,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 62145,
@@ -1335,7 +975,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 62155,
@@ -1365,7 +1005,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 46355,
@@ -1395,7 +1035,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 46376,
@@ -1425,157 +1065,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46436,
-        data: [
-            14062242596622603807,
-            1483632028239279,
-        ],
-        as_string: "vstd/map.rs:212:1: 212:85 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46409,
-                    data: [
-                        14062242596622603807,
-                        1484130244445673,
-                    ],
-                    as_string: "vstd/map.rs:214:20: 214:46 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46408, data: [14062242596622603807, 1484130244445667], as_string: \"vstd/map.rs:214:20: 214:40 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"insert\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46405, data: [14062242596622603807, 1484130244445648], as_string: \"vstd/map.rs:214:20: 214:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46406, data: [14062242596622603807, 1484168899151323], as_string: \"vstd/map.rs:214:29: 214:32 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46407, data: [14062242596622603807, 1484190373987810], as_string: \"vstd/map.rs:214:34: 214:39 (#0)\" }, typ: TypParam(\"V\"), x: Var(VarIdent(\"value\", VirParam)) }]) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46452,
-        data: [
-            14062242596622603807,
-            1485208281237276,
-        ],
-        as_string: "vstd/map.rs:222:1: 222:83 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46445,
-                    data: [
-                        14062242596622603807,
-                        1485650662868821,
-                    ],
-                    as_string: "vstd/map.rs:224:9: 224:45 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46443, data: [14062242596622603807, 1485697907509072], as_string: \"vstd/map.rs:224:20: 224:40 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"insert\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46440, data: [14062242596622603807, 1485697907509053], as_string: \"vstd/map.rs:224:20: 224:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46441, data: [14062242596622603807, 1485736562214728], as_string: \"vstd/map.rs:224:29: 224:32 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46442, data: [14062242596622603807, 1485758037051215], as_string: \"vstd/map.rs:224:34: 224:39 (#0)\" }, typ: TypParam(\"V\"), x: Var(VarIdent(\"value\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46444, data: [14062242596622603807, 1485788101822292], as_string: \"vstd/map.rs:224:41: 224:44 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46477,
-        data: [
-            14062242596622603807,
-            1486273433126947,
-        ],
-        as_string: "vstd/map.rs:229:1: 229:98 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46468,
-                    data: [
-                        14062242596622603807,
-                        1486930563123329,
-                    ],
-                    as_string: "vstd/map.rs:233:9: 233:47 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46466, data: [14062242596622603807, 1486977807763579], as_string: \"vstd/map.rs:233:20: 233:41 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"insert\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46463, data: [14062242596622603807, 1486977807763559], as_string: \"vstd/map.rs:233:20: 233:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46464, data: [14062242596622603807, 1487016462469235], as_string: \"vstd/map.rs:233:29: 233:33 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key2\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46465, data: [14062242596622603807, 1487042232273018], as_string: \"vstd/map.rs:233:35: 233:40 (#0)\" }, typ: TypParam(\"V\"), x: Var(VarIdent(\"value\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46467, data: [14062242596622603807, 1487072297044096], as_string: \"vstd/map.rs:233:42: 233:46 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key1\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46509,
-        data: [
-            14062242596622603807,
-            1487729427040607,
-        ],
-        as_string: "vstd/map.rs:239:1: 239:75 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46483,
-                    data: [
-                        14062242596622603807,
-                        1488184693574034,
-                    ],
-                    as_string: "vstd/map.rs:241:20: 241:39 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46482, data: [14062242596622603807, 1488184693574028], as_string: \"vstd/map.rs:241:20: 241:33 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"remove\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46480, data: [14062242596622603807, 1488184693574016], as_string: \"vstd/map.rs:241:20: 241:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46481, data: [14062242596622603807, 1488223348279691], as_string: \"vstd/map.rs:241:29: 241:32 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key\", VirParam)) }]) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46532,
-        data: [
-            14062242596622603807,
-            1489327154875104,
-        ],
-        as_string: "vstd/map.rs:250:1: 250:88 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46523,
-                    data: [
-                        14062242596622603807,
-                        1489941335198519,
-                    ],
-                    as_string: "vstd/map.rs:254:9: 254:40 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46521, data: [14062242596622603807, 1489988579838769], as_string: \"vstd/map.rs:254:20: 254:34 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"remove\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46519, data: [14062242596622603807, 1489988579838756], as_string: \"vstd/map.rs:254:20: 254:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46520, data: [14062242596622603807, 1490027234544432], as_string: \"vstd/map.rs:254:29: 254:33 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key2\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46522, data: [14062242596622603807, 1490053004348214], as_string: \"vstd/map.rs:254:35: 254:39 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key1\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 46555,
@@ -1619,7 +1109,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 46555,
@@ -1663,7 +1153,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 46678,
@@ -1693,7 +1183,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 46701,
@@ -1737,7 +1227,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 46701,
@@ -1781,7 +1271,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 46713,
@@ -1811,157 +1301,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75620,
-        data: [
-            14062242596622603807,
-            2927045982709346,
-        ],
-        as_string: "vstd/set.rs:647:1: 647:65 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75615,
-                    data: [
-                        14062242596622603807,
-                        2927458299569817,
-                    ],
-                    as_string: "vstd/set.rs:649:20: 649:43 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75613, data: [14062242596622603807, 2927458299569805], as_string: \"vstd/set.rs:649:20: 649:31 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"insert\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75611, data: [14062242596622603807, 2927458299569795], as_string: \"vstd/set.rs:649:20: 649:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75612, data: [14062242596622603807, 2927496954275468], as_string: \"vstd/set.rs:649:29: 649:30 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75614, data: [14062242596622603807, 2927548493883032], as_string: \"vstd/set.rs:649:41: 649:42 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75643,
-        data: [
-            14062242596622603807,
-            2928351652767647,
-        ],
-        as_string: "vstd/set.rs:655:1: 655:78 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75634,
-                    data: [
-                        14062242596622603807,
-                        2928952948189175,
-                    ],
-                    as_string: "vstd/set.rs:659:20: 659:45 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75632, data: [14062242596622603807, 2928952948189162], as_string: \"vstd/set.rs:659:20: 659:32 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"insert\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75630, data: [14062242596622603807, 2928952948189151], as_string: \"vstd/set.rs:659:20: 659:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75631, data: [14062242596622603807, 2928991602894825], as_string: \"vstd/set.rs:659:29: 659:31 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a2\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75633, data: [14062242596622603807, 2929047437469686], as_string: \"vstd/set.rs:659:42: 659:44 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a1\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75656,
-        data: [
-            14062242596622603807,
-            2929485524134042,
-        ],
-        as_string: "vstd/set.rs:664:1: 664:65 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75650,
-                    data: [
-                        14062242596622603807,
-                        2929854891321556,
-                    ],
-                    as_string: "vstd/set.rs:666:10: 666:46 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75648, data: [14062242596622603807, 2929906430929095], as_string: \"vstd/set.rs:666:22: 666:33 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"remove\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75646, data: [14062242596622603807, 2929906430929085], as_string: \"vstd/set.rs:666:22: 666:23 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75647, data: [14062242596622603807, 2929945085634758], as_string: \"vstd/set.rs:666:31: 666:32 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75649, data: [14062242596622603807, 2929996625242322], as_string: \"vstd/set.rs:666:43: 666:44 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75763,
-        data: [
-            14062242596622603807,
-            2930589330729373,
-        ],
-        as_string: "vstd/set.rs:672:1: 672:67 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75666,
-                    data: [
-                        14062242596622603807,
-                        2931117611706862,
-                    ],
-                    as_string: "vstd/set.rs:676:9: 676:33 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"remove\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75664, data: [14062242596622603807, 2931169151314403], as_string: \"vstd/set.rs:676:21: 676:22 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75665, data: [14062242596622603807, 2931207806020076], as_string: \"vstd/set.rs:676:30: 676:31 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75786,
-        data: [
-            14062242596622603807,
-            2934927247699354,
-        ],
-        as_string: "vstd/set.rs:702:1: 702:78 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75777,
-                    data: [
-                        14062242596622603807,
-                        2935528543120882,
-                    ],
-                    as_string: "vstd/set.rs:706:20: 706:45 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75775, data: [14062242596622603807, 2935528543120869], as_string: \"vstd/set.rs:706:20: 706:32 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"remove\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75773, data: [14062242596622603807, 2935528543120858], as_string: \"vstd/set.rs:706:20: 706:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75774, data: [14062242596622603807, 2935567197826532], as_string: \"vstd/set.rs:706:29: 706:31 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a2\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75776, data: [14062242596622603807, 2935623032401393], as_string: \"vstd/set.rs:706:42: 706:44 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a1\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 75879,
@@ -2005,7 +1345,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 75879,
@@ -2049,7 +1389,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 75965,
@@ -2079,7 +1419,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
         id: 75979,
@@ -2109,29 +1449,29 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
-        id: 76187,
+        id: 360,
         data: [
-            14062242596622603807,
-            2947155019593902,
+            1758585418759771416,
+            6193342842548,
         ],
-        as_string: "vstd/set.rs:790:1: 790:67 (#0)",
+        as_string: "withdraw_deposit.rs:53:20: 58:14 (#0)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 76047,
+                    id: 344,
                     data: [
-                        14062242596622603807,
-                        2947717660309763,
+                        1758585418759771416,
+                        6635724473890,
                     ],
-                    as_string: "vstd/set.rs:794:20: 794:40 (#0)",
+                    as_string: "withdraw_deposit.rs:55:32: 55:57 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"impl&%0\" :: \"finite\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 76046, data: [14062242596622603807, 2947717660309754], as_string: \"vstd/set.rs:794:20: 794:31 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"insert\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 76044, data: [14062242596622603807, 2947717660309744], as_string: \"vstd/set.rs:794:20: 794:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 76045, data: [14062242596622603807, 2947756315015417], as_string: \"vstd/set.rs:794:29: 794:30 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }]) }])",
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 342, data: [1758585418759771416, 6635724473878], as_string: \"withdraw_deposit.rs:55:32: 55:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 341, data: [1758585418759771416, 6635724473872], as_string: \"withdraw_deposit.rs:55:32: 55:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 343, data: [1758585418759771416, 6734508721697], as_string: \"withdraw_deposit.rs:55:55: 55:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
             ),
         ],
     ],
@@ -2139,89 +1479,29 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
-        id: 76321,
+        id: 610,
         data: [
-            14062242596622603807,
-            2951634670484673,
+            1758585418759771416,
+            4475355923558,
         ],
-        as_string: "vstd/set.rs:827:1: 827:67 (#0)",
+        as_string: "withdraw_deposit.rs:43:9: 44:41 (#0)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 76197,
+                    id: 608,
                     data: [
-                        14062242596622603807,
-                        2952197311200534,
+                        1758585418759771416,
+                        4715874092134,
                     ],
-                    as_string: "vstd/set.rs:831:20: 831:40 (#0)",
+                    as_string: "withdraw_deposit.rs:44:13: 44:41 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"impl&%0\" :: \"finite\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 76196, data: [14062242596622603807, 2952197311200525], as_string: \"vstd/set.rs:831:20: 831:31 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"remove\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 76194, data: [14062242596622603807, 2952197311200515], as_string: \"vstd/set.rs:831:20: 831:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 76195, data: [14062242596622603807, 2952235965906188], as_string: \"vstd/set.rs:831:29: 831:30 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }]) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 1342,
-        data: [
-            3792875986564049357,
-            22518513538445,
-        ],
-        as_string: "producer_comsumer_example.rs:173:20: 178:14 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 1326,
-                    data: [
-                        3792875986564049357,
-                        22960895169787,
-                    ],
-                    as_string: "producer_comsumer_example.rs:175:32: 175:57 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1324, data: [3792875986564049357, 22960895169775], as_string: \"producer_comsumer_example.rs:175:32: 175:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1323, data: [3792875986564049357, 22960895169769], as_string: \"producer_comsumer_example.rs:175:32: 175:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 1325, data: [3792875986564049357, 23059679417594], as_string: \"producer_comsumer_example.rs:175:55: 175:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 3865,
-        data: [
-            3792875986564049357,
-            20800526619455,
-        ],
-        as_string: "producer_comsumer_example.rs:163:9: 164:41 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 3863,
-                    data: [
-                        3792875986564049357,
-                        21041044788031,
-                    ],
-                    as_string: "producer_comsumer_example.rs:164:13: 164:41 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, self!, i$)",
+                "withdraw_deposit::VBQueue::State::valid_storage_at_idx(T&, self!, i$)",
             ),
         ],
     ],
@@ -2229,29 +1509,29 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue" :: "take_step"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue" :: "take_step"]),
     span: Span {
         raw_span: "ANY",
-        id: 1432,
+        id: 424,
         data: [
-            3792875986564049357,
-            22518513538445,
+            1758585418759771416,
+            6193342842548,
         ],
-        as_string: "producer_comsumer_example.rs:173:20: 178:14 (#0)",
+        as_string: "withdraw_deposit.rs:53:20: 58:14 (#0)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 1416,
+                    id: 408,
                     data: [
-                        3792875986564049357,
-                        22960895169787,
+                        1758585418759771416,
+                        6635724473890,
                     ],
-                    as_string: "producer_comsumer_example.rs:175:32: 175:57 (#0)",
+                    as_string: "withdraw_deposit.rs:55:32: 55:57 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1414, data: [3792875986564049357, 22960895169775], as_string: \"producer_comsumer_example.rs:175:32: 175:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1413, data: [3792875986564049357, 22960895169769], as_string: \"producer_comsumer_example.rs:175:32: 175:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 1415, data: [3792875986564049357, 23059679417594], as_string: \"producer_comsumer_example.rs:175:55: 175:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 406, data: [1758585418759771416, 6635724473878], as_string: \"withdraw_deposit.rs:55:32: 55:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 405, data: [1758585418759771416, 6635724473872], as_string: \"withdraw_deposit.rs:55:32: 55:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 407, data: [1758585418759771416, 6734508721697], as_string: \"withdraw_deposit.rs:55:55: 55:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
             ),
         ],
     ],
@@ -2259,7 +1539,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 61716,
@@ -2289,7 +1569,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 62109,
@@ -2333,7 +1613,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 62109,
@@ -2377,7 +1657,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 62119,
@@ -2407,7 +1687,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 62145,
@@ -2451,7 +1731,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 62145,
@@ -2495,7 +1775,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 62155,
@@ -2525,7 +1805,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 46355,
@@ -2555,7 +1835,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 46376,
@@ -2585,157 +1865,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46436,
-        data: [
-            14062242596622603807,
-            1483632028239279,
-        ],
-        as_string: "vstd/map.rs:212:1: 212:85 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46409,
-                    data: [
-                        14062242596622603807,
-                        1484130244445673,
-                    ],
-                    as_string: "vstd/map.rs:214:20: 214:46 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46408, data: [14062242596622603807, 1484130244445667], as_string: \"vstd/map.rs:214:20: 214:40 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"insert\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46405, data: [14062242596622603807, 1484130244445648], as_string: \"vstd/map.rs:214:20: 214:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46406, data: [14062242596622603807, 1484168899151323], as_string: \"vstd/map.rs:214:29: 214:32 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46407, data: [14062242596622603807, 1484190373987810], as_string: \"vstd/map.rs:214:34: 214:39 (#0)\" }, typ: TypParam(\"V\"), x: Var(VarIdent(\"value\", VirParam)) }]) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46452,
-        data: [
-            14062242596622603807,
-            1485208281237276,
-        ],
-        as_string: "vstd/map.rs:222:1: 222:83 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46445,
-                    data: [
-                        14062242596622603807,
-                        1485650662868821,
-                    ],
-                    as_string: "vstd/map.rs:224:9: 224:45 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46443, data: [14062242596622603807, 1485697907509072], as_string: \"vstd/map.rs:224:20: 224:40 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"insert\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46440, data: [14062242596622603807, 1485697907509053], as_string: \"vstd/map.rs:224:20: 224:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46441, data: [14062242596622603807, 1485736562214728], as_string: \"vstd/map.rs:224:29: 224:32 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46442, data: [14062242596622603807, 1485758037051215], as_string: \"vstd/map.rs:224:34: 224:39 (#0)\" }, typ: TypParam(\"V\"), x: Var(VarIdent(\"value\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46444, data: [14062242596622603807, 1485788101822292], as_string: \"vstd/map.rs:224:41: 224:44 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46477,
-        data: [
-            14062242596622603807,
-            1486273433126947,
-        ],
-        as_string: "vstd/map.rs:229:1: 229:98 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46468,
-                    data: [
-                        14062242596622603807,
-                        1486930563123329,
-                    ],
-                    as_string: "vstd/map.rs:233:9: 233:47 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46466, data: [14062242596622603807, 1486977807763579], as_string: \"vstd/map.rs:233:20: 233:41 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"insert\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46463, data: [14062242596622603807, 1486977807763559], as_string: \"vstd/map.rs:233:20: 233:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46464, data: [14062242596622603807, 1487016462469235], as_string: \"vstd/map.rs:233:29: 233:33 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key2\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46465, data: [14062242596622603807, 1487042232273018], as_string: \"vstd/map.rs:233:35: 233:40 (#0)\" }, typ: TypParam(\"V\"), x: Var(VarIdent(\"value\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46467, data: [14062242596622603807, 1487072297044096], as_string: \"vstd/map.rs:233:42: 233:46 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key1\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46509,
-        data: [
-            14062242596622603807,
-            1487729427040607,
-        ],
-        as_string: "vstd/map.rs:239:1: 239:75 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46483,
-                    data: [
-                        14062242596622603807,
-                        1488184693574034,
-                    ],
-                    as_string: "vstd/map.rs:241:20: 241:39 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46482, data: [14062242596622603807, 1488184693574028], as_string: \"vstd/map.rs:241:20: 241:33 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"remove\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46480, data: [14062242596622603807, 1488184693574016], as_string: \"vstd/map.rs:241:20: 241:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46481, data: [14062242596622603807, 1488223348279691], as_string: \"vstd/map.rs:241:29: 241:32 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key\", VirParam)) }]) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 46532,
-        data: [
-            14062242596622603807,
-            1489327154875104,
-        ],
-        as_string: "vstd/map.rs:250:1: 250:88 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 46523,
-                    data: [
-                        14062242596622603807,
-                        1489941335198519,
-                    ],
-                    as_string: "vstd/map.rs:254:9: 254:40 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46521, data: [14062242596622603807, 1489988579838769], as_string: \"vstd/map.rs:254:20: 254:34 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"remove\"])), None), [TypParam(\"K\"), TypParam(\"V\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 46519, data: [14062242596622603807, 1489988579838756], as_string: \"vstd/map.rs:254:20: 254:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [TypParam(\"K\"), TypParam(\"V\")], []), x: Var(VarIdent(\"m\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46520, data: [14062242596622603807, 1490027234544432], as_string: \"vstd/map.rs:254:29: 254:33 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key2\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 46522, data: [14062242596622603807, 1490053004348214], as_string: \"vstd/map.rs:254:35: 254:39 (#0)\" }, typ: TypParam(\"K\"), x: Var(VarIdent(\"key1\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 46555,
@@ -2779,7 +1909,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 46555,
@@ -2823,7 +1953,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 46678,
@@ -2853,7 +1983,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 46701,
@@ -2897,7 +2027,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 46701,
@@ -2941,7 +2071,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 46713,
@@ -2971,157 +2101,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75620,
-        data: [
-            14062242596622603807,
-            2927045982709346,
-        ],
-        as_string: "vstd/set.rs:647:1: 647:65 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75615,
-                    data: [
-                        14062242596622603807,
-                        2927458299569817,
-                    ],
-                    as_string: "vstd/set.rs:649:20: 649:43 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75613, data: [14062242596622603807, 2927458299569805], as_string: \"vstd/set.rs:649:20: 649:31 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"insert\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75611, data: [14062242596622603807, 2927458299569795], as_string: \"vstd/set.rs:649:20: 649:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75612, data: [14062242596622603807, 2927496954275468], as_string: \"vstd/set.rs:649:29: 649:30 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75614, data: [14062242596622603807, 2927548493883032], as_string: \"vstd/set.rs:649:41: 649:42 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75643,
-        data: [
-            14062242596622603807,
-            2928351652767647,
-        ],
-        as_string: "vstd/set.rs:655:1: 655:78 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75634,
-                    data: [
-                        14062242596622603807,
-                        2928952948189175,
-                    ],
-                    as_string: "vstd/set.rs:659:20: 659:45 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75632, data: [14062242596622603807, 2928952948189162], as_string: \"vstd/set.rs:659:20: 659:32 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"insert\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75630, data: [14062242596622603807, 2928952948189151], as_string: \"vstd/set.rs:659:20: 659:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75631, data: [14062242596622603807, 2928991602894825], as_string: \"vstd/set.rs:659:29: 659:31 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a2\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75633, data: [14062242596622603807, 2929047437469686], as_string: \"vstd/set.rs:659:42: 659:44 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a1\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75656,
-        data: [
-            14062242596622603807,
-            2929485524134042,
-        ],
-        as_string: "vstd/set.rs:664:1: 664:65 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75650,
-                    data: [
-                        14062242596622603807,
-                        2929854891321556,
-                    ],
-                    as_string: "vstd/set.rs:666:10: 666:46 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75648, data: [14062242596622603807, 2929906430929095], as_string: \"vstd/set.rs:666:22: 666:33 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"remove\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75646, data: [14062242596622603807, 2929906430929085], as_string: \"vstd/set.rs:666:22: 666:23 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75647, data: [14062242596622603807, 2929945085634758], as_string: \"vstd/set.rs:666:31: 666:32 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75649, data: [14062242596622603807, 2929996625242322], as_string: \"vstd/set.rs:666:43: 666:44 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75763,
-        data: [
-            14062242596622603807,
-            2930589330729373,
-        ],
-        as_string: "vstd/set.rs:672:1: 672:67 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75666,
-                    data: [
-                        14062242596622603807,
-                        2931117611706862,
-                    ],
-                    as_string: "vstd/set.rs:676:9: 676:33 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"remove\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75664, data: [14062242596622603807, 2931169151314403], as_string: \"vstd/set.rs:676:21: 676:22 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75665, data: [14062242596622603807, 2931207806020076], as_string: \"vstd/set.rs:676:30: 676:31 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 75786,
-        data: [
-            14062242596622603807,
-            2934927247699354,
-        ],
-        as_string: "vstd/set.rs:702:1: 702:78 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 75777,
-                    data: [
-                        14062242596622603807,
-                        2935528543120882,
-                    ],
-                    as_string: "vstd/set.rs:706:20: 706:45 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75775, data: [14062242596622603807, 2935528543120869], as_string: \"vstd/set.rs:706:20: 706:32 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"remove\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 75773, data: [14062242596622603807, 2935528543120858], as_string: \"vstd/set.rs:706:20: 706:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75774, data: [14062242596622603807, 2935567197826532], as_string: \"vstd/set.rs:706:29: 706:31 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a2\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 75776, data: [14062242596622603807, 2935623032401393], as_string: \"vstd/set.rs:706:42: 706:44 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a1\", VirParam)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 75879,
@@ -3165,7 +2145,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 75879,
@@ -3209,7 +2189,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 75965,
@@ -3239,7 +2219,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 75979,
@@ -3269,67 +2249,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 76187,
-        data: [
-            14062242596622603807,
-            2947155019593902,
-        ],
-        as_string: "vstd/set.rs:790:1: 790:67 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 76047,
-                    data: [
-                        14062242596622603807,
-                        2947717660309763,
-                    ],
-                    as_string: "vstd/set.rs:794:20: 794:40 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"impl&%0\" :: \"finite\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 76046, data: [14062242596622603807, 2947717660309754], as_string: \"vstd/set.rs:794:20: 794:31 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"insert\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 76044, data: [14062242596622603807, 2947717660309744], as_string: \"vstd/set.rs:794:20: 794:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 76045, data: [14062242596622603807, 2947756315015417], as_string: \"vstd/set.rs:794:29: 794:30 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }]) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 76321,
-        data: [
-            14062242596622603807,
-            2951634670484673,
-        ],
-        as_string: "vstd/set.rs:827:1: 827:67 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 76197,
-                    data: [
-                        14062242596622603807,
-                        2952197311200534,
-                    ],
-                    as_string: "vstd/set.rs:831:20: 831:40 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"impl&%0\" :: \"finite\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 76196, data: [14062242596622603807, 2952197311200525], as_string: \"vstd/set.rs:831:20: 831:31 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"remove\"])), None), [TypParam(\"A\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 76194, data: [14062242596622603807, 2952197311200515], as_string: \"vstd/set.rs:831:20: 831:21 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [TypParam(\"A\")], []), x: Var(VarIdent(\"s\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 76195, data: [14062242596622603807, 2952235965906188], as_string: \"vstd/set.rs:831:29: 831:30 (#0)\" }, typ: TypParam(\"A\"), x: Var(VarIdent(\"a\", VirParam)) }]) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 94945,
@@ -3359,7 +2279,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 94963,
@@ -3389,7 +2309,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 94985,
@@ -3419,7 +2339,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 94997,
@@ -3449,7 +2369,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 95009,
@@ -3479,7 +2399,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 110154,
@@ -3509,7 +2429,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
         id: 115095,
@@ -3539,29 +2459,29 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
-        id: 3621,
+        id: 529,
         data: [
-            3792875986564049357,
-            1546188241927,
+            1758585418759771416,
+            657129999592,
         ],
-        as_string: "producer_comsumer_example.rs:20:1: 433:3 (#27)",
+        as_string: "withdraw_deposit.rs:8:1: 108:3 (#25)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 3620,
+                    id: 528,
                     data: [
-                        3792875986564049357,
-                        1546188241927,
+                        1758585418759771416,
+                        657129999592,
                     ],
-                    as_string: "producer_comsumer_example.rs:20:1: 433:3 (#27)",
+                    as_string: "withdraw_deposit.rs:8:1: 108:3 (#25)",
                 },
-                "producer_comsumer_example::FifoQueue::State::next_by(T&, pre!, post!, step$)",
+                "withdraw_deposit::VBQueue::State::next_by(T&, pre!, post!, step$)",
             ),
         ],
     ],
@@ -3569,119 +2489,29 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
-        id: 1342,
+        id: 360,
         data: [
-            3792875986564049357,
-            22518513538445,
+            1758585418759771416,
+            6193342842548,
         ],
-        as_string: "producer_comsumer_example.rs:173:20: 178:14 (#0)",
+        as_string: "withdraw_deposit.rs:53:20: 58:14 (#0)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 1326,
+                    id: 344,
                     data: [
-                        3792875986564049357,
-                        22960895169787,
+                        1758585418759771416,
+                        6635724473890,
                     ],
-                    as_string: "producer_comsumer_example.rs:175:32: 175:57 (#0)",
+                    as_string: "withdraw_deposit.rs:55:32: 55:57 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1324, data: [3792875986564049357, 22960895169775], as_string: \"producer_comsumer_example.rs:175:32: 175:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1323, data: [3792875986564049357, 22960895169769], as_string: \"producer_comsumer_example.rs:175:32: 175:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 1325, data: [3792875986564049357, 23059679417594], as_string: \"producer_comsumer_example.rs:175:55: 175:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 3701,
-        data: [
-            3792875986564049357,
-            1546188241927,
-        ],
-        as_string: "producer_comsumer_example.rs:20:1: 433:3 (#27)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 3700,
-                    data: [
-                        3792875986564049357,
-                        1546188241927,
-                    ],
-                    as_string: "producer_comsumer_example.rs:20:1: 433:3 (#27)",
-                },
-                "producer_comsumer_example::FifoQueue::State::init_by(T&, post!, step$)",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 3865,
-        data: [
-            3792875986564049357,
-            20800526619455,
-        ],
-        as_string: "producer_comsumer_example.rs:163:9: 164:41 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 3863,
-                    data: [
-                        3792875986564049357,
-                        21041044788031,
-                    ],
-                    as_string: "producer_comsumer_example.rs:164:13: 164:41 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, self!, i$)",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 1432,
-        data: [
-            3792875986564049357,
-            22518513538445,
-        ],
-        as_string: "producer_comsumer_example.rs:173:20: 178:14 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 1416,
-                    data: [
-                        3792875986564049357,
-                        22960895169787,
-                    ],
-                    as_string: "producer_comsumer_example.rs:175:32: 175:57 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1414, data: [3792875986564049357, 22960895169775], as_string: \"producer_comsumer_example.rs:175:32: 175:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1413, data: [3792875986564049357, 22960895169769], as_string: \"producer_comsumer_example.rs:175:32: 175:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 1415, data: [3792875986564049357, 23059679417594], as_string: \"producer_comsumer_example.rs:175:55: 175:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 342, data: [1758585418759771416, 6635724473878], as_string: \"withdraw_deposit.rs:55:32: 55:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 341, data: [1758585418759771416, 6635724473872], as_string: \"withdraw_deposit.rs:55:32: 55:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 343, data: [1758585418759771416, 6734508721697], as_string: \"withdraw_deposit.rs:55:55: 55:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
             ),
         ],
     ],
@@ -3689,29 +2519,29 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
-        id: 3672,
+        id: 587,
         data: [
-            3792875986564049357,
-            1546188241927,
+            1758585418759771416,
+            657129999592,
         ],
-        as_string: "producer_comsumer_example.rs:20:1: 433:3 (#27)",
+        as_string: "withdraw_deposit.rs:8:1: 108:3 (#25)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 3671,
+                    id: 586,
                     data: [
-                        3792875986564049357,
-                        1546188241927,
+                        1758585418759771416,
+                        657129999592,
                     ],
-                    as_string: "producer_comsumer_example.rs:20:1: 433:3 (#27)",
+                    as_string: "withdraw_deposit.rs:8:1: 108:3 (#25)",
                 },
-                "producer_comsumer_example::FifoQueue::State::next_strong_by(T&, pre!, post!, step$)",
+                "withdraw_deposit::VBQueue::State::init_by(T&, post!, step$)",
             ),
         ],
     ],
@@ -3719,29 +2549,29 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
-        id: 3941,
+        id: 610,
         data: [
-            3792875986564049357,
-            49486613196040,
+            1758585418759771416,
+            4475355923558,
         ],
-        as_string: "producer_comsumer_example.rs:326:9: 326:15 (#0)",
+        as_string: "withdraw_deposit.rs:43:9: 44:41 (#0)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 3930,
+                    id: 608,
                     data: [
-                        3792875986564049357,
-                        49774376004961,
+                        1758585418759771416,
+                        4715874092134,
                     ],
-                    as_string: "producer_comsumer_example.rs:327:46: 327:74 (#0)",
+                    as_string: "withdraw_deposit.rs:44:13: 44:41 (#0)",
                 },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, post!, i$)",
+                "withdraw_deposit::VBQueue::State::valid_storage_at_idx(T&, self!, i$)",
             ),
         ],
     ],
@@ -3749,649 +2579,29 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
     span: Span {
         raw_span: "ANY",
-        id: 3941,
+        id: 424,
         data: [
-            3792875986564049357,
-            49486613196040,
+            1758585418759771416,
+            6193342842548,
         ],
-        as_string: "producer_comsumer_example.rs:326:9: 326:15 (#0)",
+        as_string: "withdraw_deposit.rs:53:20: 58:14 (#0)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 3930,
+                    id: 408,
                     data: [
-                        3792875986564049357,
-                        49774376004961,
+                        1758585418759771416,
+                        6635724473890,
                     ],
-                    as_string: "producer_comsumer_example.rs:327:46: 327:74 (#0)",
+                    as_string: "withdraw_deposit.rs:55:32: 55:57 (#0)",
                 },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, post!, i$)",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 4059,
-        data: [
-            3792875986564049357,
-            55319178785430,
-        ],
-        as_string: "producer_comsumer_example.rs:363:16: 363:86 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4054,
-                    data: [
-                        3792875986564049357,
-                        55362128458357,
-                    ],
-                    as_string: "producer_comsumer_example.rs:363:26: 363:53 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, pre!, i$)",
-            ),
-        ],
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4057,
-                    data: [
-                        3792875986564049357,
-                        55499567411862,
-                    ],
-                    as_string: "producer_comsumer_example.rs:363:58: 363:86 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, post!, i$)",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 4059,
-        data: [
-            3792875986564049357,
-            55319178785430,
-        ],
-        as_string: "producer_comsumer_example.rs:363:16: 363:86 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4054,
-                    data: [
-                        3792875986564049357,
-                        55362128458357,
-                    ],
-                    as_string: "producer_comsumer_example.rs:363:26: 363:53 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, pre!, i$)",
-            ),
-        ],
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4057,
-                    data: [
-                        3792875986564049357,
-                        55499567411862,
-                    ],
-                    as_string: "producer_comsumer_example.rs:363:58: 363:86 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, post!, i$)",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 1978,
-        data: [
-            3792875986564049357,
-            29669634087790,
-        ],
-        as_string: "producer_comsumer_example.rs:214:13: 216:15 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 2029,
-        data: [
-            3792875986564049357,
-            31327491464570,
-        ],
-        as_string: "producer_comsumer_example.rs:222:13: 228:15 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 1978,
-        data: [
-            3792875986564049357,
-            29669634087790,
-        ],
-        as_string: "producer_comsumer_example.rs:214:13: 216:15 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 2029,
-        data: [
-            3792875986564049357,
-            31327491464570,
-        ],
-        as_string: "producer_comsumer_example.rs:222:13: 228:15 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 4103,
-        data: [
-            3792875986564049357,
-            56165287342875,
-        ],
-        as_string: "producer_comsumer_example.rs:368:9: 368:15 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4094,
-                    data: [
-                        3792875986564049357,
-                        56294136361806,
-                    ],
-                    as_string: "producer_comsumer_example.rs:369:13: 369:40 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, pre!, i$)",
-            ),
-        ],
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4099,
-                    data: [
-                        3792875986564049357,
-                        56500294792063,
-                    ],
-                    as_string: "producer_comsumer_example.rs:370:13: 370:41 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, post!, i$)",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 4103,
-        data: [
-            3792875986564049357,
-            56165287342875,
-        ],
-        as_string: "producer_comsumer_example.rs:368:9: 368:15 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4094,
-                    data: [
-                        3792875986564049357,
-                        56294136361806,
-                    ],
-                    as_string: "producer_comsumer_example.rs:369:13: 369:40 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, pre!, i$)",
-            ),
-        ],
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4099,
-                    data: [
-                        3792875986564049357,
-                        56500294792063,
-                    ],
-                    as_string: "producer_comsumer_example.rs:370:13: 370:41 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, post!, i$)",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 2499,
-        data: [
-            3792875986564049357,
-            40312563049723,
-        ],
-        as_string: "producer_comsumer_example.rs:268:13: 268:94 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 2499,
-        data: [
-            3792875986564049357,
-            40312563049723,
-        ],
-        as_string: "producer_comsumer_example.rs:268:13: 268:94 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 4145,
-        data: [
-            3792875986564049357,
-            59515361834535,
-        ],
-        as_string: "producer_comsumer_example.rs:391:9: 391:15 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4136,
-                    data: [
-                        3792875986564049357,
-                        59644210853466,
-                    ],
-                    as_string: "producer_comsumer_example.rs:392:13: 392:40 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, pre!, i$)",
-            ),
-        ],
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4141,
-                    data: [
-                        3792875986564049357,
-                        59798829676159,
-                    ],
-                    as_string: "producer_comsumer_example.rs:392:49: 392:77 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, post!, i$)",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 4145,
-        data: [
-            3792875986564049357,
-            59515361834535,
-        ],
-        as_string: "producer_comsumer_example.rs:391:9: 391:15 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4136,
-                    data: [
-                        3792875986564049357,
-                        59644210853466,
-                    ],
-                    as_string: "producer_comsumer_example.rs:392:13: 392:40 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, pre!, i$)",
-            ),
-        ],
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4141,
-                    data: [
-                        3792875986564049357,
-                        59798829676159,
-                    ],
-                    as_string: "producer_comsumer_example.rs:392:49: 392:77 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, post!, i$)",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 3032,
-        data: [
-            3792875986564049357,
-            44311177603259,
-        ],
-        as_string: "producer_comsumer_example.rs:293:13: 295:15 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 3066,
-        data: [
-            3792875986564049357,
-            44843753548111,
-        ],
-        as_string: "producer_comsumer_example.rs:297:13: 299:15 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 3090,
-        data: [
-            3792875986564049357,
-            45475113740785,
-        ],
-        as_string: "producer_comsumer_example.rs:300:13: 303:15 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 3032,
-        data: [
-            3792875986564049357,
-            44311177603259,
-        ],
-        as_string: "producer_comsumer_example.rs:293:13: 295:15 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 3066,
-        data: [
-            3792875986564049357,
-            44843753548111,
-        ],
-        as_string: "producer_comsumer_example.rs:297:13: 299:15 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 3090,
-        data: [
-            3792875986564049357,
-            45475113740785,
-        ],
-        as_string: "producer_comsumer_example.rs:300:13: 303:15 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 4321,
-        data: [
-            3792875986564049357,
-            65493956311959,
-        ],
-        as_string: "producer_comsumer_example.rs:429:9: 429:15 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4312,
-                    data: [
-                        3792875986564049357,
-                        65622805330890,
-                    ],
-                    as_string: "producer_comsumer_example.rs:430:13: 430:40 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, pre!, i$)",
-            ),
-        ],
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4317,
-                    data: [
-                        3792875986564049357,
-                        65777424153583,
-                    ],
-                    as_string: "producer_comsumer_example.rs:430:49: 430:77 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, post!, i$)",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 4321,
-        data: [
-            3792875986564049357,
-            65493956311959,
-        ],
-        as_string: "producer_comsumer_example.rs:429:9: 429:15 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4312,
-                    data: [
-                        3792875986564049357,
-                        65622805330890,
-                    ],
-                    as_string: "producer_comsumer_example.rs:430:13: 430:40 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, pre!, i$)",
-            ),
-        ],
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4317,
-                    data: [
-                        3792875986564049357,
-                        65777424153583,
-                    ],
-                    as_string: "producer_comsumer_example.rs:430:49: 430:77 (#0)",
-                },
-                "producer_comsumer_example::FifoQueue::State::valid_storage_at_idx(T&, post!, i$)",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 3559,
-        data: [
-            3792875986564049357,
-            48438641175647,
-        ],
-        as_string: "producer_comsumer_example.rs:320:13: 320:94 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 3559,
-        data: [
-            3792875986564049357,
-            48438641175647,
-        ],
-        as_string: "producer_comsumer_example.rs:320:13: 320:94 (#0)",
-    },
-    triggers: [
-        [],
-    ],
-    low_confidence: false,
-    manual: false,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), ["FifoQueue"]),
-    span: Span {
-        raw_span: "ANY",
-        id: 569,
-        data: [
-            3792875986564049357,
-            1546188241927,
-        ],
-        as_string: "producer_comsumer_example.rs:20:1: 433:3 (#27)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 553,
-                    data: [
-                        3792875986564049357,
-                        22960895169787,
-                    ],
-                    as_string: "producer_comsumer_example.rs:175:32: 175:57 (#0)",
-                },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 551, data: [3792875986564049357, 22960895169775], as_string: \"producer_comsumer_example.rs:175:32: 175:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 550, data: [3792875986564049357, 22960895169769], as_string: \"producer_comsumer_example.rs:175:32: 175:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 552, data: [3792875986564049357, 23059679417594], as_string: \"producer_comsumer_example.rs:175:55: 175:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 406, data: [1758585418759771416, 6635724473878], as_string: \"withdraw_deposit.rs:55:32: 55:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 405, data: [1758585418759771416, 6635724473872], as_string: \"withdraw_deposit.rs:55:32: 55:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 407, data: [1758585418759771416, 6734508721697], as_string: \"withdraw_deposit.rs:55:55: 55:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
             ),
         ],
     ],
@@ -4399,7 +2609,335 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
+    span: Span {
+        raw_span: "ANY",
+        id: 558,
+        data: [
+            1758585418759771416,
+            657129999592,
+        ],
+        as_string: "withdraw_deposit.rs:8:1: 108:3 (#25)",
+    },
+    triggers: [
+        [
+            (
+                Span {
+                    raw_span: "ANY",
+                    id: 557,
+                    data: [
+                        1758585418759771416,
+                        657129999592,
+                    ],
+                    as_string: "withdraw_deposit.rs:8:1: 108:3 (#25)",
+                },
+                "withdraw_deposit::VBQueue::State::next_strong_by(T&, pre!, post!, step$)",
+            ),
+        ],
+    ],
+    low_confidence: false,
+    manual: false,
+}
+ChosenTriggers {
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
+    span: Span {
+        raw_span: "ANY",
+        id: 662,
+        data: [
+            1758585418759771416,
+            11643656342173,
+        ],
+        as_string: "withdraw_deposit.rs:90:9: 90:15 (#0)",
+    },
+    triggers: [
+        [
+            (
+                Span {
+                    raw_span: "ANY",
+                    id: 651,
+                    data: [
+                        1758585418759771416,
+                        11931419151094,
+                    ],
+                    as_string: "withdraw_deposit.rs:91:46: 91:74 (#0)",
+                },
+                "withdraw_deposit::VBQueue::State::valid_storage_at_idx(T&, post!, i$)",
+            ),
+        ],
+    ],
+    low_confidence: false,
+    manual: false,
+}
+ChosenTriggers {
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
+    span: Span {
+        raw_span: "ANY",
+        id: 662,
+        data: [
+            1758585418759771416,
+            11643656342173,
+        ],
+        as_string: "withdraw_deposit.rs:90:9: 90:15 (#0)",
+    },
+    triggers: [
+        [
+            (
+                Span {
+                    raw_span: "ANY",
+                    id: 651,
+                    data: [
+                        1758585418759771416,
+                        11931419151094,
+                    ],
+                    as_string: "withdraw_deposit.rs:91:46: 91:74 (#0)",
+                },
+                "withdraw_deposit::VBQueue::State::valid_storage_at_idx(T&, post!, i$)",
+            ),
+        ],
+    ],
+    low_confidence: false,
+    manual: false,
+}
+ChosenTriggers {
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
+    span: Span {
+        raw_span: "ANY",
+        id: 699,
+        data: [
+            1758585418759771416,
+            12859132087300,
+        ],
+        as_string: "withdraw_deposit.rs:99:16: 100:68 (#0)",
+    },
+    triggers: [
+        [
+            (
+                Span {
+                    raw_span: "ANY",
+                    id: 697,
+                    data: [
+                        1758585418759771416,
+                        13095355288580,
+                    ],
+                    as_string: "withdraw_deposit.rs:100:41: 100:68 (#0)",
+                },
+                "withdraw_deposit::VBQueue::State::valid_storage_at_idx(T&, pre!, i$)",
+            ),
+        ],
+    ],
+    low_confidence: false,
+    manual: false,
+}
+ChosenTriggers {
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
+    span: Span {
+        raw_span: "ANY",
+        id: 709,
+        data: [
+            1758585418759771416,
+            13327283522661,
+        ],
+        as_string: "withdraw_deposit.rs:102:16: 102:86 (#0)",
+    },
+    triggers: [
+        [
+            (
+                Span {
+                    raw_span: "ANY",
+                    id: 704,
+                    data: [
+                        1758585418759771416,
+                        13370233195588,
+                    ],
+                    as_string: "withdraw_deposit.rs:102:26: 102:53 (#0)",
+                },
+                "withdraw_deposit::VBQueue::State::valid_storage_at_idx(T&, pre!, i$)",
+            ),
+        ],
+        [
+            (
+                Span {
+                    raw_span: "ANY",
+                    id: 707,
+                    data: [
+                        1758585418759771416,
+                        13507672149093,
+                    ],
+                    as_string: "withdraw_deposit.rs:102:58: 102:86 (#0)",
+                },
+                "withdraw_deposit::VBQueue::State::valid_storage_at_idx(T&, post!, i$)",
+            ),
+        ],
+    ],
+    low_confidence: false,
+    manual: false,
+}
+ChosenTriggers {
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
+    span: Span {
+        raw_span: "ANY",
+        id: 724,
+        data: [
+            1758585418759771416,
+            13743895350484,
+        ],
+        as_string: "withdraw_deposit.rs:104:16: 105:70 (#0)",
+    },
+    triggers: [
+        [
+            (
+                Span {
+                    raw_span: "ANY",
+                    id: 722,
+                    data: [
+                        1758585418759771416,
+                        13984413519060,
+                    ],
+                    as_string: "withdraw_deposit.rs:105:42: 105:70 (#0)",
+                },
+                "withdraw_deposit::VBQueue::State::valid_storage_at_idx(T&, post!, i$)",
+            ),
+        ],
+    ],
+    low_confidence: false,
+    manual: false,
+}
+ChosenTriggers {
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
+    span: Span {
+        raw_span: "ANY",
+        id: 699,
+        data: [
+            1758585418759771416,
+            12859132087300,
+        ],
+        as_string: "withdraw_deposit.rs:99:16: 100:68 (#0)",
+    },
+    triggers: [
+        [
+            (
+                Span {
+                    raw_span: "ANY",
+                    id: 697,
+                    data: [
+                        1758585418759771416,
+                        13095355288580,
+                    ],
+                    as_string: "withdraw_deposit.rs:100:41: 100:68 (#0)",
+                },
+                "withdraw_deposit::VBQueue::State::valid_storage_at_idx(T&, pre!, i$)",
+            ),
+        ],
+    ],
+    low_confidence: false,
+    manual: false,
+}
+ChosenTriggers {
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
+    span: Span {
+        raw_span: "ANY",
+        id: 709,
+        data: [
+            1758585418759771416,
+            13327283522661,
+        ],
+        as_string: "withdraw_deposit.rs:102:16: 102:86 (#0)",
+    },
+    triggers: [
+        [
+            (
+                Span {
+                    raw_span: "ANY",
+                    id: 704,
+                    data: [
+                        1758585418759771416,
+                        13370233195588,
+                    ],
+                    as_string: "withdraw_deposit.rs:102:26: 102:53 (#0)",
+                },
+                "withdraw_deposit::VBQueue::State::valid_storage_at_idx(T&, pre!, i$)",
+            ),
+        ],
+        [
+            (
+                Span {
+                    raw_span: "ANY",
+                    id: 707,
+                    data: [
+                        1758585418759771416,
+                        13507672149093,
+                    ],
+                    as_string: "withdraw_deposit.rs:102:58: 102:86 (#0)",
+                },
+                "withdraw_deposit::VBQueue::State::valid_storage_at_idx(T&, post!, i$)",
+            ),
+        ],
+    ],
+    low_confidence: false,
+    manual: false,
+}
+ChosenTriggers {
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
+    span: Span {
+        raw_span: "ANY",
+        id: 724,
+        data: [
+            1758585418759771416,
+            13743895350484,
+        ],
+        as_string: "withdraw_deposit.rs:104:16: 105:70 (#0)",
+    },
+    triggers: [
+        [
+            (
+                Span {
+                    raw_span: "ANY",
+                    id: 722,
+                    data: [
+                        1758585418759771416,
+                        13984413519060,
+                    ],
+                    as_string: "withdraw_deposit.rs:105:42: 105:70 (#0)",
+                },
+                "withdraw_deposit::VBQueue::State::valid_storage_at_idx(T&, post!, i$)",
+            ),
+        ],
+    ],
+    low_confidence: false,
+    manual: false,
+}
+ChosenTriggers {
+    module: Path(Some("withdraw_deposit"), ["VBQueue"]),
+    span: Span {
+        raw_span: "ANY",
+        id: 261,
+        data: [
+            1758585418759771416,
+            657129999592,
+        ],
+        as_string: "withdraw_deposit.rs:8:1: 108:3 (#25)",
+    },
+    triggers: [
+        [
+            (
+                Span {
+                    raw_span: "ANY",
+                    id: 245,
+                    data: [
+                        1758585418759771416,
+                        6635724473890,
+                    ],
+                    as_string: "withdraw_deposit.rs:55:32: 55:57 (#0)",
+                },
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 243, data: [1758585418759771416, 6635724473878], as_string: \"withdraw_deposit.rs:55:32: 55:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 242, data: [1758585418759771416, 6635724473872], as_string: \"withdraw_deposit.rs:55:32: 55:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 244, data: [1758585418759771416, 6734508721697], as_string: \"withdraw_deposit.rs:55:55: 55:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
+            ),
+        ],
+    ],
+    low_confidence: false,
+    manual: true,
+}
+ChosenTriggers {
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 61716,
@@ -4429,7 +2967,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 61877,
@@ -4459,7 +2997,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 61892,
@@ -4489,7 +3027,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 61919,
@@ -4519,7 +3057,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 61937,
@@ -4549,7 +3087,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 61960,
@@ -4579,7 +3117,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 61988,
@@ -4609,7 +3147,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 62109,
@@ -4653,7 +3191,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 62109,
@@ -4697,7 +3235,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 62119,
@@ -4727,7 +3265,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 62145,
@@ -4771,7 +3309,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 62145,
@@ -4815,7 +3353,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 62155,
@@ -4845,7 +3383,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 46355,
@@ -4875,7 +3413,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 46376,
@@ -4905,7 +3443,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 46401,
@@ -4935,7 +3473,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 46436,
@@ -4965,7 +3503,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 46452,
@@ -4995,7 +3533,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 46477,
@@ -5025,7 +3563,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 46555,
@@ -5069,7 +3607,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 46555,
@@ -5113,7 +3651,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 46678,
@@ -5143,7 +3681,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 46701,
@@ -5187,7 +3725,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 46701,
@@ -5231,7 +3769,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 46713,
@@ -5261,7 +3799,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 75593,
@@ -5291,7 +3829,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 75620,
@@ -5321,7 +3859,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 75643,
@@ -5351,7 +3889,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 75656,
@@ -5381,7 +3919,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 75763,
@@ -5411,7 +3949,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 75786,
@@ -5441,7 +3979,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 75866,
@@ -5471,7 +4009,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 75879,
@@ -5515,7 +4053,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 75879,
@@ -5559,7 +4097,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 75965,
@@ -5589,7 +4127,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 75979,
@@ -5619,7 +4157,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 76037,
@@ -5649,7 +4187,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 76187,
@@ -5679,7 +4217,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 76321,
@@ -5709,7 +4247,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 74002,
@@ -5753,7 +4291,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 80122,
@@ -5783,7 +4321,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 82914,
@@ -5813,7 +4351,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 83047,
@@ -5857,7 +4395,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 83047,
@@ -5901,7 +4439,7 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 83056,
@@ -5931,7 +4469,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 53431,
@@ -5961,7 +4499,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 53466,
@@ -5991,7 +4529,7 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
         id: 113265,
@@ -6021,59 +4559,29 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
-        id: 85148,
+        id: 846,
         data: [
-            14062242596622603807,
-            3444907369577832,
+            1758585418759771416,
+            15801184685808,
         ],
-        as_string: "vstd/thread.rs:115:9: 115:81 (#0)",
+        as_string: "withdraw_deposit.rs:120:17: 121:87 (#0)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 85142,
+                    id: 837,
                     data: [
-                        14062242596622603807,
-                        3445027628662097,
+                        1758585418759771416,
+                        16123307232977,
                     ],
-                    as_string: "vstd/thread.rs:115:37: 115:58 (#0)",
+                    as_string: "withdraw_deposit.rs:121:17: 121:56 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"thread\" :: \"impl&%0\" :: \"predicate\"])), None), [TypParam(\"Ret\")], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 85140, data: [14062242596622603807, 3445027628662082], as_string: \"vstd/thread.rs:115:37: 115:43 (#0)\" }, typ: Decorate(Ref, None, Datatype(Path(Path(Some(\"vstd\"), [\"thread\" :: \"JoinHandle\"])), [TypParam(\"Ret\")], [])), x: Var(VarIdent(\"handle\", VirParam)) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 85141, data: [14062242596622603807, 3445100643106128], as_string: \"vstd/thread.rs:115:54: 115:57 (#0)\" }, typ: TypParam(\"Ret\"), x: Var(VarIdent(\"ret\", VirExprNoNumber)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
-    span: Span {
-        raw_span: "ANY",
-        id: 4565,
-        data: [
-            3792875986564049357,
-            68101001461397,
-        ],
-        as_string: "producer_comsumer_example.rs:448:17: 450:47 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 4556,
-                    data: [
-                        3792875986564049357,
-                        68423124008546,
-                    ],
-                    as_string: "producer_comsumer_example.rs:449:17: 449:56 (#0)",
-                },
-                "vstd::seq::Seq::index(producer_comsumer_example::FifoQueue::Instance::backing_cells(T&, self!.Queue/instance), i$)",
+                "vstd::seq::Seq::index(withdraw_deposit::VBQueue::Instance::backing_cells(T&, self!.VBBuffer/instance), i$)",
             ),
         ],
     ],
@@ -6081,29 +4589,29 @@ ChosenTriggers {
     manual: false,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
-        id: 569,
+        id: 261,
         data: [
-            3792875986564049357,
-            1546188241927,
+            1758585418759771416,
+            657129999592,
         ],
-        as_string: "producer_comsumer_example.rs:20:1: 433:3 (#27)",
+        as_string: "withdraw_deposit.rs:8:1: 108:3 (#25)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 553,
+                    id: 245,
                     data: [
-                        3792875986564049357,
-                        22960895169787,
+                        1758585418759771416,
+                        6635724473890,
                     ],
-                    as_string: "producer_comsumer_example.rs:175:32: 175:57 (#0)",
+                    as_string: "withdraw_deposit.rs:55:32: 55:57 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 551, data: [3792875986564049357, 22960895169775], as_string: \"producer_comsumer_example.rs:175:32: 175:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 550, data: [3792875986564049357, 22960895169769], as_string: \"producer_comsumer_example.rs:175:32: 175:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 552, data: [3792875986564049357, 23059679417594], as_string: \"producer_comsumer_example.rs:175:55: 175:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 243, data: [1758585418759771416, 6635724473878], as_string: \"withdraw_deposit.rs:55:32: 55:45 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 242, data: [1758585418759771416, 6635724473872], as_string: \"withdraw_deposit.rs:55:32: 55:39 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"storage\", VirParam)) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 244, data: [1758585418759771416, 6734508721697], as_string: \"withdraw_deposit.rs:55:55: 55:56 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"i\", VirExprNoNumber)) }])",
             ),
         ],
     ],
@@ -6111,57 +4619,57 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
-        id: 4754,
+        id: 1083,
         data: [
-            3792875986564049357,
-            76355928606473,
+            1758585418759771416,
+            20963735377064,
         ],
-        as_string: "producer_comsumer_example.rs:509:13: 515:50 (#0)",
+        as_string: "withdraw_deposit.rs:162:13: 168:50 (#0)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 4712,
+                    id: 1041,
                     data: [
-                        3792875986564049357,
-                        76532022265270,
+                        1758585418759771416,
+                        21139829035861,
                     ],
-                    as_string: "producer_comsumer_example.rs:510:27: 510:54 (#0)",
+                    as_string: "withdraw_deposit.rs:163:27: 163:54 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 4710, data: [3792875986564049357, 76540612199848], as_string: \"producer_comsumer_example.rs:510:29: 510:40 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 4709, data: [3792875986564049357, 76540612199842], as_string: \"producer_comsumer_example.rs:510:29: 510:34 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"perms\", VirRenumbered { is_stmt: true, does_shadow: false, id: 0 })) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 4711, data: [3792875986564049357, 76630806513075], as_string: \"producer_comsumer_example.rs:510:50: 510:51 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"j\", VirExprNoNumber)) }])",
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1039, data: [1758585418759771416, 21148418970439], as_string: \"withdraw_deposit.rs:163:29: 163:40 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1038, data: [1758585418759771416, 21148418970433], as_string: \"withdraw_deposit.rs:163:29: 163:34 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"perms\", VirRenumbered { is_stmt: true, does_shadow: false, id: 0 })) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 1040, data: [1758585418759771416, 21238613283666], as_string: \"withdraw_deposit.rs:163:50: 163:51 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"j\", VirExprNoNumber)) }])",
             ),
         ],
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 4717,
+                    id: 1046,
                     data: [
-                        3792875986564049357,
-                        76768245466616,
+                        1758585418759771416,
+                        21376052237207,
                     ],
-                    as_string: "producer_comsumer_example.rs:511:27: 511:65 (#0)",
+                    as_string: "withdraw_deposit.rs:164:27: 164:65 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"seq\" :: \"Seq\" :: \"index\"])), None), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 4715, data: [3792875986564049357, 76776835401190], as_string: \"producer_comsumer_example.rs:511:29: 511:47 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"seq\" :: \"Seq\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], [])], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"view\" :: \"View\" :: \"view\"])), Some((Fun(Path(Some(\"vstd\"), [\"view\" :: \"impl&%8\" :: \"view\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], []), Primitive(Global, [])]))), [Datatype(Path(Path(Some(\"alloc\"), [\"vec\" :: \"Vec\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], []), Primitive(Global, [])], [TraitImplPath(Path(Some(\"alloc\"), [\"alloc\" :: \"impl&%1\"]))])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 4714, data: [3792875986564049357, 76776835401189], as_string: \"producer_comsumer_example.rs:511:29: 511:46 (#0)\" }, typ: Decorate(Ref, None, Datatype(Path(Path(Some(\"alloc\"), [\"vec\" :: \"Vec\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], []), Primitive(Global, [])], [TraitImplPath(Path(Some(\"alloc\"), [\"alloc\" :: \"impl&%1\"]))])), x: Var(VarIdent(\"backing_cells_vec\", VirRenumbered { is_stmt: true, does_shadow: false, id: 0 })) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 4716, data: [3792875986564049357, 76884209583598], as_string: \"producer_comsumer_example.rs:511:54: 511:55 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"j\", VirExprNoNumber)) }])",
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"seq\" :: \"Seq\" :: \"index\"])), None), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1044, data: [1758585418759771416, 21384642171781], as_string: \"withdraw_deposit.rs:164:29: 164:47 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"seq\" :: \"Seq\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], [])], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"view\" :: \"View\" :: \"view\"])), Some((Fun(Path(Some(\"vstd\"), [\"view\" :: \"impl&%8\" :: \"view\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], []), Primitive(Global, [])]))), [Datatype(Path(Path(Some(\"alloc\"), [\"vec\" :: \"Vec\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], []), Primitive(Global, [])], [TraitImplPath(Path(Some(\"alloc\"), [\"alloc\" :: \"impl&%1\"]))])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1043, data: [1758585418759771416, 21384642171780], as_string: \"withdraw_deposit.rs:164:29: 164:46 (#0)\" }, typ: Decorate(Ref, None, Datatype(Path(Path(Some(\"alloc\"), [\"vec\" :: \"Vec\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], []), Primitive(Global, [])], [TraitImplPath(Path(Some(\"alloc\"), [\"alloc\" :: \"impl&%1\"]))])), x: Var(VarIdent(\"backing_cells_vec\", VirRenumbered { is_stmt: true, does_shadow: false, id: 0 })) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 1045, data: [1758585418759771416, 21492016354189], as_string: \"withdraw_deposit.rs:164:54: 164:55 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"j\", VirExprNoNumber)) }])",
             ),
         ],
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 4721,
+                    id: 1050,
                     data: [
-                        3792875986564049357,
-                        77051713308198,
+                        1758585418759771416,
+                        21659520078789,
                     ],
-                    as_string: "producer_comsumer_example.rs:512:27: 512:45 (#0)",
+                    as_string: "withdraw_deposit.rs:165:27: 165:45 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 4719, data: [3792875986564049357, 77060303242779], as_string: \"producer_comsumer_example.rs:512:29: 512:34 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"perms\", VirRenumbered { is_stmt: true, does_shadow: false, id: 0 })) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 4720, data: [3792875986564049357, 77111842850339], as_string: \"producer_comsumer_example.rs:512:41: 512:42 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"j\", VirExprNoNumber)) }])",
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1048, data: [1758585418759771416, 21668110013370], as_string: \"withdraw_deposit.rs:165:29: 165:34 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"perms\", VirRenumbered { is_stmt: true, does_shadow: false, id: 0 })) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 1049, data: [1758585418759771416, 21719649620930], as_string: \"withdraw_deposit.rs:165:41: 165:42 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"j\", VirExprNoNumber)) }])",
             ),
         ],
     ],
@@ -6169,72 +4677,72 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
-        id: 4854,
+        id: 1183,
         data: [
-            3792875986564049357,
-            80702435510671,
+            1758585418759771416,
+            25305947313965,
         ],
-        as_string: "producer_comsumer_example.rs:533:9: 533:50 (#0)",
+        as_string: "withdraw_deposit.rs:185:9: 185:50 (#0)",
     },
     triggers: [],
     low_confidence: false,
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
-        id: 4754,
+        id: 1083,
         data: [
-            3792875986564049357,
-            76355928606473,
+            1758585418759771416,
+            20963735377064,
         ],
-        as_string: "producer_comsumer_example.rs:509:13: 515:50 (#0)",
+        as_string: "withdraw_deposit.rs:162:13: 168:50 (#0)",
     },
     triggers: [
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 4712,
+                    id: 1041,
                     data: [
-                        3792875986564049357,
-                        76532022265270,
+                        1758585418759771416,
+                        21139829035861,
                     ],
-                    as_string: "producer_comsumer_example.rs:510:27: 510:54 (#0)",
+                    as_string: "withdraw_deposit.rs:163:27: 163:54 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 4710, data: [3792875986564049357, 76540612199848], as_string: \"producer_comsumer_example.rs:510:29: 510:40 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 4709, data: [3792875986564049357, 76540612199842], as_string: \"producer_comsumer_example.rs:510:29: 510:34 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"perms\", VirRenumbered { is_stmt: true, does_shadow: false, id: 0 })) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 4711, data: [3792875986564049357, 76630806513075], as_string: \"producer_comsumer_example.rs:510:50: 510:51 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"j\", VirExprNoNumber)) }])",
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"set\" :: \"Set\" :: \"contains\"])), None), [Int(Nat)], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1039, data: [1758585418759771416, 21148418970439], as_string: \"withdraw_deposit.rs:163:29: 163:40 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"set\" :: \"Set\"])), [Int(Nat)], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"dom\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1038, data: [1758585418759771416, 21148418970433], as_string: \"withdraw_deposit.rs:163:29: 163:34 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"perms\", VirRenumbered { is_stmt: true, does_shadow: false, id: 0 })) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 1040, data: [1758585418759771416, 21238613283666], as_string: \"withdraw_deposit.rs:163:50: 163:51 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"j\", VirExprNoNumber)) }])",
             ),
         ],
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 4717,
+                    id: 1046,
                     data: [
-                        3792875986564049357,
-                        76768245466616,
+                        1758585418759771416,
+                        21376052237207,
                     ],
-                    as_string: "producer_comsumer_example.rs:511:27: 511:65 (#0)",
+                    as_string: "withdraw_deposit.rs:164:27: 164:65 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"seq\" :: \"Seq\" :: \"index\"])), None), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 4715, data: [3792875986564049357, 76776835401190], as_string: \"producer_comsumer_example.rs:511:29: 511:47 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"seq\" :: \"Seq\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], [])], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"view\" :: \"View\" :: \"view\"])), Some((Fun(Path(Some(\"vstd\"), [\"view\" :: \"impl&%8\" :: \"view\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], []), Primitive(Global, [])]))), [Datatype(Path(Path(Some(\"alloc\"), [\"vec\" :: \"Vec\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], []), Primitive(Global, [])], [TraitImplPath(Path(Some(\"alloc\"), [\"alloc\" :: \"impl&%1\"]))])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 4714, data: [3792875986564049357, 76776835401189], as_string: \"producer_comsumer_example.rs:511:29: 511:46 (#0)\" }, typ: Decorate(Ref, None, Datatype(Path(Path(Some(\"alloc\"), [\"vec\" :: \"Vec\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], []), Primitive(Global, [])], [TraitImplPath(Path(Some(\"alloc\"), [\"alloc\" :: \"impl&%1\"]))])), x: Var(VarIdent(\"backing_cells_vec\", VirRenumbered { is_stmt: true, does_shadow: false, id: 0 })) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 4716, data: [3792875986564049357, 76884209583598], as_string: \"producer_comsumer_example.rs:511:54: 511:55 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"j\", VirExprNoNumber)) }])",
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"seq\" :: \"Seq\" :: \"index\"])), None), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1044, data: [1758585418759771416, 21384642171781], as_string: \"withdraw_deposit.rs:164:29: 164:47 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"seq\" :: \"Seq\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], [])], []), x: Call(Fun(Fun(Path(Some(\"vstd\"), [\"view\" :: \"View\" :: \"view\"])), Some((Fun(Path(Some(\"vstd\"), [\"view\" :: \"impl&%8\" :: \"view\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], []), Primitive(Global, [])]))), [Datatype(Path(Path(Some(\"alloc\"), [\"vec\" :: \"Vec\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], []), Primitive(Global, [])], [TraitImplPath(Path(Some(\"alloc\"), [\"alloc\" :: \"impl&%1\"]))])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1043, data: [1758585418759771416, 21384642171780], as_string: \"withdraw_deposit.rs:164:29: 164:46 (#0)\" }, typ: Decorate(Ref, None, Datatype(Path(Path(Some(\"alloc\"), [\"vec\" :: \"Vec\"])), [Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PCell\"])), [TypParam(\"T\")], []), Primitive(Global, [])], [TraitImplPath(Path(Some(\"alloc\"), [\"alloc\" :: \"impl&%1\"]))])), x: Var(VarIdent(\"backing_cells_vec\", VirRenumbered { is_stmt: true, does_shadow: false, id: 0 })) }]) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 1045, data: [1758585418759771416, 21492016354189], as_string: \"withdraw_deposit.rs:164:54: 164:55 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"j\", VirExprNoNumber)) }])",
             ),
         ],
         [
             (
                 Span {
                     raw_span: "ANY",
-                    id: 4721,
+                    id: 1050,
                     data: [
-                        3792875986564049357,
-                        77051713308198,
+                        1758585418759771416,
+                        21659520078789,
                     ],
-                    as_string: "producer_comsumer_example.rs:512:27: 512:45 (#0)",
+                    as_string: "withdraw_deposit.rs:165:27: 165:45 (#0)",
                 },
-                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 4719, data: [3792875986564049357, 77060303242779], as_string: \"producer_comsumer_example.rs:512:29: 512:34 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"perms\", VirRenumbered { is_stmt: true, does_shadow: false, id: 0 })) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 4720, data: [3792875986564049357, 77111842850339], as_string: \"producer_comsumer_example.rs:512:41: 512:42 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"j\", VirExprNoNumber)) }])",
+                "Call(Fun(Fun(Path(Some(\"vstd\"), [\"map\" :: \"impl&%0\" :: \"index\"])), None), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 1048, data: [1758585418759771416, 21668110013370], as_string: \"withdraw_deposit.rs:165:29: 165:34 (#0)\" }, typ: Datatype(Path(Path(Some(\"vstd\"), [\"map\" :: \"Map\"])), [Int(Nat), Datatype(Path(Path(Some(\"vstd\"), [\"cell\" :: \"PointsTo\"])), [TypParam(\"T\")], [])], []), x: Var(VarIdent(\"perms\", VirRenumbered { is_stmt: true, does_shadow: false, id: 0 })) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 1049, data: [1758585418759771416, 21719649620930], as_string: \"withdraw_deposit.rs:165:41: 165:42 (#0)\" }, typ: Int(Nat), x: Var(VarIdent(\"j\", VirExprNoNumber)) }])",
             ),
         ],
     ],
@@ -6242,77 +4750,17 @@ ChosenTriggers {
     manual: true,
 }
 ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
+    module: Path(Some("withdraw_deposit"), []),
     span: Span {
         raw_span: "ANY",
-        id: 4854,
+        id: 1183,
         data: [
-            3792875986564049357,
-            80702435510671,
+            1758585418759771416,
+            25305947313965,
         ],
-        as_string: "producer_comsumer_example.rs:533:9: 533:50 (#0)",
+        as_string: "withdraw_deposit.rs:185:9: 185:50 (#0)",
     },
     triggers: [],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
-    span: Span {
-        raw_span: "ANY",
-        id: 5848,
-        data: [
-            3792875986564049357,
-            108027017454525,
-        ],
-        as_string: "producer_comsumer_example.rs:708:9: 721:14 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 5848,
-                    data: [
-                        3792875986564049357,
-                        108027017454525,
-                    ],
-                    as_string: "producer_comsumer_example.rs:708:9: 721:14 (#0)",
-                },
-                "Call(InternalFun(ClosureReq), [Datatype(Path(Path(None, [\"anonymous_closure%340\"])), [], []), Datatype(Tuple(0), [], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 5848, data: [3792875986564049357, 108027017454525], as_string: \"producer_comsumer_example.rs:708:9: 721:14 (#0)\" }, typ: Datatype(Path(Path(None, [\"anonymous_closure%340\"])), [], []), x: Var(VarIdent(\"tmp%%\", VirTemp(2))) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 5848, data: [3792875986564049357, 108027017454525], as_string: \"producer_comsumer_example.rs:708:9: 721:14 (#0)\" }, typ: Datatype(Tuple(0), [], []), x: Var(VarIdent(\"closure%\", VirExprNoNumber)) }])",
-            ),
-        ],
-    ],
-    low_confidence: false,
-    manual: true,
-}
-ChosenTriggers {
-    module: Path(Some("producer_comsumer_example"), []),
-    span: Span {
-        raw_span: "ANY",
-        id: 5848,
-        data: [
-            3792875986564049357,
-            108027017454525,
-        ],
-        as_string: "producer_comsumer_example.rs:708:9: 721:14 (#0)",
-    },
-    triggers: [
-        [
-            (
-                Span {
-                    raw_span: "ANY",
-                    id: 5848,
-                    data: [
-                        3792875986564049357,
-                        108027017454525,
-                    ],
-                    as_string: "producer_comsumer_example.rs:708:9: 721:14 (#0)",
-                },
-                "Call(InternalFun(ClosureReq), [Datatype(Path(Path(None, [\"anonymous_closure%340\"])), [], []), Datatype(Tuple(0), [], [])], [SpannedTyped { span: Span { raw_span: \"ANY\", id: 5848, data: [3792875986564049357, 108027017454525], as_string: \"producer_comsumer_example.rs:708:9: 721:14 (#0)\" }, typ: Datatype(Path(Path(None, [\"anonymous_closure%340\"])), [], []), x: Var(VarIdent(\"tmp%%\", VirTemp(2))) }, SpannedTyped { span: Span { raw_span: \"ANY\", id: 5848, data: [3792875986564049357, 108027017454525], as_string: \"producer_comsumer_example.rs:708:9: 721:14 (#0)\" }, typ: Datatype(Tuple(0), [], []), x: Var(VarIdent(\"closure%\", VirExprNoNumber)) }])",
-            ),
-        ],
-    ],
     low_confidence: false,
     manual: true,
 }

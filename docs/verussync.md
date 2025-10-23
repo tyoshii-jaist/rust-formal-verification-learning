@@ -108,3 +108,10 @@ https://verus-lang.github.io/verus/verusdoc/vstd/macro.atomic_with_ghost.html
 The value returned by the atomic_with_ghost!(...) expression will be equal to ret, although the return value is an exec value (the actual result of the operation) while ret is a spec value.
 
 ということらしい。
+
+
+### inductive について
+
+ここにちゃんと書いてあった。
+
+https://verus-lang.github.io/verus/state_machines/invariants.html

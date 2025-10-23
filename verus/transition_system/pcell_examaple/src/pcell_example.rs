@@ -27,6 +27,59 @@ tokenized_state_machine!{VBQueue<T> {
         pub reserve: nat,
     }
 
+    pub open spec fn len(&self) -> nat {
+        self.backing_cells.len()
+    }
+
+    pub open spec fn add_wrap(i: nat, sz: nat, len: nat) -> (nat, bool) {
+        if i + sz >= len { (i + sz - len, true) } else { (i + sz, false) }
+    }
+
+    // Indicates whether we expect the cell at index `i` to be full based on
+    // the values of the `head` and `tail`.
+
+    pub open spec fn in_active_range(&self, i: nat) -> bool {
+        // Note that self.head = self.tail means empty range
+        0 <= i && i < self.len() && (
+            if self.write <= self.reserve {
+                self.write <= i && i < self.reserve
+            } else {
+                i >= self.write || i < self.reserve
+            }
+        )
+    }
+
+    // Predicate to determine that the state at cell index `i`
+    // is correct. For each index, there are three possibilities:
+    //
+    //  1. No cell permission is stored
+    //  2. Permission is stored; permission indicates a full cell
+    //  3. Permission is stored; permission indicates an empty cell
+    //
+    // Which of these 3 possibilities we should be in depends on the
+    // producer/consumer/head/tail state.
+
+    pub open spec fn valid_storage_at_idx(&self, i: nat) -> bool {
+        // TODO: Checked out の状態も考慮する必要がある
+        // Permission is stored
+        self.storage.dom().contains(i)
+        // Permission must be for the correct cell:
+        && self.storage.index(i).id() === self.backing_cells.index(i as int)
+        && if self.in_active_range(i) {
+            // The cell is full
+            self.storage.index(i).is_init()
+        } else {
+            // The cell is empty
+            self.storage.index(i).is_uninit()
+        }
+    }
+
+    #[invariant]
+    pub fn valid_storage_all(&self) -> bool {
+        forall|i: nat| 0 <= i && i < self.len() ==>
+            self.valid_storage_at_idx(i)
+    }
+
     init!{
         initialize(backing_cells: Seq<CellId>, storage: Map<nat, cell::PointsTo<T>>) {
             // Upon initialization, the user needs to deposit _all_ the relevant
@@ -45,6 +98,48 @@ tokenized_state_machine!{VBQueue<T> {
             init storage = storage;
             init write = 0;
             init reserve = 0;
+        }
+    }
+
+    transition!{
+        reserve_start(sz: nat) {
+            // In order to begin, we have to be in ProducerState::Idle.
+            // require(pre.producer is Idle);
+
+            // We'll be comparing the producer's _local_ copy of the tail
+            // with the _shared_ version of the head.
+            let write = pre.write;
+
+            // assert(0 <= tail && tail < pre.backing_cells.len());
+
+            // Compute the incremented tail, wrapping around if necessary.
+            let (next_reserve, wrapped) = Self::add_wrap(write, sz, pre.backing_cells.len());
+
+            // We have to check that the buffer isn't full to proceed.
+            require(!wrapped || next_reserve <= write);
+
+            // Update the producer's local state to be in the `Producing` state.
+            // update producer = ProducerState::Producing(tail);
+            update reserve = next_reserve;
+
+            // Withdraw ("check out") the permission stored at index `tail`.
+            // This creates a proof obligation for the transition system to prove that
+            // there is actually a permission stored at this index.
+            withdraw storage -= [tail => let perm] by {
+                assert(pre.valid_storage_at_idx(tail));
+            };
+
+            // The transition needs to guarantee to the client that the
+            // permission they are checking out:
+            //  (i) is for the cell at index `tail` (the IDs match)
+            //  (ii) the permission indicates that the cell is empty
+            assert(
+                perm.id() === pre.backing_cells.index(tail as int)
+                && perm.is_uninit()
+            ) by {
+                assert(!pre.in_active_range(tail));
+                assert(pre.valid_storage_at_idx(tail));
+            };
         }
     }
 }} // tokenized_state_machine
@@ -205,24 +300,19 @@ impl<T> Producer<T> {
                 atomic_with_ghost!(&queue.write => load();
                 returning write;
                 ghost write_token => {
-                    
-                }
-            );
-            let reserve =
-                atomic_with_ghost!(&queue.reserve => load();
-                returning reserve;
-                ghost reserve_token => {
-                    // If `head != next_tail`, then we proceed with the operation.
-                    // We check here, ghostily, in the `open_atomic_invariant` block if that's the case.
-                    // If so, we proceed with the `produce_start` transition
-                    // and obtain the cell permission.
-                    いまここらへん
                     cell_perm = if !wrapped || next_reserve <= write {
                         let tracked cp = queue.instance.borrow().reserve_start(next_reserve, &reserve_token, self.producer.borrow_mut());
                         Option::Some(cp)
                     } else {
                         Option::None
                     };
+                }
+            );
+            let reserve =
+                atomic_with_ghost!(&queue.reserve => load();
+                returning reserve;
+                ghost reserve_token => {
+
                 }
             );
             // Here's where we "actually" do the `head != next_tail` check:

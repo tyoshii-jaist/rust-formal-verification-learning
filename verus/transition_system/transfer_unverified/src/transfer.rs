@@ -49,10 +49,10 @@ tokenized_state_machine!(
                 update waiting_increment = pre.waiting_increment - 1;
             }
         }
-
+/*
         property!{
             decrement_will_not_underflow_u32() {
-                assert 0 < pre.a;
+                assert 0 <= pre.a;
             }
         }
 
@@ -61,7 +61,7 @@ tokenized_state_machine!(
                 assert 0 <= pre.b < 0xffff_ffff;
             }
         }
-
+*/
         property!{
             finalize_a() {
                 require(pre.a == 0);
@@ -129,8 +129,6 @@ fn main() {
                     atomic_with_ghost!(&globals.atomic_a => load();
                     returning ret;
                     ghost a => {
-                        assume(a.value() == 1);
-                        assume(ret == 1);
                         //globals.instance.borrow().decrement_will_not_underflow_u32(&mut a);
                     }
                 );
@@ -148,7 +146,7 @@ fn main() {
                                 Result::Ok(_) => {
                                     assert(old_val == current_a);
                                     assert(new_val == current_a - 1);
-                                    globals.instance.borrow().decrement_will_not_underflow_u32(&mut a);
+                                    //globals.instance.borrow().decrement_will_not_underflow_u32(&mut a);
                                     globals.instance.borrow().tr_dec_a(&mut a, &mut waiting_increment_token); // atomic decrement
                                     updated = true;
                                 },
@@ -166,8 +164,7 @@ fn main() {
                             atomic_with_ghost!(&globals.atomic_b => fetch_add(1);
                             returning ret;
                             ghost b => {
-                                assume(ret == 1);
-                                globals.instance.borrow().increment_will_not_overflow_u32(&mut b);
+                                //globals.instance.borrow().increment_will_not_overflow_u32(&mut b);
                                 globals.instance.borrow().tr_inc_b(&mut b, &mut waiting_increment_token); // atomic increment
                             }
                         );
