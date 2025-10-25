@@ -55,3 +55,9 @@ https://verus-lang.zulipchat.com/#narrow/channel/399078-help/topic/.E2.9C.94.20p
         - sharding storategy ごとにかなり取り扱いが異なる。update, remove, withdraw など
         - instance など暗黙に定義されている構造体もある。
         - 中間コードを見るような方式があると助かる。--log-all でなんとなくは見える。
+    - 少しずつ慣れてきたが、まだ時間がかかる。
+        - 簡単な例でも論理的整合性がないとドツボにはまるので、なかなかシンプルな問題設定が難しい
+        - エラーが直観的でない
+    - 見えている課題
+        - SPSC の例をもう少し理解する
+        - BBQueue では slice を取り扱うのでその取り回しがまだわかっていない
