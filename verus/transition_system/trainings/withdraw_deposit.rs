@@ -5,6 +5,12 @@ use vstd::map::*;
 use vstd::{prelude::*, *};
 
 verus! {
+
+pub enum CheckoutState {
+    Idle(nat),
+    Checkedout(nat),
+}
+
 tokenized_state_machine!{VBQueue<T> {
     fields {
         #[sharding(constant)]
@@ -17,16 +23,18 @@ tokenized_state_machine!{VBQueue<T> {
 
         #[sharding(variable)]
         pub start: nat,
+
+        #[sharding(variable)]
+        pub checkout_state: CheckoutState,
     }
 
     pub open spec fn len(&self) -> nat {
         self.backing_cells.len()
     }
 
-
     pub open spec fn valid_storage_at_idx(&self, i: nat) -> bool {
-        if !self.storage.dom().contains(i) {
-            true
+        if self.is_checked_out(i) {
+            !self.storage.dom().contains(i)
         } else {
             // Permission is stored
             self.storage.dom().contains(i)
@@ -37,11 +45,28 @@ tokenized_state_machine!{VBQueue<T> {
             && self.storage.index(i).is_uninit()
         }
     }
+    
+    pub open spec fn is_checked_out(&self, i: nat) -> bool {
+        self.checkout_state == CheckoutState::Checkedout(i)
+    }
 
     #[invariant]
     pub fn valid_storage_all(&self) -> bool {
         forall|i: nat| 0 <= i && i < self.len() ==>
             self.valid_storage_at_idx(i)
+    }
+
+    #[invariant]
+    pub fn in_bounds(&self) -> bool {
+        0 <= self.start && self.start < self.len()
+        && match self.checkout_state {
+            CheckoutState::Checkedout(start) => {
+                self.start == start
+            }
+            CheckoutState::Idle(start) => {
+                self.start == start
+            }
+        }
     }
 
     init!{
@@ -61,15 +86,19 @@ tokenized_state_machine!{VBQueue<T> {
             init backing_cells = backing_cells;
             init storage = storage;
             init start = 0;
+            init checkout_state = CheckoutState::Idle(0);
         }
     }
 
     transition!{
         checkout_first() {
+            assert(0 < pre.backing_cells.len());
             /*
             withdraw storage -= [0 => let perm] by {
                 assert(pre.valid_storage_at_idx(0));
             };
+
+            update checkout_state = CheckoutState::Checkedout(0);
 
             // The transition needs to guarantee to the client that the
             // permission they are checking out:
@@ -96,14 +125,10 @@ tokenized_state_machine!{VBQueue<T> {
 
     #[inductive(checkout_first)]
     fn checkout_first_inductive(pre: Self, post: Self) {
-        assert(forall|i: nat|
-            0 <= i && i < pre.len() ==> pre.valid_storage_at_idx(i)
-        );
-        assert(forall|i| pre.valid_storage_at_idx(i) ==> post.valid_storage_at_idx(i));
         
-        assert(forall|i: nat|
-            0 <= i && i < post.len() ==> post.valid_storage_at_idx(i)
-        );
+        assert(forall|i| pre.valid_storage_at_idx(i) ==> post.valid_storage_at_idx(i)) by {
+
+        }
     }
 }} // tokenized_state_machine
 
@@ -112,13 +137,18 @@ struct_with_invariants!{
         buffer: Vec<PCell<T>>,
         start: AtomicU64<_, VBQueue::start<T>, _>,
         instance: Tracked<VBQueue::Instance<T>>,
+        checkout_token: Tracked<VBQueue::checkout_state<T>>,
     }
 
     pub closed spec fn wf(&self) -> bool {
         predicate {
+            &&& 0 < self.instance@.backing_cells().len()
+            &&& 0 < self.buffer@.len()
             &&& self.instance@.backing_cells().len() == self.buffer@.len()
             &&& forall|i: int| 0 <= i && i < self.buffer@.len() as int ==>
                 self.instance@.backing_cells().index(i) === self.buffer@.index(i).id()
+            &&& self.checkout_token@.instance_id() == self.instance@.id()
+            &&& (self.checkout_token@.value() == CheckoutState::Idle(0) || self.checkout_token@.value() == CheckoutState::Checkedout(0))
         }
 
         invariant on start with (instance) is (v: u64, g: VBQueue::start<T>) {
@@ -134,12 +164,12 @@ impl<T> VBBuffer<T> {
             old(self).wf(),
         ensures
             self.wf(),
-    {
+    {        
         let start =
             atomic_with_ghost!(&self.start => load();
             returning start;
             ghost start_token => {
-                let tracked _ = self.instance.borrow().checkout_first();
+                let tracked _ = self.instance.borrow_mut().checkout_first();//self.checkout_token.borrow_mut());
             }
         );
     }
@@ -188,6 +218,7 @@ pub fn new_buf<T>(len: usize) -> (vbuf: VBBuffer<T>)
     let tracked (
         Tracked(instance),
         Tracked(start_token),
+        Tracked(checkout_token),
     ) = VBQueue::Instance::initialize(backing_cells_ids, perms /* storage */, perms /* param token storage */);
 
     let tracked_inst: Tracked<VBQueue::Instance<T>> = Tracked(instance.clone());
@@ -195,9 +226,10 @@ pub fn new_buf<T>(len: usize) -> (vbuf: VBBuffer<T>)
 
     // Initialize the queue
     VBBuffer::<T> {
-        instance: Tracked(instance),
-        start: start_atomic,
         buffer: backing_cells_vec,
+        start: start_atomic,
+        instance: Tracked(instance),
+        checkout_token: Tracked(checkout_token),
     }
 }
 
