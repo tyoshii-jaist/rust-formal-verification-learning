@@ -5,3 +5,4 @@
 **/Cargo.toml.orig
 **/*.rs.bk
 
+**/.verus-log/
