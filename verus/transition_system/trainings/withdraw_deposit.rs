@@ -93,12 +93,15 @@ tokenized_state_machine!{VBQueue<T> {
     transition!{
         checkout_first() {
             assert(0 < pre.backing_cells.len());
-            /*
+
+            require(pre.checkout_state is Idle);
+
             withdraw storage -= [0 => let perm] by {
                 assert(pre.valid_storage_at_idx(0));
             };
 
             update checkout_state = CheckoutState::Checkedout(0);
+            update start = 0;
 
             // The transition needs to guarantee to the client that the
             // permission they are checking out:
@@ -110,7 +113,6 @@ tokenized_state_machine!{VBQueue<T> {
             ) by {
                 assert(pre.valid_storage_at_idx(0));
             };
-             */
         }
     }
 
@@ -148,7 +150,7 @@ struct_with_invariants!{
             &&& forall|i: int| 0 <= i && i < self.buffer@.len() as int ==>
                 self.instance@.backing_cells().index(i) === self.buffer@.index(i).id()
             &&& self.checkout_token@.instance_id() == self.instance@.id()
-            &&& (self.checkout_token@.value() == CheckoutState::Idle(0) || self.checkout_token@.value() == CheckoutState::Checkedout(0))
+            //&&& (self.checkout_token@.value() == CheckoutState::Idle(0) || self.checkout_token@.value() == CheckoutState::Checkedout(0))
         }
 
         invariant on start with (instance) is (v: u64, g: VBQueue::start<T>) {
@@ -169,7 +171,7 @@ impl<T> VBBuffer<T> {
             atomic_with_ghost!(&self.start => load();
             returning start;
             ghost start_token => {
-                let tracked _ = self.instance.borrow_mut().checkout_first();//self.checkout_token.borrow_mut());
+                let tracked _ = self.instance.borrow_mut().checkout_first(&mut start_token, self.checkout_token.borrow_mut());
             }
         );
     }
