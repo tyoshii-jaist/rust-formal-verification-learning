@@ -17,7 +17,7 @@ add で map_field に k => v を足せる
 
 
 
-# Atomicについて(これはVerusSyncでない。)
+# Atomicについて(これはVerusSyncに限った話でない。)
 
 SeqCst
 https://zenn.dev/belle/articles/bcddf554a43053

@@ -1,7 +1,0 @@
-{
-  // Copilot をこのワークスペースで無効化
-  "github.copilot.enable": { "*": false },
-
-  // インライン提案そのものを無効化（Copilot/Codeium等の多くに効く）
-  "editor.inlineSuggest.enabled": false
-}
