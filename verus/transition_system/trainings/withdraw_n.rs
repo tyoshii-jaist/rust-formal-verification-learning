@@ -6,11 +6,6 @@ use vstd::{prelude::*, *};
 
 verus! {
 
-pub enum CheckoutState {
-    Idle(nat),
-    Checkedout(nat),
-}
-
 tokenized_state_machine!{VBQueue<T> {
     fields {
         #[sharding(constant)]
@@ -22,10 +17,10 @@ tokenized_state_machine!{VBQueue<T> {
         pub storage: Map<nat, cell::PointsTo<T>>,
 
         #[sharding(variable)]
-        pub start: nat,
+        pub prod_checkout_idx: nat,
 
         #[sharding(variable)]
-        pub checkout_state: CheckoutState,
+        pub cons_checkout_idx: nat,
     }
 
     pub open spec fn len(&self) -> nat {
@@ -47,7 +42,7 @@ tokenized_state_machine!{VBQueue<T> {
     }
     
     pub open spec fn is_checked_out(&self, i: nat) -> bool {
-        self.checkout_state == CheckoutState::Checkedout(i)
+        0 <= i && i < self.prod_checkout_idx
     }
 
     #[invariant]
@@ -58,21 +53,14 @@ tokenized_state_machine!{VBQueue<T> {
 
     #[invariant]
     pub fn in_bounds(&self) -> bool {
-        0 <= self.start && self.start < self.len()
-        && match self.checkout_state {
-            CheckoutState::Checkedout(start) => {
-                self.start == start
-            }
-            CheckoutState::Idle(start) => {
-                self.start == start
-            }
-        }
+        &&& 0 < self.len()
+        &&& 0 <= self.prod_checkout_idx && self.prod_checkout_idx <= self.len()
     }
 
     init!{
         initialize(backing_cells: Seq<CellId>, storage: Map<nat, cell::PointsTo<T>>) {
             // Upon initialization, the user needs to deposit _all_ the relevant
-            // cell permissions to start with. Each permission should indicate
+            // cell permissions. Each permission should indicate
             // an empty cell.
 
             require(
@@ -85,33 +73,25 @@ tokenized_state_machine!{VBQueue<T> {
 
             init backing_cells = backing_cells;
             init storage = storage;
-            init start = 0;
-            init checkout_state = CheckoutState::Idle(0);
+            init prod_checkout_idx = 0;
         }
     }
 
     transition!{
-        checkout_first() {
-            assert(0 < pre.backing_cells.len());
+        checkout_at(idx: nat) {
+            require(0 <= idx && idx < pre.backing_cells.len());
 
-            require(pre.checkout_state is Idle);
+            require(!pre.is_checked_out(nat));
 
-            withdraw storage -= [0 => let perm] by {
-                assert(pre.valid_storage_at_idx(0));
+            withdraw storage -= [nat => let perm] by {
+                assert(pre.valid_storage_at_idx(nat));
             };
 
-            update checkout_state = CheckoutState::Checkedout(0);
-            update start = 0;
-
-            // The transition needs to guarantee to the client that the
-            // permission they are checking out:
-            //  (i) is for the cell at index `tail` (the IDs match)
-            //  (ii) the permission indicates that the cell is empty
             assert(
-                perm.id() === pre.backing_cells.index(0)
+                perm.id() === pre.backing_cells.index(nat)
                 && perm.is_uninit()
             ) by {
-                assert(pre.valid_storage_at_idx(0));
+                assert(pre.valid_storage_at_idx(nat));
             };
         }
     }
@@ -126,20 +106,18 @@ tokenized_state_machine!{VBQueue<T> {
     }
 
     #[inductive(checkout_first)]
-    fn checkout_first_inductive(pre: Self, post: Self) {
-        
+    fn checkout_at_inductive(idx: nat, pre: Self, post: Self) {
+        assert(!pre.is_checked_out(idx));
         assert(forall|i| pre.valid_storage_at_idx(i) ==> post.valid_storage_at_idx(i)) by {
-
         }
+        assert(post.is_checked_out(idx));
     }
 }} // tokenized_state_machine
 
 struct_with_invariants!{
     pub struct VBBuffer<T> {
         buffer: Vec<PCell<T>>,
-        start: AtomicU64<_, VBQueue::start<T>, _>,
         instance: Tracked<VBQueue::Instance<T>>,
-        checkout_token: Tracked<VBQueue::checkout_state<T>>,
     }
 
     pub closed spec fn wf(&self) -> bool {
@@ -149,11 +127,9 @@ struct_with_invariants!{
             &&& self.instance@.backing_cells().len() == self.buffer@.len()
             &&& forall|i: int| 0 <= i && i < self.buffer@.len() as int ==>
                 self.instance@.backing_cells().index(i) === self.buffer@.index(i).id()
-            &&& self.checkout_token@.instance_id() == self.instance@.id()
-            //&&& (self.checkout_token@.value() == CheckoutState::Idle(0) || self.checkout_token@.value() == CheckoutState::Checkedout(0))
         }
 
-        invariant on start with (instance) is (v: u64, g: VBQueue::start<T>) {
+        invariant on prod_checkout_idx with (instance) is (v: u64, g: VBQueue::prod_checkout_idx<T>) {
             &&& g.instance_id() === instance@.id()
             &&& g.value() == v as int
         }
@@ -161,22 +137,69 @@ struct_with_invariants!{
 }
 
 impl<T> VBBuffer<T> {
-    fn checkout_first(&mut self)
+    fn checkout(&mut self, thread_id: u32, to_put: T) -> (t: Option<T>)
         requires
             old(self).wf(),
         ensures
             self.wf(),
-    {        
-        let start =
-            atomic_with_ghost!(&self.start => load();
-            returning start;
-            ghost start_token => {
-                let tracked _ = self.instance.borrow_mut().checkout_first(&mut start_token, self.checkout_token.borrow_mut());
-            }
+            match t {
+                Option::Some(tt) => {
+                    tt == to_put
+                }
+                Option::None => {
+                    true
+                }
+            },
+    {
+        let tracked mut cell_perm: Option<cell::PointsTo<T>>;
+
+        // まず現時点での prod_checkout_idx を確認する
+        let current_prod_checkout_idx =
+            atomic_with_ghost!(&self.prod_checkout_idx => compare_exchange(0, 1);
+                update old_val -> new_val;
+                returning ret;
+                ghost prod_checkout_idx_token => {
+                    match ret {
+                        Result::Ok(prev) => {
+                            assert(prev == 0);
+                            assert(old_val == 0);
+                            assert(new_val == 1);
+                            assert(prod_checkout_idx_token.value() == 0);
+                            let tracked cp = self.instance.borrow_mut().checkout_first(&mut prod_checkout_idx_token);
+                            cell_perm = Option::Some(cp);
+                            assert(prod_checkout_idx_token.value() == new_val);
+                        }
+                        Result::Err(prev) => {
+                            assert(old_val == new_val);
+                            cell_perm = Option::None;
+                        }
+                    };
+                }
         );
+
+        // current_prod_checkout_idx は Compare Exchange が成功していたら Result::Ok(old_val) が入っている。
+        // 失敗していたら Err(old_val) が入っている
+        match current_prod_checkout_idx {
+            Result::Ok(_) => {
+                // cell_perm を Unwrap して確認
+                let tracked mut cell_perm = match cell_perm {
+                    Option::Some(cp) => cp,
+                    Option::None => {
+                        assert(false);
+                        proof_from_false()
+                    },
+                };
+
+                self.buffer[0].put(Tracked(&mut cell_perm), to_put);
+                let t = self.buffer[0].take(Tracked(&mut cell_perm));
+                return Option::Some(t);
+            }
+            Result::Err(_) => {
+                return Option::None
+            }
+        }
     }
 }
-
 
 pub fn new_buf<T>(len: usize) -> (vbuf: VBBuffer<T>)
     requires
@@ -219,24 +242,35 @@ pub fn new_buf<T>(len: usize) -> (vbuf: VBBuffer<T>)
     // Initialize an instance of the VBQueue
     let tracked (
         Tracked(instance),
-        Tracked(start_token),
-        Tracked(checkout_token),
+        Tracked(prod_checkout_idx_token),
     ) = VBQueue::Instance::initialize(backing_cells_ids, perms /* storage */, perms /* param token storage */);
 
     let tracked_inst: Tracked<VBQueue::Instance<T>> = Tracked(instance.clone());
-    let start_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(start_token));
+    let prod_checkout_idx_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(prod_checkout_idx_token));
+    let cons_checkout_idx_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(prod_checkout_idx_token));
 
     // Initialize the queue
     VBBuffer::<T> {
         buffer: backing_cells_vec,
-        start: start_atomic,
+        prod_checkout_idx: prod_checkout_idx_atomic,
+        cons_checkout_idx: cons_checkout_idx_atomic,
         instance: Tracked(instance),
-        checkout_token: Tracked(checkout_token),
     }
 }
 
 fn main() {
     let mut vbuf : VBBuffer<u32> = new_buf(5);
-    let _ = vbuf.checkout_first();
+    let val: u32 = 555;
+
+    let x = vbuf.checkout_first(val);
+
+    assert(match x {
+        Option::Some(xx) => {
+            xx == val
+        }
+        Option::None => {
+            true
+        }
+    });
 }
 } // verus

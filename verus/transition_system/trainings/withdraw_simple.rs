@@ -1,3 +1,16 @@
+/*
+withdraw のプログラムの説明
+
+これは new_buf<T>(n) で初期化した長さ n のバッファの最初の位置 (0) の要素をチェックアウトするだけのプログラムである。
+
+状態遷移としては checkout_first という transition しかない。
+end_idx という変数があり、これを使って 0 番目がチェックアウトされていないことを証明するようにしている。
+名前が適切ではないが、将来的に 0~end_idxまでをチェックアウトできるように拡張する予定なのでこの名前になっている。
+
+checkout_first()を実行すると compare_exchange を用いて end_idx を 0 => 1 に変更しようとする。
+これが成功すると、transition を発生させ、Ghostの方も end_idx を 0 => 1 に変更し、かつ、実際のバッファに紐づく PointsTo トークンを払い出す。これは atomic_with_ghost!内でハンドリングすることで Atomic 変数の変更と同時に行うことができる。
+ */
+
 use state_machines_macros::tokenized_state_machine;
 use vstd::atomic_ghost::*;
 use vstd::cell::*;

@@ -48,16 +48,26 @@ https://verus-lang.zulipchat.com/#narrow/channel/399078-help/topic/.E2.9C.94.20p
 
 
 # 10/27 mtg 用メモ
-- 「ロック」の話について整理した
-- 「BBQueue」の利点について BipBuffer を絡めて整理した
-- VerusSync の transition システムを読み進めた
-    - transition の記述と関数の使い方にかなり癖がある。引数が自明でない。
-        - sharding storategy ごとにかなり取り扱いが異なる。update, remove, withdraw など
-        - instance など暗黙に定義されている構造体もある。
-        - 中間コードを見るような方式があると助かる。--log-all でなんとなくは見える。
-    - 少しずつ慣れてきたが、まだ時間がかかる。
-        - 簡単な例でも論理的整合性がないとドツボにはまるので、なかなかシンプルな問題設定が難しい
-        - エラーが直観的でない
-    - 見えている課題
-        - SPSC の例をもう少し理解する
-        - BBQueue では slice を取り扱うのでその取り回しがまだわかっていない
+- これまでの歩み
+    - TBD
+- 今回の進捗
+    - 「ロック」の話について整理した
+    - 「BBQueue」の利点について BipBuffer を絡めて整理した
+    - VerusSync の transition システムを読み進めた
+        - transition の記述と関数の使い方にかなり癖がある。
+            - 引数が関数の処理内容によって変わるので、特にややこしい。
+            - selfの意味がどのstmtの中にいるかで変わる。
+            - sharding storategy ごとにかなり記述が異なる。update, remove, withdraw など
+            - instance など暗黙に定義されている構造体もある。
+            - 中間コードを見るような方式があると助かる。--log-all でなんとなくは見える。
+        - 少しずつ慣れてきたが、まだ時間がかかる。
+            - 簡単な例でも論理的整合性がないとドツボにはまるので、なかなかシンプルな問題設定が難しい
+            - エラーが直観的でない
+            - ただし、書く、エラーを見る、直す、のサイクルは回り始めた。
+        - 見えている課題と今後の方向性
+            - SPSC の例をもう少し理解する
+            - BBQueue では slice を取り扱うのでその取り回しがまだわかっていない
+            - 今は2スレッドで、PointsToのプールからの出し入れ (withdraw/deposit)の習熟中
+                - これは BBQueue のベースになる
+                - 1 エレメントの withdraw ができた。
+                - n エレメントの withdraw/deposit に発展させたい。
