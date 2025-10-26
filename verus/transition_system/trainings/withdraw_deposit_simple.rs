@@ -142,27 +142,67 @@ struct_with_invariants!{
 }
 
 impl<T> VBBuffer<T> {
-    fn checkout_first(&mut self, to_put: T) -> (t: T)
+    fn checkout_first(&mut self, to_put: T) -> (t: Option<T>)
         requires
             old(self).wf(),
         ensures
             self.wf(),
-            t == to_put,
+            match t {
+                Option::Some(tt) => {
+                    tt == to_put
+                }
+                Option::None => {
+                    true
+                }
+            },
     {
-        let tracked mut cell_perm: cell::PointsTo<T>;
-        let _ =
-            atomic_with_ghost!(&self.end_idx => store(1);
-            update prev -> next;
-            returning ret;
-            ghost end_idx_token => {
-                assume(end_idx_token.value() == 0);
-                cell_perm = self.instance.borrow_mut().checkout_first(&mut end_idx_token);
-            }
+        let tracked mut cell_perm: Option<cell::PointsTo<T>>;
+
+        // まず現時点での end_idx を確認する
+        let current_end_idx =
+            atomic_with_ghost!(&self.end_idx => compare_exchange(0, 1);
+                update old_val -> new_val;
+                returning ret;
+                ghost end_idx_token => {
+                    match ret {
+                        Result::Ok(prev) => {
+                            assert(prev == 0);
+                            assert(old_val == 0);
+                            assert(new_val == 1);
+                            assert(end_idx_token.value() == 0);
+                            let tracked cp = self.instance.borrow_mut().checkout_first(&mut end_idx_token);
+                            cell_perm = Option::Some(cp);
+                            assert(end_idx_token.value() == new_val);
+                        }
+                        Result::Err(prev) => {
+                            assert(old_val == new_val);
+                            cell_perm = Option::None;
+                        }
+                    };
+                }
         );
 
-        self.buffer[0].put(Tracked(&mut cell_perm), to_put);
-        let t = self.buffer[0].take(Tracked(&mut cell_perm));
-        return t;
+        // current_end_idx は Compare Exchange が成功していたら Result::Ok(old_val) が入っている。
+        // 失敗していたら Err(old_val) が入っている
+        match current_end_idx {
+            Result::Ok(_) => {
+                // cell_perm を Unwrap して確認
+                let tracked mut cell_perm = match cell_perm {
+                    Option::Some(cp) => cp,
+                    Option::None => {
+                        assert(false);
+                        proof_from_false()
+                    },
+                };
+
+                self.buffer[0].put(Tracked(&mut cell_perm), to_put);
+                let t = self.buffer[0].take(Tracked(&mut cell_perm));
+                return Option::Some(t);
+            }
+            Result::Err(_) => {
+                return Option::None
+            }
+        }
     }
 }
 
@@ -221,12 +261,19 @@ pub fn new_buf<T>(len: usize) -> (vbuf: VBBuffer<T>)
     }
 }
 
-use vstd::pervasive::print_u64;
 fn main() {
     let mut vbuf : VBBuffer<u32> = new_buf(5);
     let val: u32 = 555;
+
     let x = vbuf.checkout_first(val);
 
-    assert(x == val);
+    assert(match x {
+        Option::Some(xx) => {
+            xx == val
+        }
+        Option::None => {
+            true
+        }
+    });
 }
 } // verus
