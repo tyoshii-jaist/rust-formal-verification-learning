@@ -171,7 +171,6 @@ impl<T> VBBuffer<T> {
     {
         let tracked mut cell_perm: Option<cell::PointsTo<T>>;
 
-        // まず現時点での end_idx を確認する
         let current_end_idx =
             atomic_with_ghost!(&self.end_idx => compare_exchange(0, 1);
                 update old_val -> new_val;
