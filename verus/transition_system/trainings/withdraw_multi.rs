@@ -92,27 +92,29 @@ tokenized_state_machine!{VBQueue<T> {
             assert(0 < pre.backing_cells.len());
 
             require(pre.end_idx == 0);
+            require(pre.backing_cells.len() > 1);
 
             // https://github.com/verus-lang/verified-memory-allocator/blob/8588ce6accba37fa2ebc40e05af39038187c1ddc/verus-mimalloc/tokens.rs#L509
             birds_eye let perm_map: Map<nat, cell::PointsTo<T>> = Map::new(
-                    |i: nat| 0 <= i && i < 1,
+                    |i: nat| 0 <= i && i < 2,
                     |i: nat| pre.storage[i]);
 
             withdraw storage -= (perm_map) by {
-                assert(pre.valid_storage_at_idx(0));
+                assert(pre.valid_storage_at_idx(0) && pre.valid_storage_at_idx(1));
             };
 
-            birds_eye let perm = perm_map[0];
+            birds_eye let perm0 = perm_map[0];
+            birds_eye let perm1 = perm_map[1];
 
-            update end_idx = 1;
+            update end_idx = 2;
 
             // The transition needs to guarantee to the client that the
             // permission they are checking out:
             //  (i) is for the cell at index `tail` (the IDs match)
             //  (ii) the permission indicates that the cell is empty
             assert(
-                perm.id() === pre.backing_cells.index(0)
-                && perm.is_uninit()
+                perm0.id() === pre.backing_cells.index(0)
+                && perm0.is_uninit()
             ) by {
                 assert(pre.valid_storage_at_idx(0));
             };
@@ -131,10 +133,12 @@ tokenized_state_machine!{VBQueue<T> {
     #[inductive(checkout_first)]
     fn checkout_first_inductive(pre: Self, post: Self) {
         assert(!pre.is_checked_out(0));
+        assert(!pre.is_checked_out(1));
         assert(forall|i| pre.valid_storage_at_idx(i) ==> post.valid_storage_at_idx(i)) by {
         
         }
         assert(post.is_checked_out(0));
+        assert(post.is_checked_out(1));
     }
 }} // tokenized_state_machine
 
@@ -165,6 +169,7 @@ impl<T> VBBuffer<T> {
     fn checkout_first(&mut self, to_put: T) -> (t: Option<T>)
         requires
             old(self).wf(),
+            old(self).buffer.len() > 1,
         ensures
             self.wf(),
             match t {
@@ -179,7 +184,7 @@ impl<T> VBBuffer<T> {
         let tracked mut cell_perm: Option<cell::PointsTo<T>>;
 
         let current_end_idx =
-            atomic_with_ghost!(&self.end_idx => compare_exchange(0, 1);
+            atomic_with_ghost!(&self.end_idx => compare_exchange(0, 2);
                 update old_val -> new_val;
                 returning ret;
                 ghost end_idx_token => {
@@ -187,7 +192,7 @@ impl<T> VBBuffer<T> {
                         Result::Ok(prev) => {
                             assert(prev == 0);
                             assert(old_val == 0);
-                            assert(new_val == 1);
+                            assert(new_val == 2);
                             assert(end_idx_token.value() == 0);
                             let tracked (_, Tracked(mut cp)) = self.instance.borrow_mut().checkout_first(&mut end_idx_token);
                             cell_perm = Option::Some(cp.tracked_remove(0));
@@ -225,18 +230,19 @@ impl<T> VBBuffer<T> {
     }
 }
 
-pub fn new_buf<T>(len: usize) -> (vbuf: VBBuffer<T>)
+fn new_buf<T>(len: usize) -> (vbuf: VBBuffer<T>)
     requires
         len > 0,
     ensures
         vbuf.wf(),
+        vbuf.buffer@.len() == len,
 {
     // Initialize the vector to store the cells
     let mut backing_cells_vec = Vec::<PCell<T>>::new();
     // Initialize map for the permissions to the cells
     // (keyed by the indices into the vector)
     let tracked mut perms = Map::<nat, cell::PointsTo<T>>::tracked_empty();
-    while backing_cells_vec.len() < len
+    for cell_i in 0..len
         invariant
             forall|j: nat|
                 #![trigger( perms.dom().contains(j) )]
@@ -245,8 +251,9 @@ pub fn new_buf<T>(len: usize) -> (vbuf: VBBuffer<T>)
                 0 <= j && j < backing_cells_vec.len() as int ==> perms.dom().contains(j)
                     && backing_cells_vec@.index(j as int).id() === perms.index(j).id()
                     && perms.index(j).is_uninit(),
+            backing_cells_vec.len() == cell_i,
         decreases
-            len - backing_cells_vec.len(),
+            len - cell_i,
     {
         let ghost i = backing_cells_vec.len();
         let (cell, cell_perm) = PCell::empty();
@@ -257,6 +264,9 @@ pub fn new_buf<T>(len: usize) -> (vbuf: VBBuffer<T>)
         assert(perms.dom().contains(i as nat));
         assert(backing_cells_vec@.index(i as int).id() === perms.index(i as nat).id());
         assert(perms.index(i as nat).is_uninit());
+    }
+    proof {
+        assert(backing_cells_vec@.len() == len);
     }
     // Vector for ids
     let ghost mut backing_cells_ids = Seq::<CellId>::new(
@@ -283,6 +293,9 @@ pub fn new_buf<T>(len: usize) -> (vbuf: VBBuffer<T>)
 fn main() {
     let mut vbuf : VBBuffer<u32> = new_buf(5);
     let val: u32 = 555;
+    proof {
+        assert(vbuf.buffer@.len() == 5)
+    }
 
     let x = vbuf.checkout_first(val);
 
