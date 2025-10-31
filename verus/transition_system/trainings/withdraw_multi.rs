@@ -3,11 +3,11 @@ withdraw のプログラムの説明
 
 これは new_buf<T>(n) で初期化した長さ n のバッファの最初の位置 (0) の要素をチェックアウトするだけのプログラムである。
 
-状態遷移としては checkout_first という transition しかない。
+状態遷移としては checkout_first_two という transition しかない。
 end_idx という変数があり、これを使って 0 番目がチェックアウトされていないことを証明するようにしている。
 名前が適切ではないが、将来的に 0~end_idxまでをチェックアウトできるように拡張する予定なのでこの名前になっている。
 
-checkout_first()を実行すると compare_exchange を用いて end_idx を 0 => 1 に変更しようとする。
+checkout_first_two()を実行すると compare_exchange を用いて end_idx を 0 => 1 に変更しようとする。
 これが成功すると、transition を発生させ、Ghostの方も end_idx を 0 => 1 に変更し、かつ、実際のバッファに紐づく PointsTo トークンを払い出す。これは atomic_with_ghost!内でハンドリングすることで Atomic 変数の変更と同時に行うことができる。
  */
 
@@ -88,7 +88,7 @@ tokenized_state_machine!{VBQueue<T> {
     }
 
     transition!{
-        checkout_first() {
+        checkout_first_two() {
             assert(0 < pre.backing_cells.len());
 
             require(pre.end_idx == 0);
@@ -130,8 +130,8 @@ tokenized_state_machine!{VBQueue<T> {
         }
     }
 
-    #[inductive(checkout_first)]
-    fn checkout_first_inductive(pre: Self, post: Self) {
+    #[inductive(checkout_first_two)]
+    fn checkout_first_two_inductive(pre: Self, post: Self) {
         assert(!pre.is_checked_out(0));
         assert(!pre.is_checked_out(1));
         assert(forall|i| pre.valid_storage_at_idx(i) ==> post.valid_storage_at_idx(i)) by {
@@ -166,7 +166,7 @@ struct_with_invariants!{
 }
 
 impl<T> VBBuffer<T> {
-    fn checkout_first(&mut self, to_put: T) -> (t: Option<T>)
+    fn checkout_first_two(&mut self, to_put: T) -> (t: Option<&[PCell<T>]>)
         requires
             old(self).wf(),
             old(self).buffer.len() > 1,
@@ -194,7 +194,7 @@ impl<T> VBBuffer<T> {
                             assert(old_val == 0);
                             assert(new_val == 2);
                             assert(end_idx_token.value() == 0);
-                            let tracked (_, Tracked(mut cp)) = self.instance.borrow_mut().checkout_first(&mut end_idx_token);
+                            let tracked (_, Tracked(mut cp)) = self.instance.borrow_mut().checkout_first_two(&mut end_idx_token);
                             cell_perm = Option::Some(cp.tracked_remove(0));
                             assert(end_idx_token.value() == new_val);
                         }
@@ -297,7 +297,7 @@ fn main() {
         assert(vbuf.buffer@.len() == 5)
     }
 
-    let x = vbuf.checkout_first(val);
+    let x = vbuf.checkout_first_two(val);
 
     assert(match x {
         Option::Some(xx) => {
