@@ -218,3 +218,76 @@ read が想定通りの型のデータを返すことを保証する。
 - read_grant_end
 - release_start
 - release_end
+
+
+
+## バッファは Verus でどう扱うべきか？
+
+UnsafeCell は PCell が対応する。
+よって PCell<[u8; N]> になる？
+Const generics は Partially Supported らしい。
+
+https://verus-lang.github.io/verus/verusdoc/vstd/raw_ptr/fn.allocate.html
+
+[u8; N] は使えないことが分かった。
+https://github.com/verus-lang/verus/issues/187
+[u8; N] の *mut T への変換ができない。
+
+ということで妥協してヒープの allocate を使う。
+
+### Producer/Consumer に渡す BBQueue の参照をどうするか
+BBQueueの元の実装は NonNull<BBBuffer<N>> を使っている。
+Verus のProd/Consの例はArcを使っており、少し違う。
+
+NonNull<BBBuffer<N>>は non null な生ポインタに近いので、PCellを使うのが妥当なのか？
+ここを読む.https://verus-lang.github.io/verus/guide/interior_mutability.html
+
+ちょっと大変そうなので、一旦 Verus 公式の Arc 方式で妥協...
+
+```
+pub struct BBBuffer<const N: usize> {
+    buf: UnsafeCell<MaybeUninit<[u8; N]>>,
+
+    /// Where the next byte will be written
+    write: AtomicUsize,
+
+    /// Where the next byte will be read from
+    read: AtomicUsize,
+
+    /// Used in the inverted case to mark the end of the
+    /// readable streak. Otherwise will == sizeof::<self.buf>().
+    /// Writer is responsible for placing this at the correct
+    /// place when entering an inverted condition, and Reader
+    /// is responsible for moving it back to sizeof::<self.buf>()
+    /// when exiting the inverted condition
+    last: AtomicUsize,
+
+    /// Used by the Writer to remember what bytes are currently
+    /// allowed to be written to, but are not yet ready to be
+    /// read from
+    reserve: AtomicUsize,
+
+    /// Is there an active read grant?
+    read_in_progress: AtomicBool,
+
+    /// Is there an active write grant?
+    write_in_progress: AtomicBool,
+
+    /// Have we already split?
+    already_split: AtomicBool,
+}
+
+pub struct GrantW<'a, const N: usize> {
+    pub(crate) buf: NonNull<[u8]>,
+    bbq: NonNull<BBBuffer<N>>,
+    pub(crate) to_commit: usize,
+    phatom: PhantomData<&'a mut [u8]>,
+}
+
+pub struct GrantR<'a, const N: usize> {
+    pub(crate) buf: NonNull<[u8]>,
+    bbq: NonNull<BBBuffer<N>>,
+    pub(crate) to_release: usize,
+    phatom: PhantomData<&'a mut [u8]>,
+}
+```
