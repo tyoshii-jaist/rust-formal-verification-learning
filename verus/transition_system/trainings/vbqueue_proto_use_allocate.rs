@@ -21,30 +21,74 @@ pub enum ConsumerState {
     Reading(nat),
 }
 
-
-/*
 tokenized_state_machine!{VBQueue<const N: usize> {
     fields {
-        #[sharding(variable)]
-        pub not_granted: raw_ptr::PointsToRaw;
+        #[sharding(constant)]
+        pub capacity: nat,
 
         #[sharding(variable)]
-        pub granted_write: raw_ptr::PointsToRaw;
+        pub buffer_perm: raw_ptr::PointsToRaw,
 
         #[sharding(variable)]
-        pub granted_write: raw_ptr::PointsToRaw;
+        pub buffer_dealloc_token: raw_ptr::Dealloc,
+
+        #[sharding(variable)]
+        pub write: nat,
+
+        #[sharding(variable)]
+        pub read: nat,
+
+        #[sharding(variable)]
+        pub last: nat,
+
+        #[sharding(variable)]
+        pub reserve: nat,
+
+        #[sharding(variable)]
+        pub read_in_progress: bool,
+
+        #[sharding(variable)]
+        pub write_in_progress: bool,
+
+        #[sharding(variable)]
+        pub already_split: bool,
+
+        // Represents the local state of the single-producer
+        #[sharding(variable)]
+        pub producer: ProducerState,
+
+        // Represents the local state of the single-consumer
+        #[sharding(variable)]
+        pub consumer: ConsumerState,
     }
 
     init! {
-        initialize(provenance: raw_ptr::Provenance) {
-            init not_granted = raw_ptr
+        initialize(n: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc_token: raw_ptr::Dealloc) {
+            init capacity = n;
+            init buffer_perm = buffer_perm;
+            init buffer_dealloc_token = buffer_dealloc_token;
+            init write = 0;
+            init read = 0;
+            init last = n; // FIXME
+            init reserve = 0;
+            init read_in_progress = false;
+            init write_in_progress = false;
+            init already_split = false;
         }
     }
 }}
-*/
 
 pub struct VBBuffer<const N: usize> {
     buffer: *mut u8,
+    write: AtomicU64<_, VBQueue::write, _>,
+    read: AtomicU64<_, VBQueue::read, _>,
+    last: AtomicU64<_, VBQueue::last, _>,
+    reserve: AtomicU64<_, VBQueue::reserve, _>,
+    read_in_progress: AtomicBool<_, VBQueue::read_in_progress, _>,
+    write_in_progress: AtomicBool<_, VBQueue::write_in_progress, _>, 
+    already_split: AtomicBool<_, VBQueue::already_split, _>, 
+
+    instance: Tracked<VBQueue::Instance<T>>,
     buffer_perm: Tracked<raw_ptr::PointsToRaw>,
     buffer_dealloc_token: Tracked<raw_ptr::Dealloc>,
 }
