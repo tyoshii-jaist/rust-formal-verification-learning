@@ -8,7 +8,6 @@ use vstd::{prelude::*, *};
 use vstd::modes::*;
 use vstd::layout::*;
 use std::sync::Arc;
-use core::marker::PhantomData;
 
 verus! {
 global layout u8 is size == 1, align == 1;
@@ -26,7 +25,7 @@ pub enum ConsumerState {
 tokenized_state_machine!{VBQueue {
     fields {
         #[sharding(constant)]
-        pub capacity: nat,
+        pub length: nat,
 
         #[sharding(variable)]
         pub buffer_perm: raw_ptr::PointsToRaw,
@@ -66,13 +65,13 @@ tokenized_state_machine!{VBQueue {
     }
 
     init! {
-        initialize(n: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc_token: raw_ptr::Dealloc) {
-            init capacity = n;
+        initialize(length: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc_token: raw_ptr::Dealloc) {
+            init length = length;
             init buffer_perm = buffer_perm;
             init buffer_dealloc_token = buffer_dealloc_token;
             init write = 0;
             init read = 0;
-            init last = n; // FIXME
+            init last = length;
             init reserve = 0;
             init read_in_progress = false;
             init write_in_progress = false;
@@ -82,8 +81,9 @@ tokenized_state_machine!{VBQueue {
 }}
 
 struct_with_invariants!{
-    pub struct VBBuffer<const N: usize> {
+    pub struct VBBuffer {
         buffer: *mut u8,
+        length: usize,
         write: AtomicU64<_, VBQueue::write, _>,
         read: AtomicU64<_, VBQueue::read, _>,
         last: AtomicU64<_, VBQueue::last, _>,
@@ -96,9 +96,10 @@ struct_with_invariants!{
     }
 
     pub closed spec fn wf(&self) -> bool {
+        /*
         predicate {
             &&& N == self.instance@.capacity
-        }
+        } */
 
         invariant on write with (instance) is (v: u64, g: VBQueue::write) {
             &&& g.instance_id() === instance@.id()
@@ -137,8 +138,8 @@ struct_with_invariants!{
     }
 }
 
-pub struct Producer<const N: usize> {
-    vbq: Arc<VBBuffer<N>>,
+pub struct Producer {
+    vbq: Arc<VBBuffer>,
     //producer: Tracked<VBQueue::producer>,
 }
 /*
@@ -151,8 +152,8 @@ impl<T> Producer<T> {
     }
 }
  */
-pub struct Consumer<const N: usize> {
-    vbq: Arc<VBBuffer<N>>,
+pub struct Consumer {
+    vbq: Arc<VBBuffer>,
 }
 
 /*
@@ -165,38 +166,35 @@ impl<T> Consumer<T> {
     }
 }
  */
-impl<const N: usize> VBBuffer<N>
+impl VBBuffer
 {
-    fn new() -> (s: Self)
+    fn new(length: usize) -> (s: Self)
         requires
-            valid_layout(N, 1),
-            N > 0, // TODO: 元の BBQueue はこの制約は持っていない。0で使うことはないと思うが。
+            valid_layout(length, 1),
+            length > 0, // TODO: 元の BBQueue はこの制約は持っていない。0で使うことはないと思うが。
         ensures
-            s.buffer_perm@.is_range(s.buffer.addr() as int, N as int),
-            s.buffer.addr() + N <= usize::MAX + 1,
-            s.buffer_dealloc_token@@
+            s.instance@.buffer_perm().is_range(s.buffer.addr() as int, length as int),
+            s.buffer.addr() + length <= usize::MAX + 1,
+            s.instance@.buffer_dealloc_token()@
                 == (DeallocData {
                     addr: s.buffer.addr(),
-                    size: N as nat,
+                    size: length as nat,
                     align: 1,
-                    provenance: s.buffer_perm@.provenance(),
+                    provenance: s.instance@.buffer_perm().provenance(),
                 }),
             s.buffer.addr() as int % 1 as int == 0,
-            s.buffer@.provenance == s.buffer_perm@.provenance(),
+            s.buffer@.provenance == s.instance@.buffer_perm().provenance(),
     {
-        layout_for_type_is_valid::<[u8; N]>();
         // TODO: 元の BBQueue は静的に確保している。
-        let (buffer_ptr, buffer_perm, buffer_dealloc_token) = allocate(N, 1);
+        let (buffer_ptr, buffer_perm, buffer_dealloc_token) = allocate(length, 1);
 
         // Initialize the queue
         Self {
             buffer: buffer_ptr,
-            buffer_perm,
-            buffer_dealloc_token
         }
     }
 
-    fn try_split(self) -> Result<(Producer<N>, Consumer<N>),  &'static str>
+    fn try_split(self) -> Result<(Producer, Consumer),  &'static str>
     {
         // TODO: already_split の実装
         // FIXME:元の実装は Arc は使っていない。
@@ -214,8 +212,8 @@ impl<const N: usize> VBBuffer<N>
 
     fn experimental(&mut self) -> ()
         requires
-            old(self).buffer.addr() as int % align_of::<[u8; N]>() as int == 0,
-            old(self).buffer_perm@.is_range(old(self).buffer.addr() as int, size_of::<[u8; N]>() as int),
+            old(self).buffer.addr() as int % align_of::<u8>() as int == 0,
+            old(self).instance@.buffer_perm().is_range(old(self).buffer.addr() as int, size_of::<u8>() as int),
     {
         let tracked mut points_to;
         proof {
@@ -223,39 +221,33 @@ impl<const N: usize> VBBuffer<N>
             let tracked bufp = self.buffer_perm.borrow();
             let tracked mut buffer_perm = raw_ptr::PointsToRaw::empty(bufp.provenance());
             tracked_swap(&mut buffer_perm, self.buffer_perm.borrow_mut());        
-            //assume(size_of::<[u8; N]>() == N as int);
             assert(buffer_perm.dom() == crate::set_lib::set_int_range(
                 self.buffer.addr() as int,
-                self.buffer.addr() as int + size_of::<[u8; N]>() as int,
+                self.buffer.addr() as int + size_of::<u8>() as int,
             ));
-            assert(buffer_perm.is_range(self.buffer.addr() as int, size_of::<[u8; N]>() as int));
-            points_to = buffer_perm.into_typed::<[u8; N]>(self.buffer.addr() as usize);
+            assert(buffer_perm.is_range(self.buffer.addr() as int, size_of::<u8>() as int));
+            points_to = buffer_perm.into_typed::<u8>(self.buffer.addr() as usize);
 
             assert(equal(points_to.opt_value(), MemContents::Uninit));
             //tracked_swap(&mut buffer_perm, self.buffer_perm.borrow_mut());
         }
 
-        let ptr = self.buffer as *mut [u8; N];
+        let ptr = self.buffer as *mut u8;
         proof {
             assert(equal(points_to.ptr() as usize, self.buffer as usize));
             // FIXME: assume を取り除く
             assume(equal(points_to.ptr() as *mut u8, self.buffer as *mut u8));
         }
-        ptr_mut_write(ptr, Tracked(&mut points_to), [0u8; N]);
-        assert(equal(points_to.opt_value(), MemContents::Init([0u8; N])));
-
-
+        ptr_mut_write(ptr, Tracked(&mut points_to), 0);
+        assert(equal(points_to.opt_value(), MemContents::Init(0)));
     }
 
     // TODO: try_release を実装する
 
-    const fn capacity(&self) -> usize {
-        N
-    }
 }
 
 fn main() {
-    let vbuf: VBBuffer<6> = VBBuffer::new();
+    let vbuf: VBBuffer = VBBuffer::new(6);
 }
 
 }

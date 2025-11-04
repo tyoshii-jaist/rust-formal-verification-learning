@@ -234,6 +234,29 @@ https://github.com/verus-lang/verus/issues/187
 [u8; N] の *mut T への変換ができない。
 
 ということで妥協してヒープの allocate を使う。
+const N を使う理由もなく、const generics は partially support なので利用をやめる。
+struct_with_invariants! で closed spec の方にどのように N を渡せばよいかも不詳。
+
+
+```
+struct_with_invariants!{
+    pub struct VBBuffer<const N: usize> {
+        buffer: *mut u8,
+        write: AtomicU64<_, VBQueue::write, _>,
+        read: AtomicU64<_, VBQueue::read, _>,
+        last: AtomicU64<_, VBQueue::last, _>,
+        reserve: AtomicU64<_, VBQueue::reserve, _>,
+        read_in_progress: AtomicBool<_, VBQueue::read_in_progress, _>,
+        write_in_progress: AtomicBool<_, VBQueue::write_in_progress, _>, 
+        already_split: AtomicBool<_, VBQueue::already_split, _>,
+
+        instance: Tracked<VBQueue::Instance>,
+    }
+
+    pub closed spec fn wf(&self) -> bool {
+    }
+```
+
 
 ### Producer/Consumer に渡す BBQueue の参照をどうするか
 BBQueueの元の実装は NonNull<BBBuffer<N>> を使っている。
@@ -241,8 +264,25 @@ Verus のProd/Consの例はArcを使っており、少し違う。
 
 NonNull<BBBuffer<N>>は non null な生ポインタに近いので、PCellを使うのが妥当なのか？
 ここを読む.https://verus-lang.github.io/verus/guide/interior_mutability.html
-
 ちょっと大変そうなので、一旦 Verus 公式の Arc 方式で妥協...
+
+### Producer/Consumer に渡す GrantW/GrantR 内のスライスはどう扱うか？
+元の実装は [u8; N] の領域に対して from_raw_parts_mut (unsafe) を使ってスライスを作り、返している。
+今のところ、[u8; N] を *mut u8 に変換できないので、ヒープにアロケートする妥協を行うことにした。
+
+また、GrantW/GrantRは元のRust 実装で使っている &mut [u8]（スライス型）を Verus 側ではそのまま扱えない。(未対応)
+
+Verus の raw_ptr モジュールは、基本的に PointsTo<T> や ptr_mut_write<T> のように
+「コンパイル時にサイズが決まる型 T が 1 個置かれている領域」を前提にしており、
+長さが実行時に変わるスライス（&mut [u8]）をそのまま T として扱うことができない。
+
+
+実行コードではバッファを *mut u8 と usize（長さ）として保持し、スライス相当の範囲は生ポインタとオフセットで扱う。
+
+メモリ領域の所有権については、PointsToRaw とそのドメイン（バイト範囲）で管理し、u8 単位の書き込みに対して ptr_mut_write::<u8> を用いる
+
+つまり、Verus では Rust の &mut [u8] を直接モデリングするのではなく、*mut u8 + len と ghost の所有権によって、
+「スライスとしての意味」を表現する。
 
 ```
 pub struct BBBuffer<const N: usize> {
@@ -291,3 +331,6 @@ pub struct GrantR<'a, const N: usize> {
     phatom: PhantomData<&'a mut [u8]>,
 }
 ```
+
+
+split_read、frame 機能などは対応しない。
