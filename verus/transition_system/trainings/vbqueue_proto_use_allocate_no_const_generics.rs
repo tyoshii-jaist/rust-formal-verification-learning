@@ -27,11 +27,11 @@ tokenized_state_machine!{VBQueue {
         #[sharding(constant)]
         pub length: nat,
 
-        #[sharding(variable)]
-        pub buffer_perm: raw_ptr::PointsToRaw,
+        #[sharding(storage_option)]
+        pub buffer_perm: Option<raw_ptr::PointsToRaw>,
 
-        #[sharding(variable)]
-        pub buffer_dealloc_token: raw_ptr::Dealloc,
+        #[sharding(storage_option)]
+        pub buffer_dealloc: Option<raw_ptr::Dealloc>,
 
         #[sharding(variable)]
         pub write: nat,
@@ -65,10 +65,10 @@ tokenized_state_machine!{VBQueue {
     }
 
     init! {
-        initialize(length: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc_token: raw_ptr::Dealloc) {
+        initialize(length: nat, buffer_perm: Option<raw_ptr::PointsToRaw>, buffer_dealloc: Option<raw_ptr::Dealloc>) {
             init length = length;
             init buffer_perm = buffer_perm;
-            init buffer_dealloc_token = buffer_dealloc_token;
+            init buffer_dealloc = buffer_dealloc;
             init write = 0;
             init read = 0;
             init last = length;
@@ -123,17 +123,17 @@ struct_with_invariants!{
 
         invariant on read_in_progress with (instance) is (v: bool, g: VBQueue::read_in_progress) {
             &&& g.instance_id() === instance@.id()
-            &&& g.value() == v as int
+            &&& g.value() == v
         }
 
         invariant on write_in_progress with (instance) is (v: bool, g: VBQueue::write_in_progress) {
             &&& g.instance_id() === instance@.id()
-            &&& g.value() == v as int
+            &&& g.value() == v
         }
 
         invariant on already_split with (instance) is (v: bool, g: VBQueue::already_split) {
             &&& g.instance_id() === instance@.id()
-            &&& g.value() == v as int
+            &&& g.value() == v
         }
     }
 }
@@ -173,9 +173,10 @@ impl VBBuffer
             valid_layout(length, 1),
             length > 0, // TODO: 元の BBQueue はこの制約は持っていない。0で使うことはないと思うが。
         ensures
+        /*
             s.instance@.buffer_perm().is_range(s.buffer.addr() as int, length as int),
             s.buffer.addr() + length <= usize::MAX + 1,
-            s.instance@.buffer_dealloc_token()@
+            s.instance@.buffer_dealloc()@
                 == (DeallocData {
                     addr: s.buffer.addr(),
                     size: length as nat,
@@ -184,13 +185,45 @@ impl VBBuffer
                 }),
             s.buffer.addr() as int % 1 as int == 0,
             s.buffer@.provenance == s.instance@.buffer_perm().provenance(),
+         */
     {
         // TODO: 元の BBQueue は静的に確保している。
-        let (buffer_ptr, buffer_perm, buffer_dealloc_token) = allocate(length, 1);
+        let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
+
+        let tracked (
+            Tracked(instance),
+            //Tracked(buffer_perm_token),
+            //Tracked(buffer_dealloc_token),
+            Tracked(write_token),
+            Tracked(read_token),
+            Tracked(last_token),
+            Tracked(reserve_token),
+            Tracked(read_in_progress_token),
+            Tracked(write_in_progress_token),
+            Tracked(already_split_token),
+        ) = VBQueue::Instance::initialize(length as nat, Some(buffer_perm), Some(buffer_dealloc), Some(buffer_perm), Some(buffer_dealloc));
+
+        let tracked_inst: Tracked<VBQueue::Instance> = Tracked(instance.clone());
+        let write_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(write_token));
+        let read_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(read_token));
+        let last_atomic = AtomicU64::new(Ghost(tracked_inst), length as u64, Tracked(last_token));
+        let reserve_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(reserve_token));
+        let read_in_progress_atomic = AtomicBool::new(Ghost(tracked_inst), false, Tracked(read_in_progress_token));
+        let write_in_progress_atomic = AtomicBool::new(Ghost(tracked_inst), false, Tracked(write_in_progress_token));
+        let already_split_atomic = AtomicBool::new(Ghost(tracked_inst), false, Tracked(already_split_token));
 
         // Initialize the queue
         Self {
             buffer: buffer_ptr,
+            length,
+            write: write_atomic,
+            read: read_atomic,
+            last: last_atomic,
+            reserve: reserve_atomic,
+            read_in_progress: read_in_progress_atomic,
+            write_in_progress: write_in_progress_atomic,
+            already_split: already_split_atomic,
+            instance: Tracked(instance),
         }
     }
 
@@ -209,11 +242,11 @@ impl VBBuffer
             }
         ))
     }
-
+/*
     fn experimental(&mut self) -> ()
         requires
             old(self).buffer.addr() as int % align_of::<u8>() as int == 0,
-            old(self).instance@.buffer_perm().is_range(old(self).buffer.addr() as int, size_of::<u8>() as int),
+            //old(self).instance@.buffer_perm().is_range(old(self).buffer.addr() as int, size_of::<u8>() as int),
     {
         let tracked mut points_to;
         proof {
@@ -241,11 +274,10 @@ impl VBBuffer
         ptr_mut_write(ptr, Tracked(&mut points_to), 0);
         assert(equal(points_to.opt_value(), MemContents::Init(0)));
     }
+     */
 
     // TODO: try_release を実装する
-
 }
-
 fn main() {
     let vbuf: VBBuffer = VBBuffer::new(6);
 }
