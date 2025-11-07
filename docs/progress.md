@@ -47,21 +47,15 @@ https://verus-lang.zulipchat.com/#narrow/channel/399078-help/topic/.E2.9C.94.20p
     - 各要素の free、および、deallocには対応していない。
 
 
-# 10/27 mtg 用メモ
-- これまでの歩み
-    - 東京社会人コース修士課程 3 年目 (残り半年弱)
-    - 都内のロボットベンチャー勤務。ソフトウェアエンジニア。
-    - 研究テーマを仕事と絡めようとして迷走 (自動運転系、転職後にロボットの状態遷移調査系) した結果、半年前に一旦リセットして Rust の形式検証をやることにして、Verus に挑戦中。
-    - Verus歴約半年
-        - まずは手習いとして元の論文のフィボナッチ数列の検証、最大公約数を求めるプログラムの検証などを行った。
-        - 低レベルの検証のため、PPtr、raw_pointer を用いたプログラムの検証を書いた。
-        - Atomic、および、並行性検証 (tokenized_state_machine) のための検証プログラムを作成中。
-        - 最終的に課題研究として BBQueue という Rust 用のライブラリの検証を行い、結果をまとめる予定。
-    - MOUDE/CafeObj
-- 今回の進捗
-    - 「ロック」の話について整理した
-    - 「BBQueue」の利点について BipBuffer を絡めて整理した
-    - VerusSync の transition システムを読み進めた
+# 11/9 進捗
+- VerusSync の transition システムを読み進めた
+        - transition システムでは field を持つゴーストなモデルを定義し、状態遷移時に問題がないかを管理する
+            - field に値を持つ
+            - init! で初期化
+            - transition! で遷移
+            - invariant で不変量を記述する
+            - inductive で遷移時の前後のチェック条件を記述する
+            - 内部的には素の Verus コードに展開されているようなので、必ずしも使わなくてもよい。
         - transition の記述と関数の使い方にかなり癖がある。
             - 引数が関数の処理内容によって変わるので、特にややこしい。
             - selfの意味がどのstmtの中にいるかで変わる。
@@ -74,8 +68,15 @@ https://verus-lang.zulipchat.com/#narrow/channel/399078-help/topic/.E2.9C.94.20p
             - ただし、書く、エラーを見る、直す、のサイクルは回り始めた。
         - 見えている課題と今後の方向性
             - SPSC の例をもう少し理解する
-            - BBQueue では slice を取り扱うのでその取り回しがまだわかっていない
-            - 今は2スレッドで、PointsToのプールからの出し入れ (withdraw/deposit)の習熟中
+                - 簡単な例を書くことで、tokenized_state_machine の取り回しは何となくわかった。
+            - 2スレッドで、PointsToのプールからの出し入れ (withdraw/deposit)をやってみた。
                 - これは BBQueue のベースになる
-                - 1 エレメントの withdraw ができた。
+                - 1 エレメントの withdraw ができた。(depositはしていない)
                 - n エレメントの withdraw/deposit に発展させたい。
+                    => Adhoc な拡張を行うと論理整合性が取れなくて進捗が著しく悪いので、BBQueue 本体の検証に移ることにした。
+            - BBQueue では slice を取り扱うのでその取り回しがまだわかっていない
+                - BBQueueは Rust の const generics でコンパイルタイムにサイズを確定させ、[u8; N] の塊でハンドリング方式を取っている。
+                - Prod/Consにはポインタを使ってこの塊の view を渡して見せている。(当然 unsafe の領域になる)
+                - verus では[u8; N] を *mut u8 に変換することが未サポートなため、ヒープ確保で代替することにした。(fat => thin がサポートされていない？)
+            - BBQueue 書き始めた。
+
