@@ -137,8 +137,19 @@ tokenized_state_machine!{VBQueue {
         }
     }
 
+    transition!{
+        grant_start() {
+            require(pre.write_in_progress == false);
+
+            update write_in_progress = true;
+        }
+    }
+
     #[inductive(try_split)]
     fn try_split_inductive(pre: Self, post: Self) { }
+
+    #[inductive(grant_start)]
+    fn grant_start_inductive(pre: Self, post: Self) { }
 }}
 
 struct_with_invariants!{
@@ -293,6 +304,12 @@ impl VBBuffer
     fn try_split(self) -> (res: Result<(Producer, Consumer),  &'static str>)
         requires
             self.wf(),
+        ensures
+            self.wf(),
+            match res {
+                Ok((prod, cons)) => prod.vbq.wf() && cons.vbq.wf(),
+                Err(_) => true
+            }
     {
         let already_splitted =
             atomic_with_ghost!(&self.already_split => swap(true);
@@ -312,7 +329,6 @@ impl VBBuffer
         if already_splitted {
             return Err("already splitted");
         }
-
 
         // FIXME:元の実装は Arc は使っていない。
         // また、buffer のゼロ化もしているが、こちらは今はやっていない。
@@ -362,8 +378,59 @@ impl VBBuffer
 
     // TODO: try_release を実装する
 }
+
+struct GrantW {
+    buf: *mut u8,
+    vbq: Arc<VBBuffer>,
+    to_commit: usize,
+}
+
+impl Producer {
+    fn grant_exact(&mut self, sz: usize) -> Result<GrantW, &'static str>
+        requires
+            old(self).vbq.wf(),
+    {
+        let is_write_in_progress =
+            atomic_with_ghost!(&self.vbq.write_in_progress => swap(true);
+                update prev -> next;
+                returning ret;
+                ghost write_in_progress_token => {
+                    if !ret {
+                        assert(prev == false);
+                        assert(next == true);
+                        assert(write_in_progress_token.value() == false);
+                        let _ = self.vbq.instance.borrow().grant_start(&mut write_in_progress_token);
+                        assert(write_in_progress_token.value() == true);
+                    };
+                }
+        );
+
+        if is_write_in_progress {
+            return Err("write in progress");
+        }
+
+        Ok (
+            GrantW {
+                buf: self.vbq.buffer,
+                vbq: self.vbq.clone(),
+                to_commit: sz,
+            }
+        )
+    }
+}
+
 fn main() {
     let vbuf: VBBuffer = VBBuffer::new(6);
+    let (mut prod, mut cons) = match vbuf.try_split() {
+        Ok((prod, cons)) => (prod, cons),
+        Err(_) => {
+            return;
+        }
+    };
+
+    // Request space for one byte
+    let mut wgr = prod.grant_exact(1);
+    
 }
 
 }
