@@ -5,7 +5,7 @@ use vstd::raw_ptr::*;
 //use vstd::cell::*;
 //use vstd::map::*;
 use vstd::{prelude::*, *};
-use vstd::modes::*;
+// use vstd::modes::*;
 use vstd::layout::*;
 use std::sync::Arc;
 
@@ -27,6 +27,8 @@ tokenized_state_machine!{VBQueue {
         #[sharding(constant)]
         pub length: nat,
 
+        // 使い方はここが参考になりそう。
+        // https://github.com/verus-lang/verus/blob/7b6fdd861b43cbd88e886ad16c7af7cb1186ebc1/examples/state_machines/arc.rs#L26
         #[sharding(storage_option)]
         pub buffer_perm: Option<raw_ptr::PointsToRaw>,
 
@@ -64,11 +66,42 @@ tokenized_state_machine!{VBQueue {
  */
     }
 
+    #[invariant]
+    pub fn buffer_perm_is_some(&self) -> bool {
+        self.buffer_perm is Some
+    }
+
+    #[invariant]
+    pub fn buffer_dealloc_is_some(&self) -> bool {
+        self.buffer_dealloc is Some
+    }
+
+    /*
+    #[invariant]
+    pub fn split_agrees_buffer_perm(&self) -> bool {
+        self.already_split == false ==> self.buffer_perm is None
+    }
+
+    #[invariant]
+    pub fn split_agrees_dealloc(&self) -> bool {
+        self.already_split == false ==> self.buffer_dealloc is None
+    }
+
+    #[invariant]
+    pub fn split_agrees_buffer_perm_rev(&self) -> bool {
+        self.buffer_perm  is None ==> self.already_split == false
+    }
+
+    #[invariant]
+    pub fn split_agrees_dealloc_rev(&self) -> bool {
+        self.buffer_dealloc is None ==> self.already_split == false
+    } */
+
     init! {
-        initialize(length: nat, buffer_perm: Option<raw_ptr::PointsToRaw>, buffer_dealloc: Option<raw_ptr::Dealloc>) {
+        initialize(length: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc: raw_ptr::Dealloc) {
             init length = length;
-            init buffer_perm = buffer_perm;
-            init buffer_dealloc = buffer_dealloc;
+            init buffer_perm = Some(buffer_perm);
+            init buffer_dealloc = Some(buffer_dealloc);
             init write = 0;
             init read = 0;
             init last = length;
@@ -78,6 +111,34 @@ tokenized_state_machine!{VBQueue {
             init already_split = false;
         }
     }
+
+    
+    #[inductive(initialize)]
+    fn initialize_inductive(post: Self, length: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc: raw_ptr::Dealloc) {
+        assert(post.buffer_perm is Some);
+    }
+
+    /*
+    確かに error: unable to prove inherent safety condition: the value being guarded must be stored が出るな...
+    https://github.com/verus-lang/verus/blob/7b6fdd861b43cbd88e886ad16c7af7cb1186ebc1/examples/scache/rwlock.rs#L308
+     
+    property!{
+        guard_buffer_perm(perm: raw_ptr::PointsToRaw) {
+            guard buffer_perm >= Some(perm);
+        }
+    }
+    */
+
+    transition!{
+        try_split() {
+            require(pre.already_split == false);
+
+            update already_split = true;
+        }
+    }
+
+    #[inductive(try_split)]
+    fn try_split_inductive(pre: Self, post: Self) { }
 }}
 
 struct_with_invariants!{
@@ -175,7 +236,6 @@ impl VBBuffer
         ensures
         /*
             s.instance@.buffer_perm().is_range(s.buffer.addr() as int, length as int),
-            s.buffer.addr() + length <= usize::MAX + 1,
             s.instance@.buffer_dealloc()@
                 == (DeallocData {
                     addr: s.buffer.addr(),
@@ -183,9 +243,12 @@ impl VBBuffer
                     align: 1,
                     provenance: s.instance@.buffer_perm().provenance(),
                 }),
+            
+        */
+            s.buffer.addr() + length <= usize::MAX + 1,
             s.buffer.addr() as int % 1 as int == 0,
-            s.buffer@.provenance == s.instance@.buffer_perm().provenance(),
-         */
+            //s.buffer@.provenance == s.instance@.split_guard_buffer_perm().provenance(),
+            s.wf(),
     {
         // TODO: 元の BBQueue は静的に確保している。
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
@@ -201,7 +264,7 @@ impl VBBuffer
             Tracked(read_in_progress_token),
             Tracked(write_in_progress_token),
             Tracked(already_split_token),
-        ) = VBQueue::Instance::initialize(length as nat, Some(buffer_perm), Some(buffer_dealloc), Some(buffer_perm), Some(buffer_dealloc));
+        ) = VBQueue::Instance::initialize(length as nat, buffer_perm, buffer_dealloc, Some(buffer_perm), Some(buffer_dealloc));
 
         let tracked_inst: Tracked<VBQueue::Instance> = Tracked(instance.clone());
         let write_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(write_token));
@@ -227,9 +290,30 @@ impl VBBuffer
         }
     }
 
-    fn try_split(self) -> Result<(Producer, Consumer),  &'static str>
+    fn try_split(self) -> (res: Result<(Producer, Consumer),  &'static str>)
+        requires
+            self.wf(),
     {
-        // TODO: already_split の実装
+        let already_splitted =
+            atomic_with_ghost!(&self.already_split => swap(true);
+                update prev -> next;
+                returning ret;
+                ghost already_split_token => {
+                    if !ret {
+                        assert(prev == false);
+                        assert(next == true);
+                        assert(already_split_token.value() == false);
+                        let _ = self.instance.borrow().try_split(&mut already_split_token);
+                        assert(already_split_token.value() == true);
+                    };
+                }
+        );
+
+        if already_splitted {
+            return Err("already splitted");
+        }
+
+
         // FIXME:元の実装は Arc は使っていない。
         // また、buffer のゼロ化もしているが、こちらは今はやっていない。
         let vbbuffer_arc = Arc::new(self);
