@@ -5,7 +5,7 @@ use vstd::raw_ptr::*;
 //use vstd::cell::*;
 //use vstd::map::*;
 use vstd::{prelude::*, *};
-// use vstd::modes::*;
+//use vstd::modes::*;
 use vstd::layout::*;
 use std::sync::Arc;
 
@@ -66,6 +66,7 @@ tokenized_state_machine!{VBQueue {
  */
     }
 
+    /*
     #[invariant]
     pub fn buffer_perm_is_some(&self) -> bool {
         self.buffer_perm is Some
@@ -75,27 +76,7 @@ tokenized_state_machine!{VBQueue {
     pub fn buffer_dealloc_is_some(&self) -> bool {
         self.buffer_dealloc is Some
     }
-
-    /*
-    #[invariant]
-    pub fn split_agrees_buffer_perm(&self) -> bool {
-        self.already_split == false ==> self.buffer_perm is None
-    }
-
-    #[invariant]
-    pub fn split_agrees_dealloc(&self) -> bool {
-        self.already_split == false ==> self.buffer_dealloc is None
-    }
-
-    #[invariant]
-    pub fn split_agrees_buffer_perm_rev(&self) -> bool {
-        self.buffer_perm  is None ==> self.already_split == false
-    }
-
-    #[invariant]
-    pub fn split_agrees_dealloc_rev(&self) -> bool {
-        self.buffer_dealloc is None ==> self.already_split == false
-    } */
+    */
 
     init! {
         initialize(length: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc: raw_ptr::Dealloc) {
@@ -145,11 +126,40 @@ tokenized_state_machine!{VBQueue {
         }
     }
 
+    transition!{
+        do_reserve(new_reserve: nat) {
+            update reserve = new_reserve;
+        }
+    }
+
+    transition!{
+        grant_end() {
+            update write_in_progress = false;
+        }
+    }
+
+    transition!{
+        withdraw_buffer_perm() {
+            withdraw buffer_perm -= Some(let _) by {
+                assume(pre.buffer_perm is Some);
+            };
+        }
+    }
+
     #[inductive(try_split)]
     fn try_split_inductive(pre: Self, post: Self) { }
 
     #[inductive(grant_start)]
     fn grant_start_inductive(pre: Self, post: Self) { }
+
+    #[inductive(grant_end)]
+    fn grant_end_inductive(pre: Self, post: Self) { }
+
+    #[inductive(do_reserve)]
+    fn do_reserve_inductive(pre: Self, post: Self, new_reserve: nat) { }
+
+    #[inductive(withdraw_buffer_perm)]
+    fn withdraw_buffer_perm_inductive(pre: Self, post: Self) { }
 }}
 
 struct_with_invariants!{
@@ -408,6 +418,78 @@ impl Producer {
         if is_write_in_progress {
             return Err("write in progress");
         }
+
+        let write = atomic_with_ghost!(&self.vbq.write => load();
+            ghost write_in_progress_token => {
+            }
+        );
+
+        let read = atomic_with_ghost!(&self.vbq.read => load();
+            ghost write_in_progress_token => {
+            }
+        );
+        let max = self.vbq.length as u64;
+        let already_inverted = write < read;
+        assume(write + sz < u64::MAX);
+
+        let start = if already_inverted {
+            if (write + sz as u64) < read {
+                // Inverted, room is still available
+                write
+            } else {
+                // Inverted, no room is available
+                atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
+                    ghost write_in_progress_token => {
+                        let _ = self.vbq.instance.borrow().grant_end(&mut write_in_progress_token);
+                        assert(write_in_progress_token.value() == false);
+                    }
+                );
+                return Err("Inverted, no room is available");
+            }
+        } else {
+            if write + sz as u64 <= max {
+                // Non inverted condition
+                write
+            } else {
+                // Not inverted, but need to go inverted
+
+                // NOTE: We check sz < read, NOT <=, because
+                // write must never == read in an inverted condition, since
+                // we will then not be able to tell if we are inverted or not
+                if (sz as u64) < read {
+                    // Invertible situation
+                    0
+                } else {
+                    // Not invertible, no space
+                    atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
+                        ghost write_in_progress_token => {
+                            let _ = self.vbq.instance.borrow().grant_end(&mut write_in_progress_token);
+                            assert(write_in_progress_token.value() == false);
+                        }
+                    );
+                    return Err("Insufficient size");
+                }
+            }
+        };
+
+        assume(start + sz < u64::MAX); // FIXME!
+        // Safe write, only viewed by this task
+
+        atomic_with_ghost!(&self.vbq.reserve => store(start + sz as u64);
+            ghost reserve_token => {
+                let _ = self.vbq.instance.borrow().do_reserve((start + sz) as nat, &mut reserve_token);
+                assert(reserve_token.value() == start + sz as u64);
+            }
+        );
+
+        proof {
+            let tracked buffer_perm = self.vbq.instance.borrow().withdraw_buffer_perm();
+        }
+
+        // This is sound, as UnsafeCell, MaybeUninit, and GenericArray
+        // are all `#[repr(Transparent)]
+        // let start_of_buf_ptr = inner.buf.get().cast::<u8>();
+        // let grant_slice = unsafe { from_raw_parts_mut(start_of_buf_ptr.add(start), sz) };
 
         Ok (
             GrantW {
