@@ -47,36 +47,48 @@ https://verus-lang.zulipchat.com/#narrow/channel/399078-help/topic/.E2.9C.94.20p
     - 各要素の free、および、deallocには対応していない。
 
 
-# 11/9 進捗
-- VerusSync の transition システムを読み進めた
-        - transition システムでは field を持つゴーストなモデルを定義し、状態遷移時に問題がないかを管理する
-            - field に値を持つ
-            - init! で初期化
-            - transition! で遷移
-            - invariant で不変量を記述する
-            - inductive で遷移時の前後のチェック条件を記述する
-            - 内部的には素の Verus コードに展開されているようなので、必ずしも使わなくてもよい。
-        - transition の記述と関数の使い方にかなり癖がある。
-            - 引数が関数の処理内容によって変わるので、特にややこしい。
-            - selfの意味がどのstmtの中にいるかで変わる。
-            - sharding storategy ごとにかなり記述が異なる。update, remove, withdraw など
-            - instance など暗黙に定義されている構造体もある。
-            - 中間コードを見るような方式があると助かる。--log-all でなんとなくは見える。
-        - 少しずつ慣れてきたが、まだ時間がかかる。
-            - 簡単な例でも論理的整合性がないとドツボにはまるので、なかなかシンプルな問題設定が難しい
-            - エラーが直観的でない
-            - ただし、書く、エラーを見る、直す、のサイクルは回り始めた。
-        - 見えている課題と今後の方向性
-            - SPSC の例をもう少し理解する
-                - 簡単な例を書くことで、tokenized_state_machine の取り回しは何となくわかった。
-            - 2スレッドで、PointsToのプールからの出し入れ (withdraw/deposit)をやってみた。
-                - これは BBQueue のベースになる
-                - 1 エレメントの withdraw ができた。(depositはしていない)
-                - n エレメントの withdraw/deposit に発展させたい。
-                    => Adhoc な拡張を行うと論理整合性が取れなくて進捗が著しく悪いので、BBQueue 本体の検証に移ることにした。
-            - BBQueue では slice を取り扱うのでその取り回しがまだわかっていない
-                - BBQueueは Rust の const generics でコンパイルタイムにサイズを確定させ、[u8; N] の塊でハンドリング方式を取っている。
-                - Prod/Consにはポインタを使ってこの塊の view を渡して見せている。(当然 unsafe の領域になる)
-                - verus では[u8; N] を *mut u8 に変換することが未サポートなため、ヒープ確保で代替することにした。(fat => thin がサポートされていない？)
-            - BBQueue 書き始めた。
-
+# 2025/11/9 進捗
+1. Atomic について
+    - Verus では SeqCst 扱いとなる。Relaxed や Acq/Rel は対応しない。
+    - SeqCst は一番強い順序制約を課すので、RelaxedやAcq/Relを使っている場合は別途保証する必要がある。
+    - 参考: https://zenn.dev/belle/articles/bcddf554a43053
+2. VerusSync の transition システム
+    - Verus ではマルチスレッドの検証用に verus transition system (tokenized_state_machine) という機能を提供している
+        - safety (データ競合free) と funtional correctness に主にフォーカスしており、liveness と termination はスコープ外 (元の論文の 2.2 に謳っている)
+    - transition システムでは field を持つゴーストなモデルを定義し、状態遷移時に問題がないかを管理する
+        - 不変量 (invariants) とその不変量が成り立つ証明を書く。
+            - init(state) ==> inv(state)
+            - transition(pre, post) && inv(pre) ==> inv(post)
+        - トークン化された状態マシンに「トークン型（token types）」の集合を生成する。
+        - システムの各遷移（transition）は、通常の遷移関係だけでなく、“トークンの交換（exchange）”としても捉える。
+        - field に値を持つ
+        - init! で初期化
+        - transition! で遷移
+        - invariant で不変量を記述する
+        - inductive で遷移時の前後のチェック条件を記述する
+        - 内部的には素の Verus コードに展開されているようなので、必ずしも使わなくてもよい。
+        - https://verus-lang.github.io/verus/state_machines/strategy-reference.html
+3. Verus state machine を用いた BBQueue の検証における現実的な課題
+    - transition の記述と関数の使い方にかなり癖がある。
+        - 引数が関数の処理内容によって変わるので、特にややこしい。
+        - selfの意味がどのstmtの中にいるかで変わる。
+        - sharding storategy ごとにかなり記述が異なる。update, remove, withdraw など
+        - instance など暗黙に定義されている構造体もある。
+        - 中間コードを見るような方式があると助かる。--log-all でなんとなくは見える。
+    - 公式チュートリアルに書かれていた SPSC の例をもう少し理解する
+        - Queueの各要素を PCell として管理している。
+            - cell 本体の方を exec の方の buffer に入れ、cell_permの方を state machine に入れている
+            - struct_with_invariants の定義で Atomic 変数と state machine の同名フィールドと紐づけている
+    - 少しずつ慣れてきたが、まだ時間がかかる。
+        - 簡単な例を書くことで、tokenized_state_machine の取り回しは何となくわかった。
+            - 1 エレメントの withdraw ができた。(depositはしていない)
+        - 簡単な例でも論理的整合性がないとドツボにはまるので、なかなかシンプルな問題設定が難しい
+            - BBQueue 本体に手を付けた方が良いと判断し、開始した
+        - エラーが直観的でない
+        - ただし、書く、エラーを見る、直す、のサイクルは回り始めた。
+    - BBQueue特有の課題
+        - BBQueueのメモリハンドリングについて整理
+            - BBQueueは Rust の const generics でコンパイルタイムにサイズを確定させ、[u8; N] の塊でハンドリング方式を取っている。
+            - Prod/Consにはsliceを使ってこの領域の view を渡して見せている。(当然 unsafe の領域になる)
+            - verus では[u8; N] を *mut u8 に変換することが未サポートなため、ヒープ確保で代替することにした。(fat => thin がサポートされていない？)issueあり。
+        - Prod/Cons に BBQueue 構造体本体へのポインタを渡しているがここもかなりトリッキー(unsafe)なので、正しく Verus で取り扱える文脈に変換する方法を考えないといけない。今は Arc (Atomic Ref count) で代替して実装を進めている。
