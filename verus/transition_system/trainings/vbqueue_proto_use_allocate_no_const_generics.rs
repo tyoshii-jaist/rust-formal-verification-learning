@@ -25,12 +25,18 @@ pub enum ConsumerState {
 tokenized_state_machine!{VBQueue {
     fields {
         #[sharding(constant)]
+        pub start_addr: nat,
+
+        #[sharding(constant)]
         pub length: nat,
 
         // 使い方はここが参考になりそう。
         // https://github.com/verus-lang/verus/blob/7b6fdd861b43cbd88e886ad16c7af7cb1186ebc1/examples/state_machines/arc.rs#L26
         #[sharding(storage_option)]
         pub buffer_perm: Option<raw_ptr::PointsToRaw>,
+
+        #[sharding(storage_option)]
+        pub buffer_perm_prod: Option<raw_ptr::PointsToRaw>,
 
         #[sharding(storage_option)]
         pub buffer_dealloc: Option<raw_ptr::Dealloc>,
@@ -66,12 +72,29 @@ tokenized_state_machine!{VBQueue {
  */
     }
 
-    /*
-    #[invariant]
-    pub fn buffer_perm_is_some(&self) -> bool {
-        self.buffer_perm is Some
+    pub open spec fn buffer_perms_covers_all_range(&self) -> bool {
+        match (self.buffer_perm, self.buffer_perm_prod) {
+            (Some(bp), Some(bpp)) => {
+                bp.dom().union(bpp.dom()).contains(self.start_addr as int)
+            },
+            (Some(bp), None) => {
+                bp.is_range(self.start_addr as int, self.length as int)
+            },
+            (None, Some(bbp)) => {
+                bbp.is_range(self.start_addr as int, self.length as int)
+            },
+            (None, None) => {
+                false
+            }
+        }
     }
 
+    #[invariant]
+    pub fn buffer_perm_is_some(&self) -> bool {
+        self.buffer_perms_covers_all_range()
+    }
+
+    /*
     #[invariant]
     pub fn buffer_dealloc_is_some(&self) -> bool {
         self.buffer_dealloc is Some
@@ -79,9 +102,11 @@ tokenized_state_machine!{VBQueue {
     */
 
     init! {
-        initialize(length: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc: raw_ptr::Dealloc) {
+        initialize(start_addr: nat, length: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_perm_prod: raw_ptr::PointsToRaw, buffer_dealloc: raw_ptr::Dealloc) {
+            init start_addr = start_addr;
             init length = length;
             init buffer_perm = Some(buffer_perm);
+            init buffer_perm_prod = Some(buffer_perm_prod);
             init buffer_dealloc = Some(buffer_dealloc);
             init write = 0;
             init read = 0;
@@ -95,7 +120,7 @@ tokenized_state_machine!{VBQueue {
 
     
     #[inductive(initialize)]
-    fn initialize_inductive(post: Self, length: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc: raw_ptr::Dealloc) {
+    fn initialize_inductive(post: Self, start_addr: nat, length: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_perm_prod: raw_ptr::PointsToRaw, buffer_dealloc: raw_ptr::Dealloc) {
         assert(post.buffer_perm is Some);
     }
 
@@ -274,6 +299,8 @@ impl VBBuffer
         // TODO: 元の BBQueue は静的に確保している。
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
 
+        let tracked buffer_perm_prod = PointsToRaw::empty(buffer_perm.provenance());
+
         let tracked (
             Tracked(instance),
             //Tracked(buffer_perm_token),
@@ -285,7 +312,7 @@ impl VBBuffer
             Tracked(read_in_progress_token),
             Tracked(write_in_progress_token),
             Tracked(already_split_token),
-        ) = VBQueue::Instance::initialize(length as nat, buffer_perm, buffer_dealloc, Some(buffer_perm), Some(buffer_dealloc));
+        ) = VBQueue::Instance::initialize(buffer_ptr as usize as nat, length as nat, buffer_perm, buffer_perm_prod, buffer_dealloc, Some(buffer_perm), Some(buffer_perm_prod),Some(buffer_dealloc));
 
         let tracked_inst: Tracked<VBQueue::Instance> = Tracked(instance.clone());
         let write_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(write_token));
