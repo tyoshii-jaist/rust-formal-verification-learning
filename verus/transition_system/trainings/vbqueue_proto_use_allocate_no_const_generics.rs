@@ -13,24 +13,25 @@ verus! {
 global layout u8 is size == 1, align == 1;
 
 pub enum ProducerState {
-    Idle(nat),  // local copy of write か？
-    Reserved(nat),
+    Idle((nat, nat)), // local copy of (write, reserved)
+    Reserved((nat, nat)), // local copy of (write, reserved)
 }
 
 pub enum ConsumerState {
-    Idle(nat),  // local copy of read か？
-    Reading(nat),
+    Idle((nat, nat)),  // local copy of (read, write)
+    Reading((nat, nat)), // local copy of (read, write)
 }
 
 tokenized_state_machine!{VBQueue {
     fields {
         #[sharding(constant)]
+        pub start_addr: nat,
+
+        #[sharding(constant)]
         pub length: nat,
 
-        // 使い方はここが参考になりそう。
-        // https://github.com/verus-lang/verus/blob/7b6fdd861b43cbd88e886ad16c7af7cb1186ebc1/examples/state_machines/arc.rs#L26
-        #[sharding(storage_option)]
-        pub buffer_perm: Option<raw_ptr::PointsToRaw>,
+        #[sharding(storage_map)]
+        pub storage: Map<nat, raw_ptr::PointsTo<u8>>,
 
         #[sharding(storage_option)]
         pub buffer_dealloc: Option<raw_ptr::Dealloc>,
@@ -79,9 +80,14 @@ tokenized_state_machine!{VBQueue {
     */
 
     init! {
-        initialize(length: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc: raw_ptr::Dealloc) {
+        initialize(start_addr: nat,
+            length: nat,
+            storage: Map<nat, raw_ptr::PointsTo<u8>>,
+            buffer_dealloc: raw_ptr::Dealloc)
+        {
+            init start_addr = start_addr;
             init length = length;
-            init buffer_perm = Some(buffer_perm);
+            init storage = storage;
             init buffer_dealloc = Some(buffer_dealloc);
             init write = 0;
             init read = 0;
@@ -95,8 +101,8 @@ tokenized_state_machine!{VBQueue {
 
     
     #[inductive(initialize)]
-    fn initialize_inductive(post: Self, length: nat, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc: raw_ptr::Dealloc) {
-        assert(post.buffer_perm is Some);
+    fn initialize_inductive(post: Self, start_addr: nat, length: nat, storage: Map<nat, raw_ptr::PointsTo<u8>>, buffer_dealloc: raw_ptr::Dealloc) {
+        assert(post.buffer_dealloc is Some);
     }
 
     /*
@@ -138,13 +144,14 @@ tokenized_state_machine!{VBQueue {
         }
     }
 
+    /*
     transition!{
         withdraw_buffer_perm() {
             withdraw buffer_perm -= Some(let _) by {
                 assume(pre.buffer_perm is Some);
             };
         }
-    }
+    } */
 
     #[inductive(try_split)]
     fn try_split_inductive(pre: Self, post: Self) { }
@@ -157,9 +164,10 @@ tokenized_state_machine!{VBQueue {
 
     #[inductive(do_reserve)]
     fn do_reserve_inductive(pre: Self, post: Self, new_reserve: nat) { }
-
+/*
     #[inductive(withdraw_buffer_perm)]
     fn withdraw_buffer_perm_inductive(pre: Self, post: Self) { }
+ */
 }}
 
 struct_with_invariants!{
@@ -273,7 +281,27 @@ impl VBBuffer
     {
         // TODO: 元の BBQueue は静的に確保している。
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
+        assert(buffer_ptr as usize + length < usize::MAX);
 
+        let tracked mut points_to_map = Map::<nat, raw_ptr::PointsTo<u8>>::tracked_empty();
+        
+        let tracked mut points_to_raw = buffer_perm;
+        let tracked mut points_to_raw_u8: raw_ptr::PointsToRaw;
+        let tracked mut p_rest: raw_ptr::PointsToRaw;
+
+        for addr in (buffer_ptr as usize)..(buffer_ptr as usize + length) as usize
+            decreases
+                buffer_ptr as usize + length as usize - addr
+        {
+            proof {
+                let tracked splitted = points_to_raw.split(vstd::set_lib::set_int_range(addr as int, (addr + 1) as int));
+
+                let tracked mut points_to = splitted.0.into_typed::<u8>(addr as usize);
+                points_to_map.insert(addr as nat, points_to);
+                points_to_raw = splitted.1;
+            }
+        }
+    
         let tracked (
             Tracked(instance),
             //Tracked(buffer_perm_token),
@@ -285,7 +313,7 @@ impl VBBuffer
             Tracked(read_in_progress_token),
             Tracked(write_in_progress_token),
             Tracked(already_split_token),
-        ) = VBQueue::Instance::initialize(length as nat, buffer_perm, buffer_dealloc, Some(buffer_perm), Some(buffer_dealloc));
+        ) = VBQueue::Instance::initialize(buffer_ptr as nat, length as nat, points_to_map, buffer_dealloc, points_to_map, Some(buffer_dealloc));
 
         let tracked_inst: Tracked<VBQueue::Instance> = Tracked(instance.clone());
         let write_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(write_token));
@@ -482,9 +510,10 @@ impl Producer {
             }
         );
 
+        /*
         proof {
             let tracked buffer_perm = self.vbq.instance.borrow().withdraw_buffer_perm();
-        }
+        } */
 
         // This is sound, as UnsafeCell, MaybeUninit, and GenericArray
         // are all `#[repr(Transparent)]
