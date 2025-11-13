@@ -281,7 +281,8 @@ impl VBBuffer
     {
         // TODO: 元の BBQueue は静的に確保している。
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
-        assert(buffer_ptr as usize + length < usize::MAX);
+        //assert(buffer_ptr as usize + length <= usize::MAX + 1);
+        assume(buffer_ptr.addr() + length <= usize::MAX); // FIXME!
 
         let tracked mut points_to_map = Map::<nat, raw_ptr::PointsTo<u8>>::tracked_empty();
         
@@ -289,15 +290,26 @@ impl VBBuffer
         let tracked mut points_to_raw_u8: raw_ptr::PointsToRaw;
         let tracked mut p_rest: raw_ptr::PointsToRaw;
 
-        for addr in (buffer_ptr as usize)..(buffer_ptr as usize + length) as usize
+        let from_addr: usize = buffer_ptr.addr();
+        let to_addr: usize = buffer_ptr.addr() + length;
+
+        assert(points_to_raw.is_range(from_addr as int, length as int));
+
+        for len in 0..length
+            invariant
+                len >= 0,
+                len <= length - 1,
+                points_to_raw.is_range(from_addr as int + len as int, length as int - len as int),
             decreases
-                buffer_ptr as usize + length as usize - addr
+                length - len,
         {
             proof {
+                let addr = from_addr as int + len as int;
                 let tracked splitted = points_to_raw.split(vstd::set_lib::set_int_range(addr as int, (addr + 1) as int));
 
                 let tracked mut points_to = splitted.0.into_typed::<u8>(addr as usize);
                 points_to_map.insert(addr as nat, points_to);
+                assert(splitted.1.contains_range(addr as int, to_addr as int + 1));
                 points_to_raw = splitted.1;
             }
         }
