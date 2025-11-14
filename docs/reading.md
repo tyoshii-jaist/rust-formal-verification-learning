@@ -253,3 +253,5 @@ Iris allows one to use ghost state via the proposition a γ , which asserts owne
 piece a of a ghost location γ .
 
 すべての PCM は RA だが、逆はそうではない。
+
+「合成」（⋅）は、同じ資源種の“持ち分”を足し合わせて、全体の資源状態を作る二項演算のことです。Iris の RA（resource algebra）ではこれが中核。
