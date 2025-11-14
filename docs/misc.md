@@ -17,6 +17,12 @@ a * e = a かつ e * a = a
 
 (Z, + , 0), (N, +, 0) とか。
 
+- Affine 論理
+線形論理では資源は一度使わないといけない。コピー (縮約 (contraction))も、捨てる(弱化 (weakening)) もダメ。
+
+Affineはコピーはダメだけど捨てるのはいい。
+
+
 
 #### Iris lecture note をチラ見
 *Invariants* are a mechanism that allows different program threads to access shared

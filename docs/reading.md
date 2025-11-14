@@ -220,3 +220,36 @@ fractional permission と counting permissionを一般化した “共有読取�
 G ⤔ P（「G guards P」）は Iris の命題（iProp）
 意味はざっくり：
 「G を持っていれば、P を shared read-only として使っていい」
+
+
+# Chapter 5 VerusSync
+
+ShardableState
+
+Shardable Transition Modeling Language (STML).
+
+
+
+
+
+
+
+
+
+
+
+### Iris from the ground up もチョイ読み
+The key idea of Iris is　that even the fanciest of the interference-control mechanisms in recent concurrency logics can be expressed by a combination of two orthogonal (and already well-known) ingredients:
+partial commutative monoids (PCMs) and invariants.
+
+2 章
+幽霊状態の必要性。幽霊状態 a_gamma は名前 gamma で a の値を持ち、現在の x の状態をミラーする。
+
+幽霊状態を記録することで、その場所でどのような共有が許されるかを選択できる。
+
+幽霊位置gammmaにはすきな構造や所有権を選択できる。
+
+Iris allows one to use ghost state via the proposition a γ , which asserts ownership of a
+piece a of a ghost location γ .
+
+すべての PCM は RA だが、逆はそうではない。

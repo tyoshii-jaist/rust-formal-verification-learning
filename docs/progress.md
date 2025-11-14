@@ -92,3 +92,19 @@ https://verus-lang.zulipchat.com/#narrow/channel/399078-help/topic/.E2.9C.94.20p
             - Prod/Consにはsliceを使ってこの領域の view を渡して見せている。(当然 unsafe の領域になる)
             - verus では[u8; N] を *mut u8 に変換することが未サポートなため、ヒープ確保で代替することにした。(fat => thin がサポートされていない？)issueあり。
         - Prod/Cons に BBQueue 構造体本体へのポインタを渡しているがここもかなりトリッキー(unsafe)なので、正しく Verus で取り扱える文脈に変換する方法を考えないといけない。今は Arc (Atomic Ref count) で代替して実装を進めている。
+
+
+# interleaving について
+VerusSync の並行意味論は、Iris 系の仕組みの上に乗っているとみなせる：
+- Resource Algebra（RA）によるリソースモデル
+- frame-preserving update
+- guards / Storage Protocol
+- invariant / fancy update（mask 付き view shift）
+
+tokenized_state_machine が生成するトークンとその操作は、これら RA／Storage Protocol の上に載る frame-preserving update として実装可能になっている
+
+並行実行・interleaving のレベルでは
+
+遷移に対応するトークン操作が RA 上の frame-preserving update になっており
+global invariant を Iris 型の invariant として保持することで定義された遷移 step を、任意の順番・任意のスレッド間で interleave してもglobal invariant は壊れないという形の性質を、Iris のメタ理論から得ている。
+
