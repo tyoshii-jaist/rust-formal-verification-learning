@@ -17,7 +17,6 @@ fn main() {
 
     assert(block_ptr@.provenance == token.provenance());
 
-    let ghost mut current_ptr = block_ptr;
     let tracked mut token = token;
     assert(token.is_range(block_ptr as int, length as int));
     assert(block_ptr as int + length * size_of::<u8>() <= usize::MAX + 1);
