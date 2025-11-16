@@ -56,6 +56,8 @@ fn main() {
         }
     }
 
+
+/*
     assert(forall |i: nat|
         i >= (block_ptr as usize) as nat && i < block_ptr as usize as nat + length as nat
             ==> points_to_map.contains_key(i));
@@ -78,8 +80,7 @@ fn main() {
     ptr_mut_write(ptr, Tracked(&mut points_to), 5);
     let val = ptr_ref(ptr, Tracked(&points_to));
     assert(val == 5);
-
-/*
+*/
     for i in 0..length
         invariant
             i <= length,
@@ -87,19 +88,29 @@ fn main() {
             forall |j: nat|
                 j >= block_ptr as nat + i as nat && j < block_ptr as nat + length as nat
                     ==> points_to_map.contains_key(j),
+            forall |j: nat|
+                j >= block_ptr as nat + i as nat && j < block_ptr as nat + length as nat
+                    ==> (points_to_map.index(j as nat).ptr() as nat == j as nat
+                        && points_to_map.index(j as nat).ptr()@.provenance == token.provenance()),
+            block_ptr@.provenance == token.provenance(),
         decreases
             length - i,
     {
         let addr = block_ptr as usize + i;
-        let ptr = with_exposed_provenance(addr, expose_provenance(block_ptr));
+        let ptr: *mut u8 = with_exposed_provenance(addr, expose_provenance(block_ptr));
         assert(points_to_map.contains_key(addr as nat));
         let tracked mut points_to = points_to_map.tracked_remove(addr as nat);
 
+        assert(points_to.ptr() as nat == ptr.addr() as nat);
+        assert(block_ptr@.provenance == token.provenance());
+        assert(ptr@.provenance == token.provenance());
+        assert(points_to.ptr()@.provenance == ptr@.provenance);
+        assert(points_to.ptr()@.metadata == ptr@.metadata);
+        assert(points_to.ptr() == ptr);
         assert(equal(points_to.ptr(), ptr));
         ptr_mut_write(ptr, Tracked(&mut points_to), 5);
         let val = ptr_ref(ptr, Tracked(&points_to));
         assert(val == 5);
     }
- */
 }
 }
