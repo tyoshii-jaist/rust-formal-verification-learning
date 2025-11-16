@@ -67,17 +67,11 @@ tokenized_state_machine!{VBQueue {
  */
     }
 
-    /*
     #[invariant]
-    pub fn buffer_perm_is_some(&self) -> bool {
-        self.buffer_perm is Some
+    pub fn valid_storage_all(&self) -> bool {
+        forall|i: nat| 0 <= i && i < self.len() ==>
+            self.valid_storage_at_idx(i)
     }
-
-    #[invariant]
-    pub fn buffer_dealloc_is_some(&self) -> bool {
-        self.buffer_dealloc is Some
-    }
-    */
 
     init! {
         initialize(start_addr: nat,
