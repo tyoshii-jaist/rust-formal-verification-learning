@@ -281,39 +281,45 @@ impl VBBuffer
     {
         // TODO: 元の BBQueue は静的に確保している。
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
-        //assert(buffer_ptr as usize + length <= usize::MAX + 1);
-        assume(buffer_ptr.addr() + length <= usize::MAX); // FIXME!
 
-        let tracked mut points_to_map = Map::<nat, raw_ptr::PointsTo<u8>>::tracked_empty();
-        
-        let tracked mut points_to_raw = buffer_perm;
-        let tracked mut points_to_raw_u8: raw_ptr::PointsToRaw;
-        let tracked mut p_rest: raw_ptr::PointsToRaw;
-
-        let from_addr: usize = buffer_ptr.addr();
-        let to_addr: usize = buffer_ptr.addr() + length;
-
-        assert(points_to_raw.is_range(from_addr as int, length as int));
+        let tracked mut buffer_perm = buffer_perm;
+        assert(buffer_perm.is_range(buffer_ptr as int, length as int));
+        assert(buffer_ptr as int + length * size_of::<u8>() <= usize::MAX + 1);
+        let tracked mut points_to_map = Map::<nat, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
 
         for len in 0..length
             invariant
-                len >= 0,
-                len <= length - 1,
-                points_to_raw.is_range(from_addr as int + len as int, length as int - len as int),
+                len <= length,
+                buffer_ptr as int + length * size_of::<u8>() <= usize::MAX + 1,
+                buffer_perm.is_range(buffer_ptr as int + len * size_of::<u8>() as int, length * size_of::<u8>() - len),
+                forall |i: nat|
+                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len * size_of::<u8>() as nat
+                        ==> points_to_map.contains_key(i),
+                forall |i: nat|
+                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len * size_of::<u8>() as nat
+                        ==> (points_to_map.index(i as nat).ptr() as nat == i as nat
+                            && points_to_map.index(i as nat).ptr()@.provenance == buffer_perm.provenance()),
+                buffer_ptr@.provenance == buffer_perm.provenance(),
             decreases
                 length - len,
         {
             proof {
-                let addr = from_addr as int + len as int;
-                let tracked splitted = points_to_raw.split(vstd::set_lib::set_int_range(addr as int, (addr + 1) as int));
+                let ghost range_start_addr = buffer_ptr as int + len * size_of::<u8>() as int;
+                let ghost range_end_addr = range_start_addr + 1 * size_of::<u8>();
+                
+                let tracked (top, rest) = buffer_perm.split(crate::set_lib::set_int_range(range_start_addr, range_end_addr as int));
+                assert(top.is_range(range_start_addr as usize as int, size_of::<u8>() as int));
 
-                let tracked mut points_to = splitted.0.into_typed::<u8>(addr as usize);
-                points_to_map.insert(addr as nat, points_to);
-                assert(splitted.1.contains_range(addr as int, to_addr as int + 1));
-                points_to_raw = splitted.1;
+                let tracked top_pointsto = top.into_typed::<u8>(range_start_addr as usize);
+                buffer_perm = rest;
+                points_to_map.tracked_insert(range_start_addr as nat, top_pointsto);
+                assert(points_to_map.contains_key(range_start_addr as nat));
+                assert(points_to_map.index(range_start_addr as nat).ptr() as nat == range_start_addr as nat);
+                assert(top_pointsto.ptr()@.provenance == top.provenance());
+                assert(top.provenance() == buffer_perm.provenance());
             }
         }
-    
+
         let tracked (
             Tracked(instance),
             //Tracked(buffer_perm_token),
