@@ -276,6 +276,7 @@ impl VBBuffer
         // TODO: 元の BBQueue は静的に確保している。
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
 
+        // allocate で得た buffer_perm (PointsToRaw) を u8 1バイトごとに分割して、addr => PointsTo の Map として格納する
         let tracked mut buffer_perm = buffer_perm;
         assert(buffer_perm.is_range(buffer_ptr as int, length as int));
         assert(buffer_ptr as int + length * size_of::<u8>() <= usize::MAX + 1);
