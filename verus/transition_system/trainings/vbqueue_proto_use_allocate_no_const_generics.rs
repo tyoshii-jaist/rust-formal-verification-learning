@@ -259,7 +259,7 @@ impl Producer {
     pub closed spec fn wf(&self) -> bool {
         (*self.vbq).wf()
             && self.producer@.instance_id() == (*self.vbq).instance@.id()
-            && self.producer@.value() == ProducerState::Idle(0)
+            && self.producer@.value() is Idle
             //&& (self.tail as int) < (*self.queue).buffer@.len()
     }
 }
@@ -301,6 +301,7 @@ impl VBBuffer
             //s.buffer@.provenance == s.instance@.split_guard_buffer_perm().provenance(),
             r.0.wf(),
             r.0.instance@.id() == r.1@.instance_id(),
+            r.1@.value() is Idle,
     {
         // TODO: 元の BBQueue は静的に確保している。
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
@@ -473,7 +474,8 @@ struct GrantW {
 impl Producer {
     fn grant_exact(&mut self, sz: usize) -> Result<GrantW, &'static str>
         requires
-            old(self).vbq.wf(),
+            old(self).wf(),
+            old(self).producer@.value() is Idle,
     {
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => swap(true);
