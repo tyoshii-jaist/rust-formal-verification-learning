@@ -13,16 +13,16 @@ verus! {
 global layout u8 is size == 1, align == 1;
 
 pub enum ProducerState {
-    Idle((nat, nat)), // local copy of (write, reserved)
-    Reserved((nat, nat)), // local copy of (write, reserved)
+    Idle(nat),
+    WriteFilled(nat),
+    WriteAndReadFilled((nat, nat)),
 }
 
 pub enum ConsumerState {
-    Idle((nat, nat)),  // local copy of (read, write)
-    Reading((nat, nat)), // local copy of (read, write)
+    Idle(nat),
 }
 
-tokenized_state_machine!{VBQueue {
+ tokenized_state_machine!{VBQueue {
     fields {
         #[sharding(constant)]
         pub start_addr: nat,
@@ -56,7 +56,7 @@ tokenized_state_machine!{VBQueue {
 
         #[sharding(variable)]
         pub already_split: bool,
-/*
+
         // Represents the local state of the single-producer
         #[sharding(variable)]
         pub producer: ProducerState,
@@ -64,15 +64,14 @@ tokenized_state_machine!{VBQueue {
         // Represents the local state of the single-consumer
         #[sharding(variable)]
         pub consumer: ConsumerState,
- */
     }
-
+/*
     #[invariant]
     pub fn valid_storage_all(&self) -> bool {
         forall|i: nat| 0 <= i && i < self.len() ==>
             self.valid_storage_at_idx(i)
     }
-
+ */
     init! {
         initialize(start_addr: nat,
             length: nat,
@@ -90,6 +89,9 @@ tokenized_state_machine!{VBQueue {
             init read_in_progress = false;
             init write_in_progress = false;
             init already_split = false;
+
+            init producer = ProducerState::Idle(0);
+            init consumer = ConsumerState::Idle(0);
         }
     }
 
@@ -127,6 +129,22 @@ tokenized_state_machine!{VBQueue {
     }
 
     transition!{
+        grant_fill_write() {
+            require(pre.producer is Idle);
+
+            update producer = ProducerState::WriteFilled(pre.write);
+        }
+    }
+
+    transition!{
+        grant_fill_read() {
+            require(pre.producer is WriteFilled);
+
+            update producer = ProducerState::WriteAndReadFilled((pre.producer->WriteFilled_0, pre.read));
+        }
+    }
+
+    transition!{
         do_reserve(new_reserve: nat) {
             update reserve = new_reserve;
         }
@@ -152,6 +170,16 @@ tokenized_state_machine!{VBQueue {
 
     #[inductive(grant_start)]
     fn grant_start_inductive(pre: Self, post: Self) { }
+
+    #[inductive(grant_fill_write)]
+    fn grant_fill_write_inductive(pre: Self, post: Self) {
+        assert(post.producer is WriteFilled);
+    }
+
+    #[inductive(grant_fill_read)]
+    fn grant_fill_read_inductive(pre: Self, post: Self) {
+        assert(post.producer is WriteAndReadFilled);
+    }
 
     #[inductive(grant_end)]
     fn grant_end_inductive(pre: Self, post: Self) { }
@@ -224,18 +252,18 @@ struct_with_invariants!{
 
 pub struct Producer {
     vbq: Arc<VBBuffer>,
-    //producer: Tracked<VBQueue::producer>,
+    producer: Tracked<VBQueue::producer>,
 }
-/*
-impl<T> Producer<T> {
+
+impl Producer {
     pub closed spec fn wf(&self) -> bool {
-        (*self.queue).wf()
-            && self.producer@.instance_id() == (*self.queue).instance@.id()
-            && self.producer@.value() == ProducerState::Idle(self.tail as nat)
-            && (self.tail as int) < (*self.queue).buffer@.len()
+        (*self.vbq).wf()
+            && self.producer@.instance_id() == (*self.vbq).instance@.id()
+            && self.producer@.value() == ProducerState::Idle(0)
+            //&& (self.tail as int) < (*self.queue).buffer@.len()
     }
 }
- */
+
 pub struct Consumer {
     vbq: Arc<VBBuffer>,
 }
@@ -252,7 +280,7 @@ impl<T> Consumer<T> {
  */
 impl VBBuffer
 {
-    fn new(length: usize) -> (s: Self)
+    fn new(length: usize) -> (r:(Self, Tracked<VBQueue::producer>,Tracked<VBQueue::consumer>))
         requires
             valid_layout(length, 1),
             length > 0, // TODO: 元の BBQueue はこの制約は持っていない。0で使うことはないと思うが。
@@ -268,10 +296,11 @@ impl VBBuffer
                 }),
             
         */
-            s.buffer.addr() + length <= usize::MAX + 1,
-            s.buffer.addr() as int % 1 as int == 0,
+            r.0.buffer.addr() + length <= usize::MAX + 1,
+            r.0.buffer.addr() as int % 1 as int == 0,
             //s.buffer@.provenance == s.instance@.split_guard_buffer_perm().provenance(),
-            s.wf(),
+            r.0.wf(),
+            r.0.instance@.id() == r.1@.instance_id(),
     {
         // TODO: 元の BBQueue は静的に確保している。
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
@@ -326,6 +355,8 @@ impl VBBuffer
             Tracked(read_in_progress_token),
             Tracked(write_in_progress_token),
             Tracked(already_split_token),
+            Tracked(producer_token),
+            Tracked(consumer_token),
         ) = VBQueue::Instance::initialize(buffer_ptr as nat, length as nat, points_to_map, buffer_dealloc, points_to_map, Some(buffer_dealloc));
 
         let tracked_inst: Tracked<VBQueue::Instance> = Tracked(instance.clone());
@@ -338,7 +369,7 @@ impl VBBuffer
         let already_split_atomic = AtomicBool::new(Ghost(tracked_inst), false, Tracked(already_split_token));
 
         // Initialize the queue
-        Self {
+        (Self {
             buffer: buffer_ptr,
             length,
             write: write_atomic,
@@ -349,16 +380,18 @@ impl VBBuffer
             write_in_progress: write_in_progress_atomic,
             already_split: already_split_atomic,
             instance: Tracked(instance),
-        }
+        }, Tracked(producer_token), Tracked(consumer_token))
     }
 
-    fn try_split(self) -> (res: Result<(Producer, Consumer),  &'static str>)
+    fn try_split(self, producer_token: Tracked<VBQueue::producer>, consumer_token: Tracked<VBQueue::consumer>) -> (res: Result<(Producer, Consumer),  &'static str>)
         requires
             self.wf(),
+            producer_token@.instance_id() == self.instance@.id(),
+            producer_token@.value() is Idle,
         ensures
             self.wf(),
             match res {
-                Ok((prod, cons)) => prod.vbq.wf() && cons.vbq.wf(),
+                Ok((prod, cons)) => prod.wf(), //&& cons.vbq.wf(),
                 Err(_) => true
             }
     {
@@ -387,6 +420,7 @@ impl VBBuffer
         Ok((
             Producer {
                 vbq: vbbuffer_arc.clone(),
+                producer: producer_token,
             },
             Consumer {
                 vbq: vbbuffer_arc.clone(),
@@ -461,12 +495,14 @@ impl Producer {
         }
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
-            ghost write_in_progress_token => {
+            ghost write_token => {
+                let _ = self.vbq.instance.borrow().grant_fill_write(&write_token, self.producer.borrow_mut());
             }
         );
 
         let read = atomic_with_ghost!(&self.vbq.read => load();
-            ghost write_in_progress_token => {
+            ghost read_token => {
+                let _ = self.vbq.instance.borrow().grant_fill_read(&read_token, self.producer.borrow_mut());
             }
         );
         let max = self.vbq.length as u64;
@@ -544,8 +580,8 @@ impl Producer {
 }
 
 fn main() {
-    let vbuf: VBBuffer = VBBuffer::new(6);
-    let (mut prod, mut cons) = match vbuf.try_split() {
+    let (vbuf, Tracked(producer_token), Tracked(consumer_token)) = VBBuffer::new(6);
+    let (mut prod, mut cons) = match vbuf.try_split(Tracked(producer_token), Tracked(consumer_token)) {
         Ok((prod, cons)) => (prod, cons),
         Err(_) => {
             return;
