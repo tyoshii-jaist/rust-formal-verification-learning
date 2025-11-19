@@ -66,13 +66,21 @@ pub enum ConsumerState {
         #[sharding(variable)]
         pub consumer: ConsumerState,
     }
-/*
+
     #[invariant]
     pub fn valid_storage_all(&self) -> bool {
-        forall|i: nat| 0 <= i && i < self.len() ==>
-            self.valid_storage_at_idx(i)
+        match self.producer {
+            ProducerState::Reserved(_) => {
+                true
+            },
+            _ => {
+                forall |i: nat|
+                    i >= self.start_addr && i < self.start_addr + self.length * size_of::<u8>() as nat
+                        ==> self.storage.contains_key(i)
+            },
+        }
     }
- */
+
     #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
         match self.producer {
@@ -89,6 +97,12 @@ pub enum ConsumerState {
             storage: Map<nat, raw_ptr::PointsTo<u8>>,
             buffer_dealloc: raw_ptr::Dealloc)
         {
+            require(
+                forall |i: nat|
+                    i >= start_addr && i < start_addr + length * size_of::<u8>() as nat
+                        ==> storage.contains_key(i)
+            );
+
             init start_addr = start_addr;
             init length = length;
             init storage = storage;
@@ -110,6 +124,11 @@ pub enum ConsumerState {
     #[inductive(initialize)]
     fn initialize_inductive(post: Self, start_addr: nat, length: nat, storage: Map<nat, raw_ptr::PointsTo<u8>>, buffer_dealloc: raw_ptr::Dealloc) {
         assert(post.buffer_dealloc is Some);
+        assert(
+            forall |i: nat|
+                i >= post.start_addr && i < post.start_addr + post.length * size_of::<u8>() as nat
+                    ==> post.storage.contains_key(i)
+        );
     }
 
     /*
@@ -157,19 +176,21 @@ pub enum ConsumerState {
 
     transition!{
         do_reserve(start: nat, sz: nat) {
+            require(pre.producer is WriteAndReadFilled);
+
             update reserve = start + sz;
 
-            update producer = ProducerState::Reserved((start, start + sz));
-
-            /*
-            birds_eye let withdraw_range_map: Map<nat, raw_ptr::PointsTo> = Map::new(
+            birds_eye let withdraw_range_map: Map<nat, raw_ptr::PointsTo<u8>> = Map::new(
                 |i: nat| 0 <= start && i < start + sz,
                 |i: nat| pre.storage[i]);
 
             withdraw storage -= (withdraw_range_map) by {
-                assert(pre.valid_storage_at_idx(0) && pre.valid_storage_at_idx(1));
+                assert (withdraw_range_map.submap_of(pre.storage)) by {
+                    assert(pre.valid_storage_all());
+                }
             };
- */
+            
+            update producer = ProducerState::Reserved((start, start + sz));
         }
     }
 
