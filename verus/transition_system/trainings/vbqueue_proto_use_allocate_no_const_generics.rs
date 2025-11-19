@@ -15,7 +15,8 @@ global layout u8 is size == 1, align == 1;
 pub enum ProducerState {
     Idle(nat),
     WriteFilled(nat),
-    WriteAndReadFilled((nat, nat)),
+    WriteAndReadFilled((nat, nat)), // (start, start + sz)
+    Reserved((nat, nat)), // (start, start + sz)
 }
 
 pub enum ConsumerState {
@@ -75,8 +76,10 @@ pub enum ConsumerState {
     #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
         match self.producer {
+            ProducerState::Idle(w) => self.write == w, //&& self.reserve == w,
             ProducerState::WriteFilled(w) => self.write == w,
-            _ => true,
+            ProducerState::WriteAndReadFilled((w, _)) => self.write == w,
+            ProducerState::Reserved((_, r)) => self.reserve == r,
         }
     }
 
@@ -155,7 +158,10 @@ pub enum ConsumerState {
     transition!{
         do_reserve(start: nat, sz: nat) {
             update reserve = start + sz;
-/*
+
+            update producer = ProducerState::Reserved((start, start + sz));
+
+            /*
             birds_eye let withdraw_range_map: Map<nat, raw_ptr::PointsTo> = Map::new(
                 |i: nat| 0 <= start && i < start + sz,
                 |i: nat| pre.storage[i]);
@@ -202,7 +208,10 @@ pub enum ConsumerState {
     fn grant_end_inductive(pre: Self, post: Self) { }
 
     #[inductive(do_reserve)]
-    fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) { }
+    fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
+        assert(post.producer is Reserved);
+        assert(post.producer->Reserved_0.1 == post.reserve);
+    }
 /*
     #[inductive(withdraw_buffer_perm)]
     fn withdraw_buffer_perm_inductive(pre: Self, post: Self) { }
@@ -573,7 +582,7 @@ impl Producer {
 
         atomic_with_ghost!(&self.vbq.reserve => store(start + sz as u64);
             ghost reserve_token => {
-                let _ = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token);
+                let _ = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, self.producer.borrow_mut());
                 assert(reserve_token.value() == start + sz as u64);
             }
         );
