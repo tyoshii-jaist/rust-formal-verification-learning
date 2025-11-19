@@ -72,6 +72,14 @@ pub enum ConsumerState {
             self.valid_storage_at_idx(i)
     }
  */
+    #[invariant]
+    pub fn valid_producer_local_state(&self) -> bool {
+        match self.producer {
+            ProducerState::WriteFilled(w) => self.write == w,
+            _ => true,
+        }
+    }
+
     init! {
         initialize(start_addr: nat,
             length: nat,
@@ -145,8 +153,17 @@ pub enum ConsumerState {
     }
 
     transition!{
-        do_reserve(new_reserve: nat) {
-            update reserve = new_reserve;
+        do_reserve(start: nat, sz: nat) {
+            update reserve = start + sz;
+/*
+            birds_eye let withdraw_range_map: Map<nat, raw_ptr::PointsTo> = Map::new(
+                |i: nat| 0 <= start && i < start + sz,
+                |i: nat| pre.storage[i]);
+
+            withdraw storage -= (withdraw_range_map) by {
+                assert(pre.valid_storage_at_idx(0) && pre.valid_storage_at_idx(1));
+            };
+ */
         }
     }
 
@@ -185,7 +202,7 @@ pub enum ConsumerState {
     fn grant_end_inductive(pre: Self, post: Self) { }
 
     #[inductive(do_reserve)]
-    fn do_reserve_inductive(pre: Self, post: Self, new_reserve: nat) { }
+    fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) { }
 /*
     #[inductive(withdraw_buffer_perm)]
     fn withdraw_buffer_perm_inductive(pre: Self, post: Self) { }
@@ -509,7 +526,7 @@ impl Producer {
         );
         let max = self.vbq.length as u64;
         let already_inverted = write < read;
-        assume(write + sz < u64::MAX);
+        assume(write + sz < u64::MAX);  // FIXME!
 
         let start = if already_inverted {
             if (write + sz as u64) < read {
@@ -556,7 +573,7 @@ impl Producer {
 
         atomic_with_ghost!(&self.vbq.reserve => store(start + sz as u64);
             ghost reserve_token => {
-                let _ = self.vbq.instance.borrow().do_reserve((start + sz) as nat, &mut reserve_token);
+                let _ = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token);
                 assert(reserve_token.value() == start + sz as u64);
             }
         );
