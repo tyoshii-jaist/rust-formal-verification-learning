@@ -76,7 +76,7 @@ pub enum ConsumerState {
             _ => {
                 forall |i: nat|
                     i >= self.start_addr && i < self.start_addr + self.length * size_of::<u8>() as nat
-                        ==> self.storage.contains_key(i)
+                        ==> self.storage.contains_key(i) && self.storage.dom().contains(i)
             },
         }
     }
@@ -100,7 +100,7 @@ pub enum ConsumerState {
             require(
                 forall |i: nat|
                     i >= start_addr && i < start_addr + length * size_of::<u8>() as nat
-                        ==> storage.contains_key(i)
+                        ==> storage.contains_key(i) && storage.dom().contains(i)
             );
 
             init start_addr = start_addr;
@@ -176,16 +176,20 @@ pub enum ConsumerState {
 
     transition!{
         do_reserve(start: nat, sz: nat) {
+            require(start + sz <= pre.length);
             require(pre.producer is WriteAndReadFilled);
 
             update reserve = start + sz;
 
             birds_eye let withdraw_range_map: Map<nat, raw_ptr::PointsTo<u8>> = Map::new(
-                |i: nat| 0 <= start && i < start + sz,
+                |i: nat| start + pre.start_addr <= i && i < start + sz + pre.start_addr,
                 |i: nat| pre.storage[i]);
 
             withdraw storage -= (withdraw_range_map) by {
                 assert (withdraw_range_map.submap_of(pre.storage)) by {
+                    assert(Set::new(|i: nat| i >= start + pre.start_addr && i < start + sz  + pre.start_addr).subset_of(Set::new(|i: nat| i >= pre.start_addr && i < pre.start_addr + pre.length)));
+                    assert(Set::new(|i: nat| i >= pre.start_addr && i < pre.start_addr + pre.length).subset_of(pre.storage.dom()));
+                    assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.start_addr && i < start + sz + pre.start_addr)));
                     assert(pre.valid_storage_all());
                 }
             };
@@ -598,7 +602,11 @@ impl Producer {
             }
         };
 
-        assume(start + sz < u64::MAX); // FIXME!
+        
+        proof {
+            assume(start + sz < u64::MAX); // FIXME!
+            assume(start + sz <= self.vbq.instance@.length());  // FIXME!
+        }
         // Safe write, only viewed by this task
 
         atomic_with_ghost!(&self.vbq.reserve => store(start + sz as u64);
