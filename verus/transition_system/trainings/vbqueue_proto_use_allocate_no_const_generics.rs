@@ -70,8 +70,11 @@ pub enum ConsumerState {
     #[invariant]
     pub fn valid_storage_all(&self) -> bool {
         match self.producer {
-            ProducerState::Reserved(_) => {
-                true
+            ProducerState::Reserved((start, start_plus_sz)) => {
+                forall |i: nat|
+                    ((i >= self.start_addr && i < self.start_addr + start as nat) || 
+                    (i >= self.start_addr + start_plus_sz && i < self.start_addr + self.length * size_of::<u8>() as nat))
+                        ==> self.storage.contains_key(i) && self.storage.dom().contains(i)
             },
             _ => {
                 forall |i: nat|
@@ -187,8 +190,8 @@ pub enum ConsumerState {
 
             withdraw storage -= (withdraw_range_map) by {
                 assert (withdraw_range_map.submap_of(pre.storage)) by {
-                    assert(Set::new(|i: nat| i >= start + pre.start_addr && i < start + sz  + pre.start_addr).subset_of(Set::new(|i: nat| i >= pre.start_addr && i < pre.start_addr + pre.length)));
-                    assert(Set::new(|i: nat| i >= pre.start_addr && i < pre.start_addr + pre.length).subset_of(pre.storage.dom()));
+                    // assert(Set::new(|i: nat| i >= start + pre.start_addr && i < start + sz  + pre.start_addr).subset_of(Set::new(|i: nat| i >= pre.start_addr && i < pre.start_addr + pre.length)));
+                    // assert(Set::new(|i: nat| i >= pre.start_addr && i < pre.start_addr + pre.length).subset_of(pre.storage.dom()));
                     assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.start_addr && i < start + sz + pre.start_addr)));
                     assert(pre.valid_storage_all());
                 }
