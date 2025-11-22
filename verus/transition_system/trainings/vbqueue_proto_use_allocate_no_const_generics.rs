@@ -520,7 +520,8 @@ impl VBBuffer
 }
 
 struct GrantW {
-    buf: *mut u8,
+    buf: Vec<*mut u8>,
+    buf_perm: Tracked<Vec<raw_ptr::PointsTo<u8>>>,
     vbq: Arc<VBBuffer>,
     to_commit: usize,
 }
@@ -612,12 +613,51 @@ impl Producer {
         }
         // Safe write, only viewed by this task
 
+        let tracked mut granted_perm;
         atomic_with_ghost!(&self.vbq.reserve => store(start + sz as u64);
             ghost reserve_token => {
-                let _ = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, self.producer.borrow_mut());
+                granted_perm = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, self.producer.borrow_mut());
                 assert(reserve_token.value() == start + sz as u64);
             }
         );
+
+
+        let mut ptr_vec: Vec<*mut u8> = Vec::new();
+        let tracked mut grantw_perms = Seq::<vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
+        let base_ptr = self.vbq.buffer;
+
+        for idx in start..(start + sz)
+            invariant
+                idx <= (start + sz),
+                base_ptr as int + (start + sz) * size_of::<u8>() <= usize::MAX + 1,
+                granted_perm.is_range(base_ptr as int + idx * size_of::<u8>() as int, (start + sz) * size_of::<u8>() - idx),
+                forall |i: nat|
+                    i >= base_ptr as nat && i < base_ptr as nat + idx * size_of::<u8>() as nat
+                        ==> grantw_perms.contains_key(i),
+                forall |i: nat|
+                    i >= base_ptr as nat && i < base_ptr as nat + idx * size_of::<u8>() as nat
+                        ==> (grantw_perms.index(i as nat).ptr() as nat == i as nat
+                            && grantw_perms.index(i as nat).ptr()@.provenance == granted_perm.provenance()),
+                base_ptr@.provenance == granted_perm.provenance(),
+            decreases
+                (start + sz) - idx,
+        {
+            proof {
+                let ghost range_start_addr = base_ptr as int + idx * size_of::<u8>() as int;
+                let ghost range_end_addr = range_start_addr + 1 * size_of::<u8>();
+                
+                let tracked (top, rest) = granted_perm.split(set_int_range(range_start_addr, range_end_addr as int));
+                assert(top.is_range(range_start_addr as usize as int, size_of::<u8>() as int));
+
+                let tracked top_pointsto = top.into_typed::<u8>(range_start_addr as usize);
+                granted_perm = rest;
+                grantw_perms.push(top_pointsto);
+                assert(top_pointsto.ptr()@.provenance == top.provenance());
+                assert(top.provenance() == granted_perm.provenance());
+                let ptr: *mut u8 = with_exposed_provenance(addr, expose_provenance(base_ptr));
+                ptr_vec.push(ptr);
+            }
+        }
 
         /*
         proof {
