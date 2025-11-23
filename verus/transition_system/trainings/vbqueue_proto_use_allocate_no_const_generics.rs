@@ -250,10 +250,10 @@ struct_with_invariants!{
     pub struct VBBuffer {
         buffer: *mut u8,
         length: usize,
-        write: AtomicU64<_, VBQueue::write, _>,
-        read: AtomicU64<_, VBQueue::read, _>,
-        last: AtomicU64<_, VBQueue::last, _>,
-        reserve: AtomicU64<_, VBQueue::reserve, _>,
+        write: AtomicUsize<_, VBQueue::write, _>,
+        read: AtomicUsize<_, VBQueue::read, _>,
+        last: AtomicUsize<_, VBQueue::last, _>,
+        reserve: AtomicUsize<_, VBQueue::reserve, _>,
         read_in_progress: AtomicBool<_, VBQueue::read_in_progress, _>,
         write_in_progress: AtomicBool<_, VBQueue::write_in_progress, _>, 
         already_split: AtomicBool<_, VBQueue::already_split, _>,
@@ -262,29 +262,32 @@ struct_with_invariants!{
     }
 
     pub closed spec fn wf(&self) -> bool {
-        /*
         predicate {
-            &&& N == self.instance@.capacity
-        } */
-
-        invariant on write with (instance) is (v: u64, g: VBQueue::write) {
-            &&& g.instance_id() === instance@.id()
-            &&& g.value() == v as int
+            &&& self.instance@.length() == self.length
         }
 
-        invariant on read with (instance) is (v: u64, g: VBQueue::read) {
+        invariant on write with (instance) is (v: usize, g: VBQueue::write) {
             &&& g.instance_id() === instance@.id()
             &&& g.value() == v as int
+            &&& g.value() <= instance@.length()
         }
 
-        invariant on last with (instance) is (v: u64, g: VBQueue::last) {
+        invariant on read with (instance) is (v: usize, g: VBQueue::read) {
             &&& g.instance_id() === instance@.id()
             &&& g.value() == v as int
+            &&& g.value() <= instance@.length()
         }
 
-        invariant on reserve with (instance) is (v: u64, g: VBQueue::reserve) {
+        invariant on last with (instance) is (v: usize, g: VBQueue::last) {
             &&& g.instance_id() === instance@.id()
             &&& g.value() == v as int
+            &&& g.value() <= instance@.length()
+        }
+
+        invariant on reserve with (instance) is (v: usize, g: VBQueue::reserve) {
+            &&& g.instance_id() === instance@.id()
+            &&& g.value() == v as int
+            &&& g.value() <= instance@.length()
         }
 
         invariant on read_in_progress with (instance) is (v: bool, g: VBQueue::read_in_progress) {
@@ -314,6 +317,7 @@ impl Producer {
         (*self.vbq).wf()
             && self.producer@.instance_id() == (*self.vbq).instance@.id()
             && self.producer@.value() is Idle
+            && (*self.vbq).buffer.addr() + (*self.vbq).length <= usize::MAX + 1
             //&& (self.tail as int) < (*self.queue).buffer@.len()
     }
 }
@@ -415,10 +419,10 @@ impl VBBuffer
         ) = VBQueue::Instance::initialize(buffer_ptr as nat, length as nat, points_to_map, buffer_dealloc, points_to_map, Some(buffer_dealloc));
 
         let tracked_inst: Tracked<VBQueue::Instance> = Tracked(instance.clone());
-        let write_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(write_token));
-        let read_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(read_token));
-        let last_atomic = AtomicU64::new(Ghost(tracked_inst), length as u64, Tracked(last_token));
-        let reserve_atomic = AtomicU64::new(Ghost(tracked_inst), 0, Tracked(reserve_token));
+        let write_atomic = AtomicUsize::new(Ghost(tracked_inst), 0, Tracked(write_token));
+        let read_atomic = AtomicUsize::new(Ghost(tracked_inst), 0, Tracked(read_token));
+        let last_atomic = AtomicUsize::new(Ghost(tracked_inst), length, Tracked(last_token));
+        let reserve_atomic = AtomicUsize::new(Ghost(tracked_inst), 0, Tracked(reserve_token));
         let read_in_progress_atomic = AtomicBool::new(Ghost(tracked_inst), false, Tracked(read_in_progress_token));
         let write_in_progress_atomic = AtomicBool::new(Ghost(tracked_inst), false, Tracked(write_in_progress_token));
         let already_split_atomic = AtomicBool::new(Ghost(tracked_inst), false, Tracked(already_split_token));
@@ -521,7 +525,7 @@ impl VBBuffer
 
 struct GrantW {
     buf: Vec<*mut u8>,
-    buf_perm: Tracked<Vec<raw_ptr::PointsTo<u8>>>,
+    buf_perms: Tracked<Seq<raw_ptr::PointsTo<u8>>>,
     vbq: Arc<VBBuffer>,
     to_commit: usize,
 }
@@ -562,12 +566,12 @@ impl Producer {
                 let _ = self.vbq.instance.borrow().grant_fill_read(&read_token, self.producer.borrow_mut());
             }
         );
-        let max = self.vbq.length as u64;
+        let max = self.vbq.length as usize;
         let already_inverted = write < read;
-        assume(write + sz < u64::MAX);  // FIXME!
+        assume(write + sz < usize::MAX);  // FIXME!
 
-        let start = if already_inverted {
-            if (write + sz as u64) < read {
+        let start: usize = if already_inverted {
+            if (write + sz) < read {
                 // Inverted, room is still available
                 write
             } else {
@@ -581,7 +585,7 @@ impl Producer {
                 return Err("Inverted, no room is available");
             }
         } else {
-            if write + sz as u64 <= max {
+            if write + sz <= max {
                 // Non inverted condition
                 write
             } else {
@@ -590,7 +594,7 @@ impl Producer {
                 // NOTE: We check sz < read, NOT <=, because
                 // write must never == read in an inverted condition, since
                 // we will then not be able to tell if we are inverted or not
-                if (sz as u64) < read {
+                if sz < read {
                     // Invertible situation
                     0
                 } else {
@@ -605,58 +609,61 @@ impl Producer {
                 }
             }
         };
+        // 上記のエラーケース以外の条件を集約
+        assert(start + sz < read || start + sz <= max || (start == 0 && sz < read));
+        assert(start + sz <= max);
+        assert(start + sz <= self.vbq.length);
 
-        
         proof {
-            assume(start + sz < u64::MAX); // FIXME!
+            assume(start + sz < usize::MAX); // FIXME!
             assume(start + sz <= self.vbq.instance@.length());  // FIXME!
         }
         // Safe write, only viewed by this task
 
-        let tracked mut granted_perm;
-        atomic_with_ghost!(&self.vbq.reserve => store(start + sz as u64);
+        let tracked mut granted_perms_map;
+        atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
             ghost reserve_token => {
-                granted_perm = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, self.producer.borrow_mut());
-                assert(reserve_token.value() == start + sz as u64);
+                // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
+                let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, self.producer.borrow_mut());
+                granted_perms_map = ret.1.get();
+                assert(reserve_token.value() == start + sz);
             }
         );
 
 
-        let mut ptr_vec: Vec<*mut u8> = Vec::new();
-        let tracked mut grantw_perms = Seq::<vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
+        let mut granted_buf: Vec<*mut u8> = Vec::new();
+        let tracked mut buf_perms = Seq::<vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
         let base_ptr = self.vbq.buffer;
+        let end_offset = start + sz;
 
-        for idx in start..(start + sz)
+        for idx in start..end_offset
             invariant
-                idx <= (start + sz),
-                base_ptr as int + (start + sz) * size_of::<u8>() <= usize::MAX + 1,
-                granted_perm.is_range(base_ptr as int + idx * size_of::<u8>() as int, (start + sz) * size_of::<u8>() - idx),
-                forall |i: nat|
-                    i >= base_ptr as nat && i < base_ptr as nat + idx * size_of::<u8>() as nat
-                        ==> grantw_perms.contains_key(i),
-                forall |i: nat|
-                    i >= base_ptr as nat && i < base_ptr as nat + idx * size_of::<u8>() as nat
-                        ==> (grantw_perms.index(i as nat).ptr() as nat == i as nat
-                            && grantw_perms.index(i as nat).ptr()@.provenance == granted_perm.provenance()),
-                base_ptr@.provenance == granted_perm.provenance(),
+                idx <= end_offset,
+                base_ptr as usize + end_offset * size_of::<u8>() <= usize::MAX + 1,
+                //base_ptr@.provenance == token.provenance(),
+                forall |j: nat|
+                    j >= base_ptr as nat + idx * size_of::<u8>() as nat && j < base_ptr as nat + end_offset * size_of::<u8>() as nat
+                        ==> (
+                            granted_perms_map.contains_key(j)
+                            && granted_perms_map.index(j as nat).ptr() as nat == j as nat),
+                            //&& grantw_perms.index(j as nat).ptr()@.provenance == token.provenance()),
             decreases
-                (start + sz) - idx,
+                end_offset - idx,
         {
+            let addr = base_ptr as usize + idx; // * size_of::<u8>();
+            let ptr: *mut u8 = with_exposed_provenance(addr, expose_provenance(base_ptr));
+            
+            granted_buf.push(ptr);
+            assert(granted_perms_map.contains_key(addr as nat));
+            let tracked mut points_to = granted_perms_map.tracked_remove(addr as nat);
             proof {
-                let ghost range_start_addr = base_ptr as int + idx * size_of::<u8>() as int;
-                let ghost range_end_addr = range_start_addr + 1 * size_of::<u8>();
-                
-                let tracked (top, rest) = granted_perm.split(set_int_range(range_start_addr, range_end_addr as int));
-                assert(top.is_range(range_start_addr as usize as int, size_of::<u8>() as int));
-
-                let tracked top_pointsto = top.into_typed::<u8>(range_start_addr as usize);
-                granted_perm = rest;
-                grantw_perms.push(top_pointsto);
-                assert(top_pointsto.ptr()@.provenance == top.provenance());
-                assert(top.provenance() == granted_perm.provenance());
-                let ptr: *mut u8 = with_exposed_provenance(addr, expose_provenance(base_ptr));
-                ptr_vec.push(ptr);
+                buf_perms.tracked_push(points_to);
             }
+
+            assert(equal(points_to.ptr(), ptr));
+            //ptr_mut_write(ptr, Tracked(&mut points_to), 5);
+            //let val = ptr_ref(ptr, Tracked(&points_to));
+            //assert(val == 5);
         }
 
         /*
@@ -671,7 +678,8 @@ impl Producer {
 
         Ok (
             GrantW {
-                buf: self.vbq.buffer,
+                buf: granted_buf,
+                buf_perms: Tracked(buf_perms),
                 vbq: self.vbq.clone(),
                 to_commit: sz,
             }
