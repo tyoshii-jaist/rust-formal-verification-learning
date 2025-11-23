@@ -26,7 +26,7 @@ pub enum ConsumerState {
  tokenized_state_machine!{VBQueue {
     fields {
         #[sharding(constant)]
-        pub start_addr: nat,
+        pub base_addr: nat,
 
         #[sharding(constant)]
         pub length: nat,
@@ -72,14 +72,14 @@ pub enum ConsumerState {
         match self.producer {
             ProducerState::Reserved((start, start_plus_sz)) => {
                 forall |i: nat|
-                    ((i >= self.start_addr && i < self.start_addr + start as nat) || 
-                    (i >= self.start_addr + start_plus_sz && i < self.start_addr + self.length * size_of::<u8>() as nat))
-                        ==> self.storage.contains_key(i) && self.storage.dom().contains(i)
+                    ((i >= self.base_addr && i < self.base_addr + start as nat) || 
+                    (i >= self.base_addr + start_plus_sz && i < self.base_addr + self.length * size_of::<u8>() as nat))
+                        ==> self.storage.contains_key(i) && self.storage.dom().contains(i) && self.storage.index(i).ptr().addr() == i
             },
             _ => {
                 forall |i: nat|
-                    i >= self.start_addr && i < self.start_addr + self.length * size_of::<u8>() as nat
-                        ==> self.storage.contains_key(i) && self.storage.dom().contains(i)
+                    i >= self.base_addr && i < self.base_addr + self.length * size_of::<u8>() as nat
+                        ==> self.storage.contains_key(i) && self.storage.dom().contains(i) && self.storage.index(i).ptr().addr() == i
             },
         }
     }
@@ -95,18 +95,18 @@ pub enum ConsumerState {
     }
 
     init! {
-        initialize(start_addr: nat,
+        initialize(base_addr: nat,
             length: nat,
             storage: Map<nat, raw_ptr::PointsTo<u8>>,
             buffer_dealloc: raw_ptr::Dealloc)
         {
             require(
                 forall |i: nat|
-                    i >= start_addr && i < start_addr + length * size_of::<u8>() as nat
-                        ==> storage.contains_key(i) && storage.dom().contains(i)
+                    i >= base_addr && i < base_addr + length * size_of::<u8>() as nat
+                        ==> storage.contains_key(i) && storage.index(i).ptr().addr() == i
             );
 
-            init start_addr = start_addr;
+            init base_addr = base_addr;
             init length = length;
             init storage = storage;
             init buffer_dealloc = Some(buffer_dealloc);
@@ -125,11 +125,11 @@ pub enum ConsumerState {
 
     
     #[inductive(initialize)]
-    fn initialize_inductive(post: Self, start_addr: nat, length: nat, storage: Map<nat, raw_ptr::PointsTo<u8>>, buffer_dealloc: raw_ptr::Dealloc) {
+    fn initialize_inductive(post: Self, base_addr: nat, length: nat, storage: Map<nat, raw_ptr::PointsTo<u8>>, buffer_dealloc: raw_ptr::Dealloc) {
         assert(post.buffer_dealloc is Some);
         assert(
             forall |i: nat|
-                i >= post.start_addr && i < post.start_addr + post.length * size_of::<u8>() as nat
+                i >= post.base_addr && i < post.base_addr + post.length * size_of::<u8>() as nat
                     ==> post.storage.contains_key(i)
         );
     }
@@ -185,19 +185,34 @@ pub enum ConsumerState {
             update reserve = start + sz;
 
             birds_eye let withdraw_range_map: Map<nat, raw_ptr::PointsTo<u8>> = Map::new(
-                |i: nat| start + pre.start_addr <= i && i < start + sz + pre.start_addr,
+                |i: nat| start + pre.base_addr <= i && i < start + sz + pre.base_addr,
                 |i: nat| pre.storage[i]);
 
             withdraw storage -= (withdraw_range_map) by {
                 assert (withdraw_range_map.submap_of(pre.storage)) by {
-                    // assert(Set::new(|i: nat| i >= start + pre.start_addr && i < start + sz  + pre.start_addr).subset_of(Set::new(|i: nat| i >= pre.start_addr && i < pre.start_addr + pre.length)));
-                    // assert(Set::new(|i: nat| i >= pre.start_addr && i < pre.start_addr + pre.length).subset_of(pre.storage.dom()));
-                    assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.start_addr && i < start + sz + pre.start_addr)));
+                    // assert(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz  + pre.base_addr).subset_of(Set::new(|i: nat| i >= pre.base_addr && i < pre.base_addr + pre.length)));
+                    // assert(Set::new(|i: nat| i >= pre.base_addr && i < pre.base_addr + pre.length).subset_of(pre.storage.dom()));
+                    assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr)));
                     assert(pre.valid_storage_all());
                 }
             };
             
             update producer = ProducerState::Reserved((start, start + sz));
+
+            assert(
+                withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr))
+            );
+            assert(
+                Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr).subset_of(withdraw_range_map.dom())
+            );
+            assert(
+                forall |j: nat|
+                    j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz
+                        ==> (
+                            withdraw_range_map.contains_key(j)
+                            && withdraw_range_map.index(j).ptr().addr() == j
+                        )
+            );
         }
     }
 
@@ -264,6 +279,9 @@ struct_with_invariants!{
     pub closed spec fn wf(&self) -> bool {
         predicate {
             &&& self.instance@.length() == self.length
+            &&& self.instance@.base_addr() == self.buffer as nat
+            &&& self.buffer.addr() + self.length <= usize::MAX + 1
+            &&& self.buffer.addr() as int % 1 as int == 0
         }
 
         invariant on write with (instance) is (v: usize, g: VBQueue::write) {
@@ -317,7 +335,6 @@ impl Producer {
         (*self.vbq).wf()
             && self.producer@.instance_id() == (*self.vbq).instance@.id()
             && self.producer@.value() is Idle
-            && (*self.vbq).buffer.addr() + (*self.vbq).length <= usize::MAX + 1
             //&& (self.tail as int) < (*self.queue).buffer@.len()
     }
 }
@@ -354,8 +371,6 @@ impl VBBuffer
                 }),
             
         */
-            r.0.buffer.addr() + length <= usize::MAX + 1,
-            r.0.buffer.addr() as int % 1 as int == 0,
             //s.buffer@.provenance == s.instance@.split_guard_buffer_perm().provenance(),
             r.0.wf(),
             r.0.instance@.id() == r.1@.instance_id(),
@@ -387,17 +402,17 @@ impl VBBuffer
                 length - len,
         {
             proof {
-                let ghost range_start_addr = buffer_ptr as int + len * size_of::<u8>() as int;
-                let ghost range_end_addr = range_start_addr + 1 * size_of::<u8>();
+                let ghost range_base_addr = buffer_ptr as int + len * size_of::<u8>() as int;
+                let ghost range_end_addr = range_base_addr + 1 * size_of::<u8>();
                 
-                let tracked (top, rest) = buffer_perm.split(crate::set_lib::set_int_range(range_start_addr, range_end_addr as int));
-                assert(top.is_range(range_start_addr as usize as int, size_of::<u8>() as int));
+                let tracked (top, rest) = buffer_perm.split(crate::set_lib::set_int_range(range_base_addr, range_end_addr as int));
+                assert(top.is_range(range_base_addr as usize as int, size_of::<u8>() as int));
 
-                let tracked top_pointsto = top.into_typed::<u8>(range_start_addr as usize);
+                let tracked top_pointsto = top.into_typed::<u8>(range_base_addr as usize);
                 buffer_perm = rest;
-                points_to_map.tracked_insert(range_start_addr as nat, top_pointsto);
-                assert(points_to_map.contains_key(range_start_addr as nat));
-                assert(points_to_map.index(range_start_addr as nat).ptr() as nat == range_start_addr as nat);
+                points_to_map.tracked_insert(range_base_addr as nat, top_pointsto);
+                assert(points_to_map.contains_key(range_base_addr as nat));
+                assert(points_to_map.index(range_base_addr as nat).ptr() as nat == range_base_addr as nat);
                 assert(top_pointsto.ptr()@.provenance == top.provenance());
                 assert(top.provenance() == buffer_perm.provenance());
             }
@@ -626,6 +641,15 @@ impl Producer {
                 // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
                 let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, self.producer.borrow_mut());
                 granted_perms_map = ret.1.get();
+                assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
+                assert(
+                    forall |j: nat|
+                        j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
+                            ==> (
+                                granted_perms_map.contains_key(j)
+                            //    && granted_perms_map.index(j as nat).ptr() as nat == j as nat
+                            )
+                );
                 assert(reserve_token.value() == start + sz);
             }
         );
@@ -636,6 +660,18 @@ impl Producer {
         let base_ptr = self.vbq.buffer;
         let end_offset = start + sz;
 
+        proof {
+            assert(base_ptr as nat == self.vbq.instance@.base_addr());
+            assert(
+                forall |j: nat|
+                    j >= base_ptr as nat + start as nat && j < base_ptr as nat + end_offset as nat
+                        ==> (
+                            granted_perms_map.contains_key(j)
+                            //&& granted_perms_map.index(j as nat).ptr() as nat == j as nat
+                        )
+            );
+        }
+
         for idx in start..end_offset
             invariant
                 idx <= end_offset,
@@ -645,7 +681,8 @@ impl Producer {
                     j >= base_ptr as nat + idx * size_of::<u8>() as nat && j < base_ptr as nat + end_offset * size_of::<u8>() as nat
                         ==> (
                             granted_perms_map.contains_key(j)
-                            && granted_perms_map.index(j as nat).ptr() as nat == j as nat),
+                            //&& granted_perms_map.index(j as nat).ptr() as nat == j as nat
+                        ),
                             //&& grantw_perms.index(j as nat).ptr()@.provenance == token.provenance()),
             decreases
                 end_offset - idx,
