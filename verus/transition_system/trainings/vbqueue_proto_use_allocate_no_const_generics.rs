@@ -185,6 +185,7 @@ pub enum ConsumerState {
             update reserve = start + sz;
 
             birds_eye let range_keys = Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + start + sz);
+            // restrict を使わないとうまく pre.storage の情報が引き継がれない
             birds_eye let withdraw_range_map = pre.storage.restrict(range_keys);
 
             withdraw storage -= (withdraw_range_map) by {
