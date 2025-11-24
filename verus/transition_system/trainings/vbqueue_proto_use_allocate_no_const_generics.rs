@@ -662,7 +662,7 @@ impl Producer {
             assert(base_ptr as nat == self.vbq.instance@.base_addr());
             assert(
                 forall |j: nat|
-                    j >= base_ptr as nat + start as nat && j < base_ptr as nat + end_offset as nat
+                    j >= base_ptr as nat + start as nat && j < base_ptr as nat + start as nat + sz as nat
                         ==> (
                             granted_perms_map.contains_key(j)
                             && granted_perms_map.index(j as nat).ptr().addr() == j
