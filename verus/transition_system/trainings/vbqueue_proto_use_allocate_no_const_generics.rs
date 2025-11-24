@@ -29,6 +29,9 @@ pub enum ConsumerState {
         pub base_addr: nat,
 
         #[sharding(constant)]
+        pub provenance: raw_ptr::Provenance,
+
+        #[sharding(constant)]
         pub length: nat,
 
         #[sharding(storage_map)]
@@ -74,12 +77,22 @@ pub enum ConsumerState {
                 forall |i: nat|
                     ((i >= self.base_addr && i < self.base_addr + start as nat) || 
                     (i >= self.base_addr + start_plus_sz && i < self.base_addr + self.length))
-                        ==> self.storage.contains_key(i) && self.storage.dom().contains(i) && self.storage.index(i).ptr().addr() == i            
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
             },
             _ => {
                 forall |i: nat|
                     i >= self.base_addr && i < self.base_addr + self.length
-                        ==> self.storage.contains_key(i) && self.storage.dom().contains(i) && self.storage.index(i).ptr().addr() == i
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )
             },
         }
     }
@@ -95,7 +108,9 @@ pub enum ConsumerState {
     }
 
     init! {
-        initialize(base_addr: nat,
+        initialize(
+            base_addr: nat,
+            provenance: raw_ptr::Provenance,
             length: nat,
             storage: Map<nat, raw_ptr::PointsTo<u8>>,
             buffer_dealloc: raw_ptr::Dealloc)
@@ -103,10 +118,15 @@ pub enum ConsumerState {
             require(
                 forall |i: nat|
                     i >= base_addr && i < base_addr + length * size_of::<u8>() as nat
-                        ==> storage.contains_key(i) && storage.index(i).ptr().addr() == i
+                        ==> (
+                            storage.contains_key(i) &&
+                            storage.index(i).ptr().addr() == i &&
+                            storage.index(i).ptr()@.provenance == provenance
+                        )
             );
 
             init base_addr = base_addr;
+            init provenance = provenance;
             init length = length;
             init storage = storage;
             init buffer_dealloc = Some(buffer_dealloc);
@@ -125,7 +145,7 @@ pub enum ConsumerState {
 
     
     #[inductive(initialize)]
-    fn initialize_inductive(post: Self, base_addr: nat, length: nat, storage: Map<nat, raw_ptr::PointsTo<u8>>, buffer_dealloc: raw_ptr::Dealloc) {
+    fn initialize_inductive(post: Self, base_addr: nat, provenance: raw_ptr::Provenance, length: nat, storage: Map<nat, raw_ptr::PointsTo<u8>>, buffer_dealloc: raw_ptr::Dealloc) {
         assert(post.buffer_dealloc is Some);
         assert(
             forall |i: nat|
@@ -200,6 +220,7 @@ pub enum ConsumerState {
                                 ==> (
                                     pre.storage.contains_key(j)
                                     && pre.storage[j].ptr().addr() == j
+                                    && pre.storage[j].ptr()@.provenance == pre.provenance
                                 )
                     );
                 }
@@ -219,6 +240,7 @@ pub enum ConsumerState {
                         ==> (
                             withdraw_range_map.contains_key(j)
                             && withdraw_range_map[j].ptr().addr() == j
+                            && withdraw_range_map[j].ptr()@.provenance == pre.provenance
                         )
             );
         }
@@ -430,7 +452,14 @@ impl VBBuffer
             Tracked(already_split_token),
             Tracked(producer_token),
             Tracked(consumer_token),
-        ) = VBQueue::Instance::initialize(buffer_ptr as nat, length as nat, points_to_map, buffer_dealloc, points_to_map, Some(buffer_dealloc));
+        ) = VBQueue::Instance::initialize(
+            buffer_ptr as nat,
+            buffer_ptr@.provenance,
+            length as nat,
+            points_to_map,
+            buffer_dealloc,
+            points_to_map,
+            Some(buffer_dealloc));
 
         let tracked_inst: Tracked<VBQueue::Instance> = Tracked(instance.clone());
         let write_atomic = AtomicUsize::new(Ghost(tracked_inst), 0, Tracked(write_token));
@@ -646,7 +675,8 @@ impl Producer {
                         j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
                             ==> (
                                 granted_perms_map.contains_key(j)
-                                && granted_perms_map.index(j as nat).ptr().addr() == j
+                                && granted_perms_map.index(j).ptr().addr() == j
+                                //&& granted_perms_map.index(j as nat).ptr()@.provenance == self.vbq.instance@.provenance()
                             )
                 );
                 assert(reserve_token.value() == start + sz);
@@ -666,7 +696,8 @@ impl Producer {
                     j >= base_ptr as nat + start as nat && j < base_ptr as nat + start as nat + sz as nat
                         ==> (
                             granted_perms_map.contains_key(j)
-                            && granted_perms_map.index(j as nat).ptr().addr() == j
+                            //&& granted_perms_map.index(j as nat).ptr().addr() == j
+                            //&& granted_perms_map.index(j as nat).ptr()@.provenance == self.vbq.instance@.provenance()
                         )
             );
         }
@@ -696,6 +727,7 @@ impl Producer {
             proof {
                 buf_perms.tracked_push(points_to);
             }
+            assert(ptr@.provenance == base_ptr@.provenance);
             assert(points_to.ptr()@.provenance == ptr@.provenance);
             assert(equal(points_to.ptr(), ptr));
             //ptr_mut_write(ptr, Tracked(&mut points_to), 5);
