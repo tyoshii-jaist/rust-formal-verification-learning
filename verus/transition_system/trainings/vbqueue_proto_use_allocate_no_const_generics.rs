@@ -73,12 +73,12 @@ pub enum ConsumerState {
             ProducerState::Reserved((start, start_plus_sz)) => {
                 forall |i: nat|
                     ((i >= self.base_addr && i < self.base_addr + start as nat) || 
-                    (i >= self.base_addr + start_plus_sz && i < self.base_addr + self.length * size_of::<u8>() as nat))
-                        ==> self.storage.contains_key(i) && self.storage.dom().contains(i) && self.storage.index(i).ptr().addr() == i
+                    (i >= self.base_addr + start_plus_sz && i < self.base_addr + self.length))
+                        ==> self.storage.contains_key(i) && self.storage.dom().contains(i) && self.storage.index(i).ptr().addr() == i            
             },
             _ => {
                 forall |i: nat|
-                    i >= self.base_addr && i < self.base_addr + self.length * size_of::<u8>() as nat
+                    i >= self.base_addr && i < self.base_addr + self.length
                         ==> self.storage.contains_key(i) && self.storage.dom().contains(i) && self.storage.index(i).ptr().addr() == i
             },
         }
@@ -184,9 +184,8 @@ pub enum ConsumerState {
 
             update reserve = start + sz;
 
-            birds_eye let withdraw_range_map: Map<nat, raw_ptr::PointsTo<u8>> = Map::new(
-                |i: nat| start + pre.base_addr <= i && i < start + sz + pre.base_addr,
-                |i: nat| pre.storage[i]);
+            birds_eye let range_keys = Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + start + sz);
+            birds_eye let withdraw_range_map = pre.storage.restrict(range_keys);
 
             withdraw storage -= (withdraw_range_map) by {
                 assert (withdraw_range_map.submap_of(pre.storage)) by {
@@ -194,6 +193,14 @@ pub enum ConsumerState {
                     // assert(Set::new(|i: nat| i >= pre.base_addr && i < pre.base_addr + pre.length).subset_of(pre.storage.dom()));
                     assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr)));
                     assert(pre.valid_storage_all());
+                    assert(
+                        forall |j: nat|
+                            j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz
+                                ==> (
+                                    pre.storage.contains_key(j)
+                                    && pre.storage[j].ptr().addr() == j
+                                )
+                    );
                 }
             };
             
@@ -210,7 +217,7 @@ pub enum ConsumerState {
                     j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz
                         ==> (
                             withdraw_range_map.contains_key(j)
-                            && withdraw_range_map.index(j).ptr().addr() == j
+                            && withdraw_range_map[j].ptr().addr() == j
                         )
             );
         }
@@ -221,15 +228,6 @@ pub enum ConsumerState {
             update write_in_progress = false;
         }
     }
-
-    /*
-    transition!{
-        withdraw_buffer_perm() {
-            withdraw buffer_perm -= Some(let _) by {
-                assume(pre.buffer_perm is Some);
-            };
-        }
-    } */
 
     #[inductive(try_split)]
     fn try_split_inductive(pre: Self, post: Self) { }
@@ -251,7 +249,7 @@ pub enum ConsumerState {
     fn grant_end_inductive(pre: Self, post: Self) { }
 
     #[inductive(do_reserve)]
-    fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
+    fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {        
         assert(post.producer is Reserved);
         assert(post.producer->Reserved_0.1 == post.reserve);
     }
@@ -647,7 +645,7 @@ impl Producer {
                         j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
                             ==> (
                                 granted_perms_map.contains_key(j)
-                            //    && granted_perms_map.index(j as nat).ptr() as nat == j as nat
+                                && granted_perms_map.index(j as nat).ptr().addr() == j
                             )
                 );
                 assert(reserve_token.value() == start + sz);
@@ -667,7 +665,7 @@ impl Producer {
                     j >= base_ptr as nat + start as nat && j < base_ptr as nat + end_offset as nat
                         ==> (
                             granted_perms_map.contains_key(j)
-                            //&& granted_perms_map.index(j as nat).ptr() as nat == j as nat
+                            && granted_perms_map.index(j as nat).ptr().addr() == j
                         )
             );
         }
@@ -676,14 +674,15 @@ impl Producer {
             invariant
                 idx <= end_offset,
                 base_ptr as usize + end_offset * size_of::<u8>() <= usize::MAX + 1,
-                //base_ptr@.provenance == token.provenance(),
+                // base_ptr@.provenance == token.provenance(),
                 forall |j: nat|
                     j >= base_ptr as nat + idx * size_of::<u8>() as nat && j < base_ptr as nat + end_offset * size_of::<u8>() as nat
                         ==> (
                             granted_perms_map.contains_key(j)
-                            //&& granted_perms_map.index(j as nat).ptr() as nat == j as nat
+                            // && granted_perms_map.index(j as nat).ptr().addr() as nat == j as nat
+                            //&& granted_perms_map.index(j as nat).ptr()@.provenance == base_ptr@.provenance
                         ),
-                            //&& grantw_perms.index(j as nat).ptr()@.provenance == token.provenance()),
+                            
             decreases
                 end_offset - idx,
         {
@@ -696,7 +695,7 @@ impl Producer {
             proof {
                 buf_perms.tracked_push(points_to);
             }
-
+            assert(points_to.ptr()@.provenance == ptr@.provenance);
             assert(equal(points_to.ptr(), ptr));
             //ptr_mut_write(ptr, Tracked(&mut points_to), 5);
             //let val = ptr_ref(ptr, Tracked(&points_to));
