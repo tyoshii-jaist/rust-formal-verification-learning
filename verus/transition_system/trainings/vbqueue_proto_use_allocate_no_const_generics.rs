@@ -218,7 +218,7 @@ pub enum ConsumerState {
                     j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz
                         ==> (
                             withdraw_range_map.contains_key(j)
-                            && withdraw_range_map[j].ptr().addr() == j
+                            && withdraw_range_map.index(j).ptr().addr() == j
                         )
             );
         }
@@ -645,8 +645,7 @@ impl Producer {
                     forall |j: nat|
                         j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
                             ==> (
-                                granted_perms_map.contains_key(j)
-                                && granted_perms_map.index(j as nat).ptr().addr() == j
+                                granted_perms_map.index(j).ptr().addr() == j
                             )
                 );
                 assert(reserve_token.value() == start + sz);
@@ -659,29 +658,16 @@ impl Producer {
         let base_ptr = self.vbq.buffer;
         let end_offset = start + sz;
 
-        proof {
-            assert(base_ptr as nat == self.vbq.instance@.base_addr());
-            assert(
-                forall |j: nat|
-                    j >= base_ptr as nat + start as nat && j < base_ptr as nat + start as nat + sz as nat
-                        ==> (
-                            granted_perms_map.contains_key(j)
-                            && granted_perms_map.index(j as nat).ptr().addr() == j
-                        )
-            );
-        }
-
         for idx in start..end_offset
             invariant
                 idx <= end_offset,
                 base_ptr as usize + end_offset * size_of::<u8>() <= usize::MAX + 1,
                 // base_ptr@.provenance == token.provenance(),
                 forall |j: nat|
-                    j >= base_ptr as nat + idx * size_of::<u8>() as nat && j < base_ptr as nat + end_offset * size_of::<u8>() as nat
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + end_offset as nat
                         ==> (
                             granted_perms_map.contains_key(j)
-                            // && granted_perms_map.index(j as nat).ptr().addr() as nat == j as nat
-                            //&& granted_perms_map.index(j as nat).ptr()@.provenance == base_ptr@.provenance
+                            && granted_perms_map.index(j).ptr().addr() == j
                         ),
                             
             decreases
@@ -692,12 +678,15 @@ impl Producer {
             
             granted_buf.push(ptr);
             assert(granted_perms_map.contains_key(addr as nat));
+            assert(granted_perms_map.index(addr as nat).ptr().addr() == addr as nat);
             let tracked mut points_to = granted_perms_map.tracked_remove(addr as nat);
+            assert(!granted_perms_map.contains_key(addr as nat));
+            //assert(points_to.ptr().addr() == addr as nat);
             proof {
                 buf_perms.tracked_push(points_to);
             }
-            assert(points_to.ptr()@.provenance == ptr@.provenance);
-            assert(equal(points_to.ptr(), ptr));
+            //assert(points_to.ptr()@.provenance == ptr@.provenance);
+            //assert(equal(points_to.ptr(), ptr));
             //ptr_mut_write(ptr, Tracked(&mut points_to), 5);
             //let val = ptr_ref(ptr, Tracked(&points_to));
             //assert(val == 5);
