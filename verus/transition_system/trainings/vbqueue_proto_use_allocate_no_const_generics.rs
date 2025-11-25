@@ -570,15 +570,32 @@ impl VBBuffer
 struct GrantW {
     buf: Vec<*mut u8>,
     buf_perms: Tracked<Seq<raw_ptr::PointsTo<u8>>>,
+    sz: Tracked<usize>,
     vbq: Arc<VBBuffer>,
     to_commit: usize,
 }
 
+impl GrantW {
+    pub closed spec fn wf(&self) -> bool {
+        let ghost Ghost(buf_perms) = self.buf_perms;
+        let ghost Ghost(sz) = self.sz;
+        &&& self.buf.len() == sz && buf_perms.len() == sz
+        &&& forall |i: int| 0 <= i && i < sz ==> self.buf[i] == buf_perms[i].ptr()
+    }
+}
+
 impl Producer {
-    fn grant_exact(&mut self, sz: usize) -> Result<GrantW, &'static str>
+    fn grant_exact(&mut self, sz: usize) -> (r: Result<GrantW, &'static str>)
         requires
             old(self).wf(),
             old(self).producer@.value() is Idle,
+        ensures
+            match r {
+                Ok(wgr) => {
+                    wgr.wf()
+                },
+                _ => true
+            }
     {
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => swap(true);
@@ -732,6 +749,8 @@ impl Producer {
                         ==> (
                             granted_perms_map.index(j).ptr()@.provenance == base_ptr@.provenance
                         ),
+                granted_buf.len() == (idx - start),
+                buf_perms.len() == (idx - start)
             decreases
                 end_offset - idx,
         {
@@ -747,25 +766,13 @@ impl Producer {
             assert(ptr@.provenance == base_ptr@.provenance);
             assert(points_to.ptr()@.provenance == base_ptr@.provenance);
             assert(equal(points_to.ptr(), ptr));
-            //ptr_mut_write(ptr, Tracked(&mut points_to), 5);
-            //let val = ptr_ref(ptr, Tracked(&points_to));
-            //assert(val == 5);
         }
-
-        /*
-        proof {
-            let tracked buffer_perm = self.vbq.instance.borrow().withdraw_buffer_perm();
-        } */
-
-        // This is sound, as UnsafeCell, MaybeUninit, and GenericArray
-        // are all `#[repr(Transparent)]
-        // let start_of_buf_ptr = inner.buf.get().cast::<u8>();
-        // let grant_slice = unsafe { from_raw_parts_mut(start_of_buf_ptr.add(start), sz) };
 
         Ok (
             GrantW {
                 buf: granted_buf,
                 buf_perms: Tracked(buf_perms),
+                sz: Tracked(sz),
                 vbq: self.vbq.clone(),
                 to_commit: sz,
             }
@@ -783,8 +790,17 @@ fn main() {
     };
 
     // Request space for one byte
-    let mut wgr = prod.grant_exact(1);
-    
+    match prod.grant_exact(2) {
+        Ok(wgr) => {
+            let Tracked(points_to_vec) = wgr.buf_perms;
+            let tracked points_to = points_to_vec.tracked_remove(0 as int);
+            
+            ptr_mut_write(wgr.buf[0], Tracked(&mut points_to), 5);
+            let val = ptr_ref(wgr.buf[0], Tracked(&points_to));
+            assert(val == 5);
+        },
+        _ => {}
+    }
 }
 
 }
