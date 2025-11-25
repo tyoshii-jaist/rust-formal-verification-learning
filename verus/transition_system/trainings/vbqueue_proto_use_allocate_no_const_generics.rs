@@ -301,6 +301,7 @@ struct_with_invariants!{
         predicate {
             &&& self.instance@.length() == self.length
             &&& self.instance@.base_addr() == self.buffer as nat
+            &&& self.instance@.provenance() == self.buffer@.provenance
             &&& self.buffer.addr() + self.length <= usize::MAX + 1
             &&& self.buffer.addr() as int % 1 as int == 0
         }
@@ -674,9 +675,14 @@ impl Producer {
                     forall |j: nat|
                         j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
                             ==> (
-                                granted_perms_map.contains_key(j)
-                                && granted_perms_map.index(j).ptr().addr() == j
-                                //&& granted_perms_map.index(j as nat).ptr()@.provenance == self.vbq.instance@.provenance()
+                                granted_perms_map.index(j).ptr().addr() == j
+                            )
+                );
+                assert(
+                    forall |j: nat|
+                        j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
+                            ==> (
+                                granted_perms_map.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
                             )
                 );
                 assert(reserve_token.value() == start + sz);
@@ -690,6 +696,7 @@ impl Producer {
         let end_offset = start + sz;
 
         proof {
+            assert(base_ptr@.provenance == self.vbq.instance@.provenance());
             assert(base_ptr as nat == self.vbq.instance@.base_addr());
             assert(
                 forall |j: nat|
@@ -706,15 +713,25 @@ impl Producer {
             invariant
                 idx <= end_offset,
                 base_ptr as usize + end_offset * size_of::<u8>() <= usize::MAX + 1,
-                // base_ptr@.provenance == token.provenance(),
+                base_ptr@.provenance == self.vbq.instance@.provenance(),
                 forall |j: nat|
                     j >= base_ptr as nat + idx * size_of::<u8>() as nat && j < base_ptr as nat + end_offset * size_of::<u8>() as nat
                         ==> (
                             granted_perms_map.contains_key(j)
-                            // && granted_perms_map.index(j as nat).ptr().addr() as nat == j as nat
+                            //&& granted_perms_map.index(j as nat).ptr().addr() as nat == j as nat
                             //&& granted_perms_map.index(j as nat).ptr()@.provenance == base_ptr@.provenance
                         ),
-                            
+                forall |j: nat|
+                    j >= base_ptr as nat + idx * size_of::<u8>() as nat && j < base_ptr as nat + end_offset * size_of::<u8>() as nat
+                        ==> (
+                            granted_perms_map.index(j as nat).ptr().addr() as nat == j as nat
+                            //&& granted_perms_map.index(j as nat).ptr()@.provenance == base_ptr@.provenance
+                        ),
+                forall |j: nat|
+                    j >= base_ptr as nat + idx * size_of::<u8>() as nat && j < base_ptr as nat + end_offset * size_of::<u8>() as nat
+                        ==> (
+                            granted_perms_map.index(j).ptr()@.provenance == base_ptr@.provenance
+                        ),
             decreases
                 end_offset - idx,
         {
@@ -728,7 +745,7 @@ impl Producer {
                 buf_perms.tracked_push(points_to);
             }
             assert(ptr@.provenance == base_ptr@.provenance);
-            assert(points_to.ptr()@.provenance == ptr@.provenance);
+            assert(points_to.ptr()@.provenance == base_ptr@.provenance);
             assert(equal(points_to.ptr(), ptr));
             //ptr_mut_write(ptr, Tracked(&mut points_to), 5);
             //let val = ptr_ref(ptr, Tracked(&points_to));
