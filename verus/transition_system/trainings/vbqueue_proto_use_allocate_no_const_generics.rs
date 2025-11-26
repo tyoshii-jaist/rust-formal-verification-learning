@@ -117,7 +117,7 @@ pub enum ConsumerState {
         {
             require(
                 forall |i: nat|
-                    i >= base_addr && i < base_addr + length * size_of::<u8>() as nat
+                    i >= base_addr && i < base_addr + length as nat
                         ==> (
                             storage.contains_key(i) &&
                             storage.index(i).ptr().addr() == i &&
@@ -149,21 +149,10 @@ pub enum ConsumerState {
         assert(post.buffer_dealloc is Some);
         assert(
             forall |i: nat|
-                i >= post.base_addr && i < post.base_addr + post.length * size_of::<u8>() as nat
+                i >= post.base_addr && i < post.base_addr + post.length as nat
                     ==> post.storage.contains_key(i)
         );
     }
-
-    /*
-    確かに error: unable to prove inherent safety condition: the value being guarded must be stored が出るな...
-    https://github.com/verus-lang/verus/blob/7b6fdd861b43cbd88e886ad16c7af7cb1186ebc1/examples/scache/rwlock.rs#L308
-     
-    property!{
-        guard_buffer_perm(perm: raw_ptr::PointsToRaw) {
-            guard buffer_perm >= Some(perm);
-        }
-    }
-    */
 
     transition!{
         try_split() {
@@ -276,10 +265,6 @@ pub enum ConsumerState {
         assert(post.producer is Reserved);
         assert(post.producer->Reserved_0.1 == post.reserve);
     }
-/*
-    #[inductive(withdraw_buffer_perm)]
-    fn withdraw_buffer_perm_inductive(pre: Self, post: Self) { }
- */
 }}
 
 struct_with_invariants!{
@@ -393,7 +378,6 @@ impl VBBuffer
                 }),
             
         */
-            //s.buffer@.provenance == s.instance@.split_guard_buffer_perm().provenance(),
             r.0.wf(),
             r.0.instance@.id() == r.1@.instance_id(),
             r.1@.value() is Idle,
@@ -404,19 +388,19 @@ impl VBBuffer
         // allocate で得た buffer_perm (PointsToRaw) を u8 1バイトごとに分割して、addr => PointsTo の Map として格納する
         let tracked mut buffer_perm = buffer_perm;
         assert(buffer_perm.is_range(buffer_ptr as int, length as int));
-        assert(buffer_ptr as int + length * size_of::<u8>() <= usize::MAX + 1);
+        assert(buffer_ptr as int + length <= usize::MAX + 1);
         let tracked mut points_to_map = Map::<nat, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
 
         for len in 0..length
             invariant
                 len <= length,
-                buffer_ptr as int + length * size_of::<u8>() <= usize::MAX + 1,
-                buffer_perm.is_range(buffer_ptr as int + len * size_of::<u8>() as int, length * size_of::<u8>() - len),
+                buffer_ptr as int + length <= usize::MAX + 1,
+                buffer_perm.is_range(buffer_ptr as int + len as int, length - len),
                 forall |i: nat|
-                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len * size_of::<u8>() as nat
+                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
                         ==> points_to_map.contains_key(i),
                 forall |i: nat|
-                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len * size_of::<u8>() as nat
+                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
                         ==> (points_to_map.index(i as nat).ptr() as nat == i as nat
                             && points_to_map.index(i as nat).ptr()@.provenance == buffer_perm.provenance()),
                 buffer_ptr@.provenance == buffer_perm.provenance(),
@@ -424,11 +408,11 @@ impl VBBuffer
                 length - len,
         {
             proof {
-                let ghost range_base_addr = buffer_ptr as int + len * size_of::<u8>() as int;
-                let ghost range_end_addr = range_base_addr + 1 * size_of::<u8>();
+                let ghost range_base_addr = buffer_ptr as int + len as int;
+                let ghost range_end_addr = range_base_addr + 1;
                 
                 let tracked (top, rest) = buffer_perm.split(crate::set_lib::set_int_range(range_base_addr, range_end_addr as int));
-                assert(top.is_range(range_base_addr as usize as int, size_of::<u8>() as int));
+                assert(top.is_range(range_base_addr as usize as int, 1));
 
                 let tracked top_pointsto = top.into_typed::<u8>(range_base_addr as usize);
                 buffer_perm = rest;
@@ -442,8 +426,6 @@ impl VBBuffer
 
         let tracked (
             Tracked(instance),
-            //Tracked(buffer_perm_token),
-            //Tracked(buffer_dealloc_token),
             Tracked(write_token),
             Tracked(read_token),
             Tracked(last_token),
@@ -530,41 +512,6 @@ impl VBBuffer
             }
         ))
     }
-/*
-    fn experimental(&mut self) -> ()
-        requires
-            old(self).buffer.addr() as int % align_of::<u8>() as int == 0,
-            //old(self).instance@.buffer_perm().is_range(old(self).buffer.addr() as int, size_of::<u8>() as int),
-    {
-        let tracked mut points_to;
-        proof {
-            // そのまま self.buffer_perm を使うと into_typed で move のエラーが出るので、swapしておく。
-            let tracked bufp = self.buffer_perm.borrow();
-            let tracked mut buffer_perm = raw_ptr::PointsToRaw::empty(bufp.provenance());
-            tracked_swap(&mut buffer_perm, self.buffer_perm.borrow_mut());        
-            assert(buffer_perm.dom() == crate::set_lib::set_int_range(
-                self.buffer.addr() as int,
-                self.buffer.addr() as int + size_of::<u8>() as int,
-            ));
-            assert(buffer_perm.is_range(self.buffer.addr() as int, size_of::<u8>() as int));
-            points_to = buffer_perm.into_typed::<u8>(self.buffer.addr() as usize);
-
-            assert(equal(points_to.opt_value(), MemContents::Uninit));
-            //tracked_swap(&mut buffer_perm, self.buffer_perm.borrow_mut());
-        }
-
-        let ptr = self.buffer as *mut u8;
-        proof {
-            assert(equal(points_to.ptr() as usize, self.buffer as usize));
-            // FIXME: assume を取り除く
-            assume(equal(points_to.ptr() as *mut u8, self.buffer as *mut u8));
-        }
-        ptr_mut_write(ptr, Tracked(&mut points_to), 0);
-        assert(equal(points_to.opt_value(), MemContents::Init(0)));
-    }
-     */
-
-    // TODO: try_release を実装する
 }
 
 struct GrantW {
@@ -727,23 +674,23 @@ impl Producer {
         for idx in start..end_offset
             invariant
                 idx <= end_offset,
-                base_ptr as usize + end_offset * size_of::<u8>() <= usize::MAX + 1,
+                base_ptr as usize + end_offset <= usize::MAX + 1,
                 base_ptr@.provenance == self.vbq.instance@.provenance(),
                 forall |j: nat|
-                    j >= base_ptr as nat + idx * size_of::<u8>() as nat && j < base_ptr as nat + end_offset * size_of::<u8>() as nat
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + end_offset as nat
                         ==> (
                             granted_perms_map.contains_key(j)
                             //&& granted_perms_map.index(j as nat).ptr().addr() as nat == j as nat
                             //&& granted_perms_map.index(j as nat).ptr()@.provenance == base_ptr@.provenance
                         ),
                 forall |j: nat|
-                    j >= base_ptr as nat + idx * size_of::<u8>() as nat && j < base_ptr as nat + end_offset * size_of::<u8>() as nat
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + end_offset as nat
                         ==> (
                             granted_perms_map.index(j as nat).ptr().addr() as nat == j as nat
                             //&& granted_perms_map.index(j as nat).ptr()@.provenance == base_ptr@.provenance
                         ),
                 forall |j: nat|
-                    j >= base_ptr as nat + idx * size_of::<u8>() as nat && j < base_ptr as nat + end_offset * size_of::<u8>() as nat
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + end_offset as nat
                         ==> (
                             granted_perms_map.index(j).ptr()@.provenance == base_ptr@.provenance
                         ),
