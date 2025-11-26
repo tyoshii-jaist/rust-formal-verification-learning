@@ -570,15 +570,13 @@ impl VBBuffer
 struct GrantW {
     buf: Vec<*mut u8>,
     buf_perms: Tracked<Seq<raw_ptr::PointsTo<u8>>>,
-    sz: Tracked<usize>,
     vbq: Arc<VBBuffer>,
     to_commit: usize,
 }
 
 impl GrantW {
-    pub closed spec fn wf(&self) -> bool {
+    pub closed spec fn wf(&self, sz: nat) -> bool {
         let ghost Ghost(buf_perms) = self.buf_perms;
-        let ghost Ghost(sz) = self.sz;
         &&& self.buf.len() == sz && buf_perms.len() == sz
         &&& forall |i: int| 0 <= i && i < sz ==> self.buf[i] == buf_perms[i].ptr()
     }
@@ -592,7 +590,7 @@ impl Producer {
         ensures
             match r {
                 Ok(wgr) => {
-                    wgr.wf()
+                    wgr.wf(sz as nat)
                 },
                 _ => true
             }
@@ -750,7 +748,13 @@ impl Producer {
                             granted_perms_map.index(j).ptr()@.provenance == base_ptr@.provenance
                         ),
                 granted_buf.len() == (idx - start),
-                buf_perms.len() == (idx - start)
+                buf_perms.len() == (idx - start),
+                granted_buf.len() == buf_perms.len(),
+                forall |j: int|
+                    0 <= j && j < (idx - start) as int
+                        ==> (
+                            equal(granted_buf[j], buf_perms[j].ptr())
+                        ),
             decreases
                 end_offset - idx,
         {
@@ -772,7 +776,6 @@ impl Producer {
             GrantW {
                 buf: granted_buf,
                 buf_perms: Tracked(buf_perms),
-                sz: Tracked(sz),
                 vbq: self.vbq.clone(),
                 to_commit: sz,
             }
