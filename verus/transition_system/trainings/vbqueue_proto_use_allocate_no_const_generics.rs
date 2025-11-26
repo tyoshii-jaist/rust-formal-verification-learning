@@ -527,6 +527,66 @@ impl GrantW {
         &&& self.buf.len() == sz && buf_perms.len() == sz
         &&& forall |i: int| 0 <= i && i < sz ==> self.buf[i] == buf_perms[i].ptr()
     }
+
+    pub fn commit(mut self, used: usize) {
+        self.commit_inner(used);
+        // forget(self); // FIXME
+    }
+
+    pub(crate) fn commit_inner(&mut self, used: usize) {
+        // If there is no grant in progress, return early. This
+        // generally means we are dropping the grant within a
+        // wrapper structure
+        if !inner.write_in_progress.load(Acquire) {
+            return;
+        }
+
+        // Writer component. Must never write to READ,
+        // be careful writing to LAST
+
+        // Saturate the grant commit
+        let len = self.buf.len();
+        let used = min(len, used);
+
+        let write = inner.write.load(Acquire);
+        atomic::fetch_sub(&inner.reserve, len - used, AcqRel);
+
+        let max = N;
+        let last = inner.last.load(Acquire);
+        let new_write = inner.reserve.load(Acquire);
+
+        if (new_write < write) && (write != max) {
+            // We have already wrapped, but we are skipping some bytes at the end of the ring.
+            // Mark `last` where the write pointer used to be to hold the line here
+            inner.last.store(write, Release);
+        } else if new_write > last {
+            // We're about to pass the last pointer, which was previously the artificial
+            // end of the ring. Now that we've passed it, we can "unlock" the section
+            // that was previously skipped.
+            //
+            // Since new_write is strictly larger than last, it is safe to move this as
+            // the other thread will still be halted by the (about to be updated) write
+            // value
+            inner.last.store(max, Release);
+        }
+        // else: If new_write == last, either:
+        // * last == max, so no need to write, OR
+        // * If we write in the end chunk again, we'll update last to max next time
+        // * If we write to the start chunk in a wrap, we'll update last when we
+        //     move write backwards
+
+        // Write must be updated AFTER last, otherwise read could think it was
+        // time to invert early!
+        inner.write.store(new_write, Release);
+
+        // Allow subsequent grants
+        inner.write_in_progress.store(false, Release);
+    }
+
+    /// Configures the amount of bytes to be commited on drop.
+    pub fn to_commit(&mut self, amt: usize) {
+        self.to_commit = self.buf.len().min(amt);
+    }
 }
 
 impl Producer {
