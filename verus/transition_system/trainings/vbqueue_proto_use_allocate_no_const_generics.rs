@@ -241,6 +241,11 @@ pub enum ConsumerState {
         }
     }
 
+    transition!{
+        commit_start() {
+        }
+    }
+
     #[inductive(try_split)]
     fn try_split_inductive(pre: Self, post: Self) { }
 
@@ -265,6 +270,9 @@ pub enum ConsumerState {
         assert(post.producer is Reserved);
         assert(post.producer->Reserved_0.1 == post.reserve);
     }
+
+    #[inductive(commit_start)]
+    fn commit_start_inductive(pre: Self, post: Self) { }
 }}
 
 struct_with_invariants!{
@@ -537,7 +545,15 @@ impl GrantW {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
         // wrapper structure
-        if !inner.write_in_progress.load(Acquire) {
+        
+        let is_write_in_progress =
+            atomic_with_ghost!(&self.vbq.write_in_progress => load();
+                ghost write_in_progress_token => {
+                    let _ = self.vbq.instance.borrow().commit_start(&mut write_in_progress_token);
+                }
+        );
+
+        if !is_write_in_progress {
             return;
         }
 
@@ -545,7 +561,7 @@ impl GrantW {
         // be careful writing to LAST
 
         // Saturate the grant commit
-        let len = self.buf.len();
+        let len = self.vbq.length as usize;
         let used = min(len, used);
 
         let write = inner.write.load(Acquire);
