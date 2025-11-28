@@ -14,9 +14,10 @@ global layout u8 is size == 1, align == 1;
 
 pub enum ProducerState {
     Idle(nat),
-    WriteFilled(nat),
-    WriteAndReadFilled((nat, nat)), // (start, start + sz)
+    GrantWriteLoaded(nat),
+    GrantWriteAndReadLoaded((nat, nat)), // (start, start + sz)
     Reserved((nat, nat)), // (start, start + sz)
+    CommitWriteLoaded(nat),
 }
 
 pub enum ConsumerState {
@@ -101,8 +102,8 @@ pub enum ConsumerState {
     pub fn valid_producer_local_state(&self) -> bool {
         match self.producer {
             ProducerState::Idle(w) => self.write == w, //&& self.reserve == w,
-            ProducerState::WriteFilled(w) => self.write == w,
-            ProducerState::WriteAndReadFilled((w, _)) => self.write == w,
+            ProducerState::GrantWriteLoaded(w) => self.write == w,
+            ProducerState::GrantWriteAndReadLoaded((w, _)) => self.write == w,
             ProducerState::Reserved((_, r)) => self.reserve == r,
         }
     }
@@ -171,25 +172,25 @@ pub enum ConsumerState {
     }
 
     transition!{
-        grant_fill_write() {
+        grant_load_write() {
             require(pre.producer is Idle);
 
-            update producer = ProducerState::WriteFilled(pre.write);
+            update producer = ProducerState::GrantWriteLoaded(pre.write);
         }
     }
 
     transition!{
-        grant_fill_read() {
-            require(pre.producer is WriteFilled);
+        grant_load_read() {
+            require(pre.producer is GrantWriteLoaded);
 
-            update producer = ProducerState::WriteAndReadFilled((pre.producer->WriteFilled_0, pre.read));
+            update producer = ProducerState::GrantWriteAndReadLoaded((pre.producer->GrantWriteLoaded_0, pre.read));
         }
     }
 
     transition!{
         do_reserve(start: nat, sz: nat) {
             require(start + sz <= pre.length);
-            require(pre.producer is WriteAndReadFilled);
+            require(pre.producer is GrantWriteAndReadLoaded);
 
             update reserve = start + sz;
 
@@ -243,8 +244,27 @@ pub enum ConsumerState {
 
     transition!{
         commit_start() {
+            require(pre.producer is Reserved);
         }
     }
+
+    transition!{
+        commit_load_write() {
+            require(pre.producer is Reserved);
+
+            update producer = ProducerState::CommitWriteLoaded(pre.write);
+        }
+    }
+
+    transition!{
+        commit_sub_reserve(commited: nat) {
+            require(pre.producer is CommitWriteLoaded);
+
+            update reserve = pre.reserve - commited;
+
+            update producer = ProducerState::CommitReserveSubbed(reserve);
+        }
+    }    
 
     #[inductive(try_split)]
     fn try_split_inductive(pre: Self, post: Self) { }
@@ -252,14 +272,14 @@ pub enum ConsumerState {
     #[inductive(grant_start)]
     fn grant_start_inductive(pre: Self, post: Self) { }
 
-    #[inductive(grant_fill_write)]
-    fn grant_fill_write_inductive(pre: Self, post: Self) {
-        assert(post.producer is WriteFilled);
+    #[inductive(grant_load_write)]
+    fn grant_load_write_inductive(pre: Self, post: Self) {
+        assert(post.producer is GrantWriteLoaded);
     }
 
-    #[inductive(grant_fill_read)]
-    fn grant_fill_read_inductive(pre: Self, post: Self) {
-        assert(post.producer is WriteAndReadFilled);
+    #[inductive(grant_load_read)]
+    fn grant_load_read_inductive(pre: Self, post: Self) {
+        assert(post.producer is GrantWriteAndReadLoaded);
     }
 
     #[inductive(grant_end)]
@@ -561,13 +581,22 @@ impl GrantW {
         // be careful writing to LAST
 
         // Saturate the grant commit
-        let len = self.vbq.length as usize;
+        let len = self.buf.len();
         let used = min(len, used);
 
-        let write = inner.write.load(Acquire);
-        atomic::fetch_sub(&inner.reserve, len - used, AcqRel);
+        let write = atomic_with_ghost!(&self.vbq.write => load();
+            ghost write_token => {
+                let _ = self.vbq.instance.borrow().commit_load_write(&write_token, self.producer.borrow_mut());
+            }
+        );
 
-        let max = N;
+        atomic_with_ghost!(&self.vbq.reserve => fetch_sub(len - used);
+            ghost reserve_token => {
+                let _ = self.vbq.instance.borrow().commit_sub_reserve(&reserve_token, self.producer.borrow_mut());
+            }
+        );
+
+        let max = self.vbq.length as usize;;
         let last = inner.last.load(Acquire);
         let new_write = inner.reserve.load(Acquire);
 
@@ -639,13 +668,13 @@ impl Producer {
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
-                let _ = self.vbq.instance.borrow().grant_fill_write(&write_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().grant_load_write(&write_token, self.producer.borrow_mut());
             }
         );
 
         let read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
-                let _ = self.vbq.instance.borrow().grant_fill_read(&read_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().grant_load_read(&read_token, self.producer.borrow_mut());
             }
         );
         let max = self.vbq.length as usize;
