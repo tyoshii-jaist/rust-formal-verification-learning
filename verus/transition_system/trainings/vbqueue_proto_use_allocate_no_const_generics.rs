@@ -597,13 +597,26 @@ impl GrantW {
         );
 
         let max = self.vbq.length as usize;;
-        let last = inner.last.load(Acquire);
-        let new_write = inner.reserve.load(Acquire);
+        let last = atomic_with_ghost!(&self.vbq.last => load();
+            ghost last_token => {
+                let _ = self.vbq.instance.borrow().commit_load_last(&last_token, self.producer.borrow_mut());
+            }
+        );
+        
+        let new_write = atomic_with_ghost!(&self.vbq.reserve => load();
+            ghost reserve_token => {
+                let _ = self.vbq.instance.borrow().commit_load_reserve(&reserve_token, self.producer.borrow_mut());
+            }
+        );
 
         if (new_write < write) && (write != max) {
             // We have already wrapped, but we are skipping some bytes at the end of the ring.
             // Mark `last` where the write pointer used to be to hold the line here
-            inner.last.store(write, Release);
+            atomic_with_ghost!(&self.vbq.last => store(write);
+                ghost last_token => {
+                    let _ = self.vbq.instance.borrow().commit_store_last(&mut last_token);
+                }
+            );
         } else if new_write > last {
             // We're about to pass the last pointer, which was previously the artificial
             // end of the ring. Now that we've passed it, we can "unlock" the section
@@ -612,7 +625,11 @@ impl GrantW {
             // Since new_write is strictly larger than last, it is safe to move this as
             // the other thread will still be halted by the (about to be updated) write
             // value
-            inner.last.store(max, Release);
+            atomic_with_ghost!(&self.vbq.last => store(max);
+                ghost last_token => {
+                    let _ = self.vbq.instance.borrow().commit_store_last(&mut last_token);
+                }
+            );
         }
         // else: If new_write == last, either:
         // * last == max, so no need to write, OR
@@ -622,10 +639,19 @@ impl GrantW {
 
         // Write must be updated AFTER last, otherwise read could think it was
         // time to invert early!
-        inner.write.store(new_write, Release);
+        atomic_with_ghost!(&self.vbq.write => store(new_write);
+            ghost write_token => {
+                let _ = self.vbq.instance.borrow().commit_store_write(&mut write_token);
+            }
+        );
 
         // Allow subsequent grants
-        inner.write_in_progress.store(false, Release);
+        atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
+            ghost write_in_progress_token => {
+                let _ = self.vbq.instance.borrow().commit_end(&mut write_in_progress_token);
+                assert(write_in_progress_token.value() == false);
+            }
+        );
     }
 
     /// Configures the amount of bytes to be commited on drop.
