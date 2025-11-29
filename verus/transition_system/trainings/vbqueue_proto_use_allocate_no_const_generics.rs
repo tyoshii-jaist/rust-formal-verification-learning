@@ -8,6 +8,7 @@ use vstd::{prelude::*, *};
 //use vstd::modes::*;
 use vstd::layout::*;
 use std::sync::Arc;
+use core::cmp::min;
 
 verus! {
 global layout u8 is size == 1, align == 1;
@@ -18,6 +19,11 @@ pub enum ProducerState {
     GrantWriteAndReadLoaded((nat, nat)), // (start, start + sz)
     Reserved((nat, nat)), // (start, start + sz)
     CommitWriteLoaded(nat),
+    CommitReserveSubbed(nat),
+    CommitLastLoaded(nat),
+    CommitReserveLoaded((nat, nat)),
+    CommitLastStored(nat),
+    CommitWriteStored(nat),
 }
 
 pub enum ConsumerState {
@@ -259,10 +265,12 @@ pub enum ConsumerState {
     transition!{
         commit_sub_reserve(commited: nat) {
             require(pre.producer is CommitWriteLoaded);
+            require(pre.reserve >= commited);
 
-            update reserve = pre.reserve - commited;
+            let new_reserve = (pre.reserve - commited) as nat;
 
-            update producer = ProducerState::CommitReserveSubbed(reserve);
+            update reserve = new_reserve;
+            update producer = ProducerState::CommitReserveSubbed(new_reserve);
         }
     }    
 
@@ -270,7 +278,7 @@ pub enum ConsumerState {
         commit_load_last() {
             require(pre.producer is CommitReserveSubbed);
 
-            update producer = ProducerState::CommitLastLoaded();
+            update producer = ProducerState::CommitLastLoaded(pre.last);
         }
     }
 
@@ -278,23 +286,27 @@ pub enum ConsumerState {
         commit_load_reserve() {
             require(pre.producer is CommitLastLoaded);
 
-            update producer = ProducerState::CommitReserveLoaded();
+            update producer = ProducerState::CommitReserveLoaded((pre.producer->CommitLastLoaded_0, pre.reserve));
         }
     }
 
     transition!{
-        commit_store_last() {
+        commit_store_last(new_last: nat) {
             require(pre.producer is CommitReserveLoaded);
 
-            update producer = ProducerState::CommitLastStored();
+            update last = new_last;
+
+            update producer = ProducerState::CommitLastStored(new_last);
         }
     }
 
     transition!{
-        commit_store_write() {
+        commit_store_write(new_write: nat) {
             require(pre.producer is CommitLastStored);
 
-            update producer = ProducerState::CommitWriteStored();
+            update write = new_write;
+
+            update producer = ProducerState::CommitWriteStored(new_write);
         }
     }
 
@@ -302,7 +314,7 @@ pub enum ConsumerState {
         commit_end() {
             require(pre.producer is CommitWriteStored);
 
-            update producer = ProducerState::Idle();
+            update producer = ProducerState::Idle(pre.producer->CommitWriteStored_0);
             update write_in_progress = false;
         }
     }
@@ -339,7 +351,7 @@ pub enum ConsumerState {
     fn commit_load_write_inductive(pre: Self, post: Self) { }
 
     #[inductive(commit_sub_reserve)]
-    fn commit_sub_reserve_inductive(pre: Self, post: Self) { }
+    fn commit_sub_reserve_inductive(pre: Self, post: Self, commited: nat) { }
 
     #[inductive(commit_load_last)]
     fn commit_load_last_inductive(pre: Self, post: Self) { }
@@ -348,7 +360,10 @@ pub enum ConsumerState {
     fn commit_load_reserve_inductive(pre: Self, post: Self) { }
 
     #[inductive(commit_store_last)]
-    fn commit_store_last_inductive(pre: Self, post: Self) { }
+    fn commit_store_last_inductive(pre: Self, post: Self, new_last: nat) { }
+
+    #[inductive(commit_store_write)]
+    fn commit_store_write_inductive(pre: Self, post: Self, new_write: nat) { }
 
     #[inductive(commit_end)]
     fn commit_end_inductive(pre: Self, post: Self) { }
@@ -606,6 +621,7 @@ struct GrantW {
     buf_perms: Tracked<Seq<raw_ptr::PointsTo<u8>>>,
     vbq: Arc<VBBuffer>,
     to_commit: usize,
+    producer: Tracked<VBQueue::producer>,
 }
 
 impl GrantW {
@@ -628,7 +644,7 @@ impl GrantW {
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => load();
                 ghost write_in_progress_token => {
-                    let _ = self.vbq.instance.borrow().commit_start(&mut write_in_progress_token);
+                    let _ = self.vbq.instance.borrow().commit_start(self.producer.borrow_mut());
                 }
         );
 
@@ -651,11 +667,11 @@ impl GrantW {
 
         atomic_with_ghost!(&self.vbq.reserve => fetch_sub(len - used);
             ghost reserve_token => {
-                let _ = self.vbq.instance.borrow().commit_sub_reserve(&reserve_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, self.producer.borrow_mut());
             }
         );
 
-        let max = self.vbq.length as usize;;
+        let max = self.vbq.length as usize;
         let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
                 let _ = self.vbq.instance.borrow().commit_load_last(&last_token, self.producer.borrow_mut());
@@ -673,7 +689,7 @@ impl GrantW {
             // Mark `last` where the write pointer used to be to hold the line here
             atomic_with_ghost!(&self.vbq.last => store(write);
                 ghost last_token => {
-                    let _ = self.vbq.instance.borrow().commit_store_last(&mut last_token);
+                    let _ = self.vbq.instance.borrow().commit_store_last(write as nat, &mut last_token, self.producer.borrow_mut());
                 }
             );
         } else if new_write > last {
@@ -686,7 +702,7 @@ impl GrantW {
             // value
             atomic_with_ghost!(&self.vbq.last => store(max);
                 ghost last_token => {
-                    let _ = self.vbq.instance.borrow().commit_store_last(&mut last_token);
+                    let _ = self.vbq.instance.borrow().commit_store_last(max as nat, &mut last_token, self.producer.borrow_mut());
                 }
             );
         }
@@ -700,14 +716,14 @@ impl GrantW {
         // time to invert early!
         atomic_with_ghost!(&self.vbq.write => store(new_write);
             ghost write_token => {
-                let _ = self.vbq.instance.borrow().commit_store_write(&mut write_token);
+                let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, &mut write_token, self.producer.borrow_mut());
             }
         );
 
         // Allow subsequent grants
         atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
             ghost write_in_progress_token => {
-                let _ = self.vbq.instance.borrow().commit_end(&mut write_in_progress_token);
+                let _ = self.vbq.instance.borrow().commit_end(&mut write_in_progress_token, self.producer.borrow_mut());
                 assert(write_in_progress_token.value() == false);
             }
         );
@@ -915,6 +931,7 @@ impl Producer {
                 buf_perms: Tracked(buf_perms),
                 vbq: self.vbq.clone(),
                 to_commit: sz,
+                producer: Tracked(&self),
             }
         )
     }
