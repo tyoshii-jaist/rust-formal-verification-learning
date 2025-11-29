@@ -266,6 +266,47 @@ pub enum ConsumerState {
         }
     }    
 
+    transition!{
+        commit_load_last() {
+            require(pre.producer is CommitReserveSubbed);
+
+            update producer = ProducerState::CommitLastLoaded();
+        }
+    }
+
+    transition!{
+        commit_load_reserve() {
+            require(pre.producer is CommitLastLoaded);
+
+            update producer = ProducerState::CommitReserveLoaded();
+        }
+    }
+
+    transition!{
+        commit_store_last() {
+            require(pre.producer is CommitReserveLoaded);
+
+            update producer = ProducerState::CommitLastStored();
+        }
+    }
+
+    transition!{
+        commit_store_write() {
+            require(pre.producer is CommitLastStored);
+
+            update producer = ProducerState::CommitWriteStored();
+        }
+    }
+
+    transition!{
+        commit_end() {
+            require(pre.producer is CommitWriteStored);
+
+            update producer = ProducerState::Idle();
+            update write_in_progress = false;
+        }
+    }
+
     #[inductive(try_split)]
     fn try_split_inductive(pre: Self, post: Self) { }
 
@@ -293,6 +334,24 @@ pub enum ConsumerState {
 
     #[inductive(commit_start)]
     fn commit_start_inductive(pre: Self, post: Self) { }
+
+    #[inductive(commit_load_write)]
+    fn commit_load_write_inductive(pre: Self, post: Self) { }
+
+    #[inductive(commit_sub_reserve)]
+    fn commit_sub_reserve_inductive(pre: Self, post: Self) { }
+
+    #[inductive(commit_load_last)]
+    fn commit_load_last_inductive(pre: Self, post: Self) { }
+
+    #[inductive(commit_load_reserve)]
+    fn commit_load_reserve_inductive(pre: Self, post: Self) { }
+
+    #[inductive(commit_store_last)]
+    fn commit_store_last_inductive(pre: Self, post: Self) { }
+
+    #[inductive(commit_end)]
+    fn commit_end_inductive(pre: Self, post: Self) { }
 }}
 
 struct_with_invariants!{
