@@ -14,15 +14,15 @@ global layout u8 is size == 1, align == 1;
 
 pub enum ProducerState {
     Idle(nat),
-    GrantWriteLoaded(nat),
-    GrantWriteAndReadLoaded((nat, nat)), // (start, start + sz)
-    Reserved((nat, nat)), // (start, start + sz)
-    CommitWriteLoaded(nat),
-    CommitReserveSubbed(nat),
-    CommitLastLoaded(nat),
-    CommitReserveLoaded((nat, nat)),
-    CommitLastStored(nat),
-    CommitWriteStored(nat),
+    GrantWriteLoaded(nat), // write
+    GrantWriteAndReadLoaded((nat, nat)), // (write, read)
+    Reserved((nat, nat)), // (grant_start, grant_start + grant_sz)
+    CommitWriteLoaded((nat, nat, nat)),  // (grant_start, grant_start + grant_sz, write)
+    CommitReserveSubbed((nat, nat, nat)), // (grant_start, grant_start + grant_sz, write)
+    CommitLastLoaded((nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz, write, last)
+    CommitReserveLoaded((nat, nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz, write, last, reserve)
+    CommitLastStored((nat, nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz,  write, last, reserve),
+    CommitWriteStored((nat, nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz,  write, last, reserve),
 }
 
 pub enum ConsumerState {
@@ -79,10 +79,76 @@ pub enum ConsumerState {
     #[invariant]
     pub fn valid_storage_all(&self) -> bool {
         match self.producer {
-            ProducerState::Reserved((start, start_plus_sz)) => {
+            ProducerState::Reserved((grant_start, grant_end)) => {
                 forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + start as nat) || 
-                    (i >= self.base_addr + start_plus_sz && i < self.base_addr + self.length))
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
+            },
+            ProducerState::CommitWriteLoaded((grant_start, grant_end, _)) => {
+                forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
+            },
+            ProducerState::CommitReserveSubbed((grant_start, grant_end, _)) => {
+                forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
+            },
+            ProducerState::CommitLastLoaded((grant_start, grant_end, _, _)) => {
+                forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
+            },
+            ProducerState::CommitReserveLoaded((grant_start, grant_end, _, _, _)) => {
+                forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
+            },
+            ProducerState::CommitLastStored((grant_start, grant_end, _, _, _)) => {
+                forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
+            },
+            ProducerState::CommitWriteStored((grant_start, grant_end, _, _, _)) => {
+                forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
                         ==> (
                             self.storage.contains_key(i) &&
                             self.storage.dom().contains(i) &&
@@ -106,16 +172,16 @@ pub enum ConsumerState {
     #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
         match self.producer {
-            ProducerState::Idle(w) => self.write == w, //&& self.reserve == w,
-            ProducerState::GrantWriteLoaded(w) => self.write == w,
-            ProducerState::GrantWriteAndReadLoaded((w, _)) => self.write == w,
-            ProducerState::Reserved((_, r)) => self.reserve == r,
-            ProducerState::CommitWriteLoaded(_) => true,
-            ProducerState::CommitReserveSubbed(_) => true,
-            ProducerState::CommitLastLoaded(_) => true,
-            ProducerState::CommitReserveLoaded(_) => true,
-            ProducerState::CommitLastStored(_) => true,
-            ProducerState::CommitWriteStored(_) => true,
+            ProducerState::Idle(write) => self.write == write, //&& self.reserve == w,
+            ProducerState::GrantWriteLoaded(write) => self.write == write,
+            ProducerState::GrantWriteAndReadLoaded((write, _)) => self.write == write,
+            ProducerState::Reserved((_, reserve)) => self.reserve == reserve,
+            ProducerState::CommitWriteLoaded((_, _, write)) => self.write == write,
+            ProducerState::CommitReserveSubbed((_, _, write)) => self.write == write,
+            ProducerState::CommitLastLoaded((_, _, write, last)) => self.write == write && self.last == last,
+            ProducerState::CommitReserveLoaded((_, _, write, last, reserve)) => self.write == write && self.last == last && self.reserve == self.reserve,
+            ProducerState::CommitLastStored((_, _, write, last, reserve)) => self.write == write && self.last == last && self.reserve == self.reserve,
+            ProducerState::CommitWriteStored((_, _, write, last, reserve)) => self.write == write && self.last == last && self.reserve == self.reserve,
         }
     }
 
@@ -249,6 +315,8 @@ pub enum ConsumerState {
 
     transition!{
         grant_end() {
+            require(pre.producer is Reserved);
+
             update write_in_progress = false;
         }
     }
@@ -263,7 +331,7 @@ pub enum ConsumerState {
         commit_load_write() {
             require(pre.producer is Reserved);
 
-            update producer = ProducerState::CommitWriteLoaded(pre.write);
+            update producer = ProducerState::CommitWriteLoaded((pre.producer->Reserved_0.0, pre.producer->Reserved_0.1, pre.write));
         }
     }
 
@@ -275,7 +343,7 @@ pub enum ConsumerState {
             let new_reserve = (pre.reserve - commited) as nat;
 
             update reserve = new_reserve;
-            update producer = ProducerState::CommitReserveSubbed(new_reserve);
+            update producer = ProducerState::CommitReserveSubbed((pre.producer->CommitWriteLoaded_0.0, pre.producer->CommitWriteLoaded_0.1, pre.producer->CommitWriteLoaded_0.2));
         }
     }    
 
@@ -283,7 +351,9 @@ pub enum ConsumerState {
         commit_load_last() {
             require(pre.producer is CommitReserveSubbed);
 
-            update producer = ProducerState::CommitLastLoaded(pre.last);
+            update producer = ProducerState::CommitLastLoaded(
+                (pre.producer->CommitReserveSubbed_0.0, pre.producer->CommitReserveSubbed_0.1, pre.producer->CommitReserveSubbed_0.2, pre.last)
+            );
         }
     }
 
@@ -291,7 +361,9 @@ pub enum ConsumerState {
         commit_load_reserve() {
             require(pre.producer is CommitLastLoaded);
 
-            update producer = ProducerState::CommitReserveLoaded((pre.producer->CommitLastLoaded_0, pre.reserve));
+            update producer = ProducerState::CommitReserveLoaded(
+                (pre.producer->CommitLastLoaded_0.0, pre.producer->CommitLastLoaded_0.1, pre.producer->CommitLastLoaded_0.2, pre.producer->CommitLastLoaded_0.3, pre.reserve)
+            );
         }
     }
 
@@ -301,7 +373,9 @@ pub enum ConsumerState {
 
             update last = new_last;
 
-            update producer = ProducerState::CommitLastStored(new_last);
+            update producer = ProducerState::CommitLastStored(
+                (pre.producer->CommitReserveLoaded_0.0, pre.producer->CommitReserveLoaded_0.1, pre.producer->CommitReserveLoaded_0.2, new_last, pre.producer->CommitReserveLoaded_0.4)
+            );
         }
     }
 
@@ -311,15 +385,19 @@ pub enum ConsumerState {
 
             update write = new_write;
 
-            update producer = ProducerState::CommitWriteStored(new_write);
+            update producer = ProducerState::CommitWriteStored(
+                (pre.producer->CommitLastStored_0.0, pre.producer->CommitLastStored_0.1, new_write, pre.producer->CommitLastStored_0.3, pre.producer->CommitLastStored_0.4)
+            );
         }
     }
 
     transition!{
-        commit_end() {
+        commit_end(to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
             require(pre.producer is CommitWriteStored);
 
-            update producer = ProducerState::Idle(pre.producer->CommitWriteStored_0);
+            deposit storage += (to_deposit);
+
+            update producer = ProducerState::Idle(pre.producer->CommitWriteStored_0.2);
             update write_in_progress = false;
         }
     }
@@ -371,7 +449,7 @@ pub enum ConsumerState {
     fn commit_store_write_inductive(pre: Self, post: Self, new_write: nat) { }
 
     #[inductive(commit_end)]
-    fn commit_end_inductive(pre: Self, post: Self) { }
+    fn commit_end_inductive(pre: Self, post: Self, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) { }
 }}
 
 struct_with_invariants!{
@@ -621,24 +699,22 @@ impl VBBuffer
 
 struct GrantW {
     buf: Vec<*mut u8>,
-    buf_perms: Tracked<Seq<raw_ptr::PointsTo<u8>>>,
     vbq: Arc<VBBuffer>,
     to_commit: usize,
 }
 
 impl GrantW {
-    pub closed spec fn wf(&self, sz: nat) -> bool {
-        let ghost Ghost(buf_perms) = self.buf_perms;
+    pub closed spec fn wf(&self, sz: nat, Tracked(buf_perms): Tracked<Seq<raw_ptr::PointsTo<u8>>>) -> bool {
         &&& self.buf.len() == sz && buf_perms.len() == sz
         &&& forall |i: int| 0 <= i && i < sz ==> self.buf[i] == buf_perms[i].ptr()
     }
 
-    pub fn commit(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) {
-        self.commit_inner(used, Tracked(producer_token));
+    pub fn commit(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<Seq<raw_ptr::PointsTo<u8>>>) {
+        self.commit_inner(used, Tracked(producer_token), Tracked(buf_perms));
         // forget(self); // FIXME
     }
 
-    pub(crate) fn commit_inner(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) {
+    pub(crate) fn commit_inner(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<Seq<raw_ptr::PointsTo<u8>>>) {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
         // wrapper structure
@@ -725,7 +801,7 @@ impl GrantW {
         // Allow subsequent grants
         atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
             ghost write_in_progress_token => {
-                let _ = self.vbq.instance.borrow().commit_end(&mut write_in_progress_token, producer_token);
+                let _ = self.vbq.instance.borrow().commit_end(buf_perms, &mut write_in_progress_token, producer_token);
                 assert(write_in_progress_token.value() == false);
             }
         );
@@ -738,14 +814,14 @@ impl GrantW {
 }
 
 impl Producer {
-    fn grant_exact(&mut self, sz: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) -> (r: Result<GrantW, &'static str>)
+    fn grant_exact(&mut self, sz: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) -> (r: Result<(GrantW, Tracked<Seq<raw_ptr::PointsTo<u8>>>,), &'static str>)
         requires
             old(self).wf(),
             old(producer_token).value() is Idle,
         ensures
             match r {
-                Ok(wgr) => {
-                    wgr.wf(sz as nat)
+                Ok((wgr, buf_perms)) => {
+                    wgr.wf(sz as nat, buf_perms)
                 },
                 _ => true
             },
@@ -793,7 +869,7 @@ impl Producer {
                 // Inverted, no room is available
                 atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                     ghost write_in_progress_token => {
-                        let _ = self.vbq.instance.borrow().grant_end(&mut write_in_progress_token);
+                        let _ = self.vbq.instance.borrow().grant_end(&mut write_in_progress_token, producer_token);
                         assert(write_in_progress_token.value() == false);
                     }
                 );
@@ -816,7 +892,7 @@ impl Producer {
                     // Not invertible, no space
                     atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                         ghost write_in_progress_token => {
-                            let _ = self.vbq.instance.borrow().grant_end(&mut write_in_progress_token);
+                            let _ = self.vbq.instance.borrow().grant_end(&mut write_in_progress_token, producer_token);
                             assert(write_in_progress_token.value() == false);
                         }
                     );
@@ -929,12 +1005,13 @@ impl Producer {
         }
 
         Ok (
-            GrantW {
-                buf: granted_buf,
-                buf_perms: Tracked(buf_perms),
-                vbq: self.vbq.clone(),
-                to_commit: sz,
-            }
+            (
+                GrantW {
+                    buf: granted_buf,
+                    vbq: self.vbq.clone(),
+                    to_commit: sz,
+                }, Tracked(buf_perms)
+            ),
         )
     }
 }
@@ -950,8 +1027,8 @@ fn main() {
 
     // Request space for one byte
     match prod.grant_exact(2, Tracked(&mut producer_token)) {
-        Ok(wgr) => {
-            let Tracked(points_to_vec) = wgr.buf_perms;
+        Ok((wgr, buf_perms)) => {
+            let Tracked(points_to_vec) = buf_perms;
             let tracked points_to = points_to_vec.tracked_remove(0 as int);
             
             ptr_mut_write(wgr.buf[0], Tracked(&mut points_to), 5);
