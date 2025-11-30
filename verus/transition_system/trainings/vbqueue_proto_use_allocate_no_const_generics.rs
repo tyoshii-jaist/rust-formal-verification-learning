@@ -799,7 +799,7 @@ impl GrantW {
         );
         let tracked mut granted_perms_map = Map::<nat, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
         proof {
-
+            
         }
 
         // Allow subsequent grants
