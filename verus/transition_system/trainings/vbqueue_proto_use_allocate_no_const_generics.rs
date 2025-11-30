@@ -8,7 +8,6 @@ use vstd::{prelude::*, *};
 //use vstd::modes::*;
 use vstd::layout::*;
 use std::sync::Arc;
-use core::cmp::min;
 
 verus! {
 global layout u8 is size == 1, align == 1;
@@ -111,6 +110,12 @@ pub enum ConsumerState {
             ProducerState::GrantWriteLoaded(w) => self.write == w,
             ProducerState::GrantWriteAndReadLoaded((w, _)) => self.write == w,
             ProducerState::Reserved((_, r)) => self.reserve == r,
+            ProducerState::CommitWriteLoaded(_) => true,
+            ProducerState::CommitReserveSubbed(_) => true,
+            ProducerState::CommitLastLoaded(_) => true,
+            ProducerState::CommitReserveLoaded(_) => true,
+            ProducerState::CommitLastStored(_) => true,
+            ProducerState::CommitWriteStored(_) => true,
         }
     }
 
@@ -436,14 +441,11 @@ struct_with_invariants!{
 
 pub struct Producer {
     vbq: Arc<VBBuffer>,
-    producer: Tracked<VBQueue::producer>,
 }
 
 impl Producer {
     pub closed spec fn wf(&self) -> bool {
         (*self.vbq).wf()
-            && self.producer@.instance_id() == (*self.vbq).instance@.id()
-            && self.producer@.value() is Idle
             //&& (self.tail as int) < (*self.queue).buffer@.len()
     }
 }
@@ -570,17 +572,19 @@ impl VBBuffer
         }, Tracked(producer_token), Tracked(consumer_token))
     }
 
-    fn try_split(self, producer_token: Tracked<VBQueue::producer>, consumer_token: Tracked<VBQueue::consumer>) -> (res: Result<(Producer, Consumer),  &'static str>)
+    fn try_split(self, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(consumer_token): Tracked<VBQueue::consumer>) -> (res: Result<(Producer, Consumer),  &'static str>)
         requires
             self.wf(),
-            producer_token@.instance_id() == self.instance@.id(),
-            producer_token@.value() is Idle,
+            old(producer_token).instance_id() == self.instance@.id(),
+            old(producer_token).value() is Idle,
         ensures
             self.wf(),
             match res {
                 Ok((prod, cons)) => prod.wf(), //&& cons.vbq.wf(),
                 Err(_) => true
-            }
+            },
+            producer_token.instance_id() == self.instance@.id(),
+            producer_token.value() is Idle,
     {
         let already_splitted =
             atomic_with_ghost!(&self.already_split => swap(true);
@@ -607,7 +611,6 @@ impl VBBuffer
         Ok((
             Producer {
                 vbq: vbbuffer_arc.clone(),
-                producer: producer_token,
             },
             Consumer {
                 vbq: vbbuffer_arc.clone(),
@@ -621,7 +624,6 @@ struct GrantW {
     buf_perms: Tracked<Seq<raw_ptr::PointsTo<u8>>>,
     vbq: Arc<VBBuffer>,
     to_commit: usize,
-    producer: Tracked<VBQueue::producer>,
 }
 
 impl GrantW {
@@ -631,12 +633,12 @@ impl GrantW {
         &&& forall |i: int| 0 <= i && i < sz ==> self.buf[i] == buf_perms[i].ptr()
     }
 
-    pub fn commit(mut self, used: usize) {
-        self.commit_inner(used);
+    pub fn commit(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) {
+        self.commit_inner(used, Tracked(producer_token));
         // forget(self); // FIXME
     }
 
-    pub(crate) fn commit_inner(&mut self, used: usize) {
+    pub(crate) fn commit_inner(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
         // wrapper structure
@@ -644,7 +646,7 @@ impl GrantW {
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => load();
                 ghost write_in_progress_token => {
-                    let _ = self.vbq.instance.borrow().commit_start(self.producer.borrow_mut());
+                    let _ = self.vbq.instance.borrow().commit_start(producer_token);
                 }
         );
 
@@ -657,30 +659,30 @@ impl GrantW {
 
         // Saturate the grant commit
         let len = self.buf.len();
-        let used = min(len, used);
+        let used = if len <= used { len } else { used }; // min の代用。
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
-                let _ = self.vbq.instance.borrow().commit_load_write(&write_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().commit_load_write(&write_token, producer_token);
             }
         );
 
         atomic_with_ghost!(&self.vbq.reserve => fetch_sub(len - used);
             ghost reserve_token => {
-                let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, producer_token);
             }
         );
 
         let max = self.vbq.length as usize;
         let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
-                let _ = self.vbq.instance.borrow().commit_load_last(&last_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().commit_load_last(&last_token, producer_token);
             }
         );
         
         let new_write = atomic_with_ghost!(&self.vbq.reserve => load();
             ghost reserve_token => {
-                let _ = self.vbq.instance.borrow().commit_load_reserve(&reserve_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().commit_load_reserve(&reserve_token, producer_token);
             }
         );
 
@@ -689,7 +691,7 @@ impl GrantW {
             // Mark `last` where the write pointer used to be to hold the line here
             atomic_with_ghost!(&self.vbq.last => store(write);
                 ghost last_token => {
-                    let _ = self.vbq.instance.borrow().commit_store_last(write as nat, &mut last_token, self.producer.borrow_mut());
+                    let _ = self.vbq.instance.borrow().commit_store_last(write as nat, &mut last_token, producer_token);
                 }
             );
         } else if new_write > last {
@@ -702,7 +704,7 @@ impl GrantW {
             // value
             atomic_with_ghost!(&self.vbq.last => store(max);
                 ghost last_token => {
-                    let _ = self.vbq.instance.borrow().commit_store_last(max as nat, &mut last_token, self.producer.borrow_mut());
+                    let _ = self.vbq.instance.borrow().commit_store_last(max as nat, &mut last_token, producer_token);
                 }
             );
         }
@@ -716,14 +718,14 @@ impl GrantW {
         // time to invert early!
         atomic_with_ghost!(&self.vbq.write => store(new_write);
             ghost write_token => {
-                let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, &mut write_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, &mut write_token, producer_token);
             }
         );
 
         // Allow subsequent grants
         atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
             ghost write_in_progress_token => {
-                let _ = self.vbq.instance.borrow().commit_end(&mut write_in_progress_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().commit_end(&mut write_in_progress_token, producer_token);
                 assert(write_in_progress_token.value() == false);
             }
         );
@@ -736,17 +738,18 @@ impl GrantW {
 }
 
 impl Producer {
-    fn grant_exact(&mut self, sz: usize) -> (r: Result<GrantW, &'static str>)
+    fn grant_exact(&mut self, sz: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) -> (r: Result<GrantW, &'static str>)
         requires
             old(self).wf(),
-            old(self).producer@.value() is Idle,
+            old(producer_token).value() is Idle,
         ensures
             match r {
                 Ok(wgr) => {
                     wgr.wf(sz as nat)
                 },
                 _ => true
-            }
+            },
+            producer_token.value() is Reserved,
     {
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => swap(true);
@@ -769,13 +772,13 @@ impl Producer {
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
-                let _ = self.vbq.instance.borrow().grant_load_write(&write_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().grant_load_write(&write_token, producer_token);
             }
         );
 
         let read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
-                let _ = self.vbq.instance.borrow().grant_load_read(&read_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().grant_load_read(&read_token, producer_token);
             }
         );
         let max = self.vbq.length as usize;
@@ -836,7 +839,7 @@ impl Producer {
         atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
             ghost reserve_token => {
                 // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
-                let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, self.producer.borrow_mut());
+                let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, producer_token);
                 granted_perms_map = ret.1.get();
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
                 assert(
@@ -931,7 +934,6 @@ impl Producer {
                 buf_perms: Tracked(buf_perms),
                 vbq: self.vbq.clone(),
                 to_commit: sz,
-                producer: Tracked(&self),
             }
         )
     }
@@ -939,7 +941,7 @@ impl Producer {
 
 fn main() {
     let (vbuf, Tracked(producer_token), Tracked(consumer_token)) = VBBuffer::new(6);
-    let (mut prod, mut cons) = match vbuf.try_split(Tracked(producer_token), Tracked(consumer_token)) {
+    let (mut prod, mut cons) = match vbuf.try_split(Tracked(&mut producer_token), Tracked(consumer_token)) {
         Ok((prod, cons)) => (prod, cons),
         Err(_) => {
             return;
@@ -947,7 +949,7 @@ fn main() {
     };
 
     // Request space for one byte
-    match prod.grant_exact(2) {
+    match prod.grant_exact(2, Tracked(&mut producer_token)) {
         Ok(wgr) => {
             let Tracked(points_to_vec) = wgr.buf_perms;
             let tracked points_to = points_to_vec.tracked_remove(0 as int);
