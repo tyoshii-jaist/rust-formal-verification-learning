@@ -797,6 +797,10 @@ impl GrantW {
                 let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, &mut write_token, producer_token);
             }
         );
+        let tracked mut granted_perms_map = Map::<nat, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
+        proof {
+
+        }
 
         // Allow subsequent grants
         atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
