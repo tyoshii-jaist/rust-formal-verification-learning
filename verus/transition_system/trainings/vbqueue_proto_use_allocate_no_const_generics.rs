@@ -805,6 +805,14 @@ impl GrantW {
         for l in 0..len
             invariant
                 l <= len,
+                forall |i: nat|
+                    i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
+                        ==> granted_perms_map.contains_key(i),
+                forall |i: nat|
+                    i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
+                        ==> (granted_perms_map.index(i as nat).ptr() as nat == i as nat
+                            && granted_perms_map.index(i as nat).ptr()@.provenance == self.vbq.instance@.provenance()),
+
             decreases
                 len - l,
         {
