@@ -396,7 +396,10 @@ pub enum ConsumerState {
         commit_end(to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
             require(pre.producer is CommitWriteStored);
 
-            deposit storage += (to_deposit);
+            deposit storage += (to_deposit) by {
+                assume(forall |i: nat| to_deposit.contains_key(i)
+                        ==> !pre.storage.contains_key(i));
+            };
 
             update producer = ProducerState::Idle(pre.producer->CommitWriteStored_0.2);
             update write_in_progress = false;
@@ -710,12 +713,22 @@ impl GrantW {
         &&& forall |i: int| 0 <= i && i < sz ==> self.buf[i] == buf_perms[i].ptr()
     }
 
-    pub fn commit(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<&mut Seq<raw_ptr::PointsTo<u8>>>) {
+    pub fn commit(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<&mut Seq<raw_ptr::PointsTo<u8>>>)
+        requires
+            old(producer_token).value() is Reserved,
+        ensures
+            producer_token.value() is Idle,
+    {
         self.commit_inner(used, Tracked(producer_token), Tracked(buf_perms));
         // forget(self); // FIXME
     }
 
-    pub(crate) fn commit_inner(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<&mut Seq<raw_ptr::PointsTo<u8>>>) {
+    pub(crate) fn commit_inner(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<&mut Seq<raw_ptr::PointsTo<u8>>>)
+        requires
+            old(producer_token).value() is Reserved,
+        ensures
+            producer_token.value() is Idle,
+    {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
         // wrapper structure
@@ -798,6 +811,7 @@ impl GrantW {
                 let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, &mut write_token, producer_token);
             }
         );
+
         let tracked mut granted_perms_map = Map::<nat, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
         proof {
             assert(len as nat == buf_perms.len());
@@ -805,6 +819,7 @@ impl GrantW {
         for l in 0..len
             invariant
                 l <= len,
+                buf_perms.len() == len - l,
                 forall |i: nat|
                     i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
                         ==> granted_perms_map.contains_key(i),
@@ -817,7 +832,7 @@ impl GrantW {
                 len - l,
         {
             proof {
-                let points_to = buf_perms.tracked_remove(l as int);
+                let points_to = buf_perms.tracked_remove(0);
                 granted_perms_map.insert(points_to.ptr().addr() as nat, points_to);
             }
         }
