@@ -78,6 +78,7 @@ pub enum ConsumerState {
 
     #[invariant]
     pub fn valid_storage_all(&self) -> bool {
+        // match 節は統合することもできるが、そうすると SMT solver が flaky エラーを吐くのでばらしている。
         match self.producer {
             ProducerState::Reserved((grant_start, grant_end)) => {
                 forall |i: nat|
@@ -704,17 +705,17 @@ struct GrantW {
 }
 
 impl GrantW {
-    pub closed spec fn wf(&self, sz: nat, Tracked(buf_perms): Tracked<Seq<raw_ptr::PointsTo<u8>>>) -> bool {
+    pub closed spec fn wf(&self, sz: nat, buf_perms: Seq<raw_ptr::PointsTo<u8>>) -> bool {
         &&& self.buf.len() == sz && buf_perms.len() == sz
         &&& forall |i: int| 0 <= i && i < sz ==> self.buf[i] == buf_perms[i].ptr()
     }
 
-    pub fn commit(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<Seq<raw_ptr::PointsTo<u8>>>) {
+    pub fn commit(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<&mut Seq<raw_ptr::PointsTo<u8>>>) {
         self.commit_inner(used, Tracked(producer_token), Tracked(buf_perms));
         // forget(self); // FIXME
     }
 
-    pub(crate) fn commit_inner(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<Seq<raw_ptr::PointsTo<u8>>>) {
+    pub(crate) fn commit_inner(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<&mut Seq<raw_ptr::PointsTo<u8>>>) {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
         // wrapper structure
@@ -799,13 +800,24 @@ impl GrantW {
         );
         let tracked mut granted_perms_map = Map::<nat, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
         proof {
-            
+            assert(len as nat == buf_perms.len());
+        }
+        for l in 0..len
+            invariant
+                l <= len,
+            decreases
+                len - l,
+        {
+            proof {
+                let points_to = buf_perms.tracked_remove(l as int);
+                granted_perms_map.insert(points_to.ptr().addr() as nat, points_to);
+            }
         }
 
         // Allow subsequent grants
         atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
             ghost write_in_progress_token => {
-                let _ = self.vbq.instance.borrow().commit_end(buf_perms, &mut write_in_progress_token, producer_token);
+                let _ = self.vbq.instance.borrow().commit_end(granted_perms_map, granted_perms_map, &mut write_in_progress_token, producer_token);
                 assert(write_in_progress_token.value() == false);
             }
         );
@@ -825,6 +837,7 @@ impl Producer {
         ensures
             match r {
                 Ok((wgr, buf_perms)) => {
+                    let Ghost(buf_perms) = buf_perms;
                     wgr.wf(sz as nat, buf_perms)
                 },
                 _ => true
