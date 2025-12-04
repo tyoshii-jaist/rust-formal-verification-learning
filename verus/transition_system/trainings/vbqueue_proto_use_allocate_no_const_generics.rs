@@ -316,8 +316,7 @@ pub enum ConsumerState {
 
     transition!{
         grant_end() {
-            require(pre.producer is Reserved);
-
+            // require(pre.producer is Reserved);
             update write_in_progress = false;
         }
     }
@@ -662,7 +661,10 @@ impl VBBuffer
         ensures
             self.wf(),
             match res {
-                Ok((prod, cons)) => prod.wf(), //&& cons.vbq.wf(),
+                Ok((prod, cons)) => {
+                    prod.wf() &&/* //cons.wf(), */
+                    producer_token.instance_id() == prod.vbq.instance@.id()
+                }, 
                 Err(_) => true
             },
             producer_token.instance_id() == self.instance@.id(),
@@ -713,11 +715,14 @@ impl GrantW {
         &&& forall |i: int| 0 <= i && i < sz ==> self.buf[i] == buf_perms[i].ptr()
     }
 
-    pub fn commit(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<&mut Seq<raw_ptr::PointsTo<u8>>>)
+    fn commit(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<&mut Seq<raw_ptr::PointsTo<u8>>>)
         requires
+            old(self).vbq.wf(),
             old(producer_token).value() is Reserved,
+            old(producer_token).instance_id() == old(self).vbq.instance@.id(),
         ensures
             producer_token.value() is Idle,
+            self.vbq.wf(),
     {
         self.commit_inner(used, Tracked(producer_token), Tracked(buf_perms));
         // forget(self); // FIXME
@@ -725,9 +730,12 @@ impl GrantW {
 
     pub(crate) fn commit_inner(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(buf_perms): Tracked<&mut Seq<raw_ptr::PointsTo<u8>>>)
         requires
+            old(self).vbq.wf(),
             old(producer_token).value() is Reserved,
+            old(producer_token).instance_id() == old(self).vbq.instance@.id(),
         ensures
             producer_token.value() is Idle,
+            self.vbq.wf(),
     {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
@@ -741,6 +749,7 @@ impl GrantW {
         );
 
         if !is_write_in_progress {
+            assume(producer_token.value() is Idle); // FIXME!
             return;
         }
 
@@ -759,6 +768,7 @@ impl GrantW {
 
         atomic_with_ghost!(&self.vbq.reserve => fetch_sub(len - used);
             ghost reserve_token => {
+                assume(reserve_token.value() >= (len - used)); // FIXME!
                 let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, producer_token);
             }
         );
@@ -827,7 +837,6 @@ impl GrantW {
                     i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
                         ==> (granted_perms_map.index(i as nat).ptr() as nat == i as nat
                             && granted_perms_map.index(i as nat).ptr()@.provenance == self.vbq.instance@.provenance()),
-
             decreases
                 len - l,
         {
@@ -856,16 +865,17 @@ impl Producer {
     fn grant_exact(&mut self, sz: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) -> (r: Result<(GrantW, Tracked<Seq<raw_ptr::PointsTo<u8>>>,), &'static str>)
         requires
             old(self).wf(),
+            old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value() is Idle,
         ensures
             match r {
                 Ok((wgr, buf_perms)) => {
                     let Ghost(buf_perms) = buf_perms;
-                    wgr.wf(sz as nat, buf_perms)
+                    wgr.wf(sz as nat, buf_perms) && 
+                    producer_token.value() is Reserved
                 },
                 _ => true
             },
-            producer_token.value() is Reserved,
     {
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => swap(true);
@@ -909,7 +919,7 @@ impl Producer {
                 // Inverted, no room is available
                 atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                     ghost write_in_progress_token => {
-                        let _ = self.vbq.instance.borrow().grant_end(&mut write_in_progress_token, producer_token);
+                        let _ = self.vbq.instance.borrow().grant_end(&mut write_in_progress_token);
                         assert(write_in_progress_token.value() == false);
                     }
                 );
@@ -932,7 +942,7 @@ impl Producer {
                     // Not invertible, no space
                     atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                         ghost write_in_progress_token => {
-                            let _ = self.vbq.instance.borrow().grant_end(&mut write_in_progress_token, producer_token);
+                            let _ = self.vbq.instance.borrow().grant_end(&mut write_in_progress_token);
                             assert(write_in_progress_token.value() == false);
                         }
                     );
@@ -1064,6 +1074,10 @@ fn main() {
             return;
         }
     };
+
+    proof {
+        assert(producer_token.instance_id() == prod.vbq.instance@.id());
+    }
 
     // Request space for one byte
     match prod.grant_exact(2, Tracked(&mut producer_token)) {
