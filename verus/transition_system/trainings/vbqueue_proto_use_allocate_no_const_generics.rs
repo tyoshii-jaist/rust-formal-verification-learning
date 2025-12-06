@@ -21,8 +21,6 @@ pub enum ProducerState {
     CommitReserveSubbed((nat, nat, nat)), // (grant_start, grant_start + grant_sz, write)
     CommitLastLoaded((nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz, write, last)
     CommitReserveLoaded((nat, nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz, write, last, reserve)
-    CommitLastStored((nat, nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz,  write, last, reserve),
-    CommitWriteStored((nat, nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz,  write, last, reserve),
 }
 
 pub enum ConsumerState {
@@ -80,92 +78,41 @@ pub enum ConsumerState {
     pub fn valid_storage_all(&self) -> bool {
         // match 節は統合することもできるが、そうすると SMT solver が flaky エラーを吐くのでばらしている。
         match self.producer {
-            ProducerState::Reserved((grant_start, grant_end)) => {
-                forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
-                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
-                        ==> (
-                            self.storage.contains_key(i) &&
-                            self.storage.dom().contains(i) &&
-                            self.storage.index(i).ptr().addr() == i &&
-                            self.storage.index(i).ptr()@.provenance == self.provenance
-                        )            
-            },
-            ProducerState::CommitWriteLoaded((grant_start, grant_end, _)) => {
-                forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
-                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
-                        ==> (
-                            self.storage.contains_key(i) &&
-                            self.storage.dom().contains(i) &&
-                            self.storage.index(i).ptr().addr() == i &&
-                            self.storage.index(i).ptr()@.provenance == self.provenance
-                        )            
-            },
-            ProducerState::CommitReserveSubbed((grant_start, grant_end, _)) => {
-                forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
-                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
-                        ==> (
-                            self.storage.contains_key(i) &&
-                            self.storage.dom().contains(i) &&
-                            self.storage.index(i).ptr().addr() == i &&
-                            self.storage.index(i).ptr()@.provenance == self.provenance
-                        )            
-            },
-            ProducerState::CommitLastLoaded((grant_start, grant_end, _, _)) => {
-                forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
-                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
-                        ==> (
-                            self.storage.contains_key(i) &&
-                            self.storage.dom().contains(i) &&
-                            self.storage.index(i).ptr().addr() == i &&
-                            self.storage.index(i).ptr()@.provenance == self.provenance
-                        )            
-            },
+            ProducerState::Reserved((grant_start, grant_end)) |
+            ProducerState::CommitWriteLoaded((grant_start, grant_end, _)) |
+            ProducerState::CommitReserveSubbed((grant_start, grant_end, _)) |
+            ProducerState::CommitLastLoaded((grant_start, grant_end, _, _)) |
             ProducerState::CommitReserveLoaded((grant_start, grant_end, _, _, _)) => {
-                forall |i: nat|
+                &&& forall |i: nat|
                     ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
                     (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
                         ==> (
-                            self.storage.contains_key(i) &&
-                            self.storage.dom().contains(i) &&
-                            self.storage.index(i).ptr().addr() == i &&
-                            self.storage.index(i).ptr()@.provenance == self.provenance
-                        )            
-            },
-            ProducerState::CommitLastStored((grant_start, grant_end, _, _, _)) => {
-                forall |i: nat|
+                            self.storage.contains_key(i)
+                        )
+                &&& forall |i: nat|
                     ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
                     (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
                         ==> (
-                            self.storage.contains_key(i) &&
-                            self.storage.dom().contains(i) &&
-                            self.storage.index(i).ptr().addr() == i &&
-                            self.storage.index(i).ptr()@.provenance == self.provenance
-                        )            
-            },
-            ProducerState::CommitWriteStored((grant_start, grant_end, _, _, _)) => {
-                forall |i: nat|
+                            self.storage.dom().contains(i)
+                        )
+                &&& forall |i: nat|
                     ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
                     (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
                         ==> (
-                            self.storage.contains_key(i) &&
-                            self.storage.dom().contains(i) &&
-                            self.storage.index(i).ptr().addr() == i &&
-                            self.storage.index(i).ptr()@.provenance == self.provenance
-                        )            
-            },
-            _ => {
-                forall |i: nat|
-                    i >= self.base_addr && i < self.base_addr + self.length
+                            self.storage.index(i).ptr().addr() == i
+                        )
+                &&& forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
                         ==> (
-                            self.storage.contains_key(i) &&
-                            self.storage.dom().contains(i) &&
-                            self.storage.index(i).ptr().addr() == i &&
                             self.storage.index(i).ptr()@.provenance == self.provenance
                         )
+            },
+            _ => {
+                &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.contains_key(i)
+                &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.dom().contains(i)
+                &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.index(i).ptr().addr() == i
+                &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.index(i).ptr()@.provenance == self.provenance
             },
         }
     }
@@ -181,8 +128,6 @@ pub enum ConsumerState {
             ProducerState::CommitReserveSubbed((_, _, write)) => self.write == write,
             ProducerState::CommitLastLoaded((_, _, write, last)) => self.write == write && self.last == last,
             ProducerState::CommitReserveLoaded((_, _, write, last, reserve)) => self.write == write && self.last == last && self.reserve == self.reserve,
-            ProducerState::CommitLastStored((_, _, write, last, reserve)) => self.write == write && self.last == last && self.reserve == self.reserve,
-            ProducerState::CommitWriteStored((_, _, write, last, reserve)) => self.write == write && self.last == last && self.reserve == self.reserve,
         }
     }
 
@@ -195,13 +140,12 @@ pub enum ConsumerState {
             buffer_dealloc: raw_ptr::Dealloc)
         {
             require(
-                forall |i: nat|
-                    i >= base_addr && i < base_addr + length as nat
-                        ==> (
-                            storage.contains_key(i) &&
-                            storage.index(i).ptr().addr() == i &&
-                            storage.index(i).ptr()@.provenance == provenance
-                        )
+                {
+                    &&& forall |i: nat| i >= base_addr && i < base_addr + length ==> storage.contains_key(i)
+                    &&& forall |i: nat| i >= base_addr && i < base_addr + length ==> storage.dom().contains(i)
+                    &&& forall |i: nat| i >= base_addr && i < base_addr + length ==> storage.index(i).ptr().addr() == i
+                    &&& forall |i: nat| i >= base_addr && i < base_addr + length ==> storage.index(i).ptr()@.provenance == provenance
+                }
             );
 
             init base_addr = base_addr;
@@ -225,12 +169,8 @@ pub enum ConsumerState {
     
     #[inductive(initialize)]
     fn initialize_inductive(post: Self, base_addr: nat, provenance: raw_ptr::Provenance, length: nat, storage: Map<nat, raw_ptr::PointsTo<u8>>, buffer_dealloc: raw_ptr::Dealloc) {
+        assert(post.producer is Idle);
         assert(post.buffer_dealloc is Some);
-        assert(
-            forall |i: nat|
-                i >= post.base_addr && i < post.base_addr + post.length as nat
-                    ==> post.storage.contains_key(i)
-        );
     }
 
     transition!{
@@ -277,7 +217,7 @@ pub enum ConsumerState {
             birds_eye let withdraw_range_map = pre.storage.restrict(range_keys);
 
             withdraw storage -= (withdraw_range_map) by {
-                assert (withdraw_range_map.submap_of(pre.storage)) by {
+                assert(withdraw_range_map.submap_of(pre.storage)) by {
                     // assert(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz  + pre.base_addr).subset_of(Set::new(|i: nat| i >= pre.base_addr && i < pre.base_addr + pre.length)));
                     // assert(Set::new(|i: nat| i >= pre.base_addr && i < pre.base_addr + pre.length).subset_of(pre.storage.dom()));
                     assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr)));
@@ -373,7 +313,7 @@ pub enum ConsumerState {
 
             update last = new_last;
 
-            update producer = ProducerState::CommitLastStored(
+            update producer = ProducerState::CommitReserveLoaded(
                 (pre.producer->CommitReserveLoaded_0.0, pre.producer->CommitReserveLoaded_0.1, pre.producer->CommitReserveLoaded_0.2, new_last, pre.producer->CommitReserveLoaded_0.4)
             );
         }
@@ -381,26 +321,26 @@ pub enum ConsumerState {
 
     transition!{
         commit_store_write(new_write: nat) {
-            require(pre.producer is CommitLastStored);
+            require(pre.producer is CommitReserveLoaded);
 
             update write = new_write;
 
-            update producer = ProducerState::CommitWriteStored(
-                (pre.producer->CommitLastStored_0.0, pre.producer->CommitLastStored_0.1, new_write, pre.producer->CommitLastStored_0.3, pre.producer->CommitLastStored_0.4)
+            update producer = ProducerState::CommitReserveLoaded(
+                (pre.producer->CommitReserveLoaded_0.0, pre.producer->CommitReserveLoaded_0.1, new_write, pre.producer->CommitReserveLoaded_0.3, pre.producer->CommitReserveLoaded_0.4)
             );
         }
     }
 
     transition!{
         commit_end(to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
-            require(pre.producer is CommitWriteStored);
+            require(pre.producer is CommitReserveLoaded);
 
             deposit storage += (to_deposit) by {
                 assume(forall |i: nat| to_deposit.contains_key(i)
                         ==> !pre.storage.contains_key(i));
             };
 
-            update producer = ProducerState::Idle(pre.producer->CommitWriteStored_0.2);
+            update producer = ProducerState::Idle(pre.producer->CommitReserveLoaded_0.2);
             update write_in_progress = false;
         }
     }
@@ -452,7 +392,16 @@ pub enum ConsumerState {
     fn commit_store_write_inductive(pre: Self, post: Self, new_write: nat) { }
 
     #[inductive(commit_end)]
-    fn commit_end_inductive(pre: Self, post: Self, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) { }
+    fn commit_end_inductive(pre: Self, post: Self, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
+        assume(
+            {
+                &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.contains_key(i)
+                &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.dom().contains(i)
+                &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i
+                &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance
+            }
+        );
+    }
 }}
 
 struct_with_invariants!{
@@ -586,8 +535,13 @@ impl VBBuffer
                         ==> points_to_map.contains_key(i),
                 forall |i: nat|
                     i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
-                        ==> (points_to_map.index(i as nat).ptr() as nat == i as nat
-                            && points_to_map.index(i as nat).ptr()@.provenance == buffer_perm.provenance()),
+                        ==> points_to_map.dom().contains(i),
+                forall |i: nat|
+                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
+                        ==> points_to_map.index(i as nat).ptr() as nat == i as nat,
+                forall |i: nat|
+                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
+                        ==> points_to_map.index(i as nat).ptr()@.provenance == buffer_perm.provenance(),
                 buffer_ptr@.provenance == buffer_perm.provenance(),
             decreases
                 length - len,
@@ -831,18 +785,40 @@ impl GrantW {
         let tracked mut granted_perms_map = Map::<nat, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
         proof {
             assert(self.buf.len() == self.buf_perms@.len());
+            /*
+            assert(
+                {
+                    &&& forall |i: nat|
+                        i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + len as nat
+                            ==> granted_perms_map.contains_key(i)
+                    &&& forall |i: nat|
+                        i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + len as nat
+                            ==> granted_perms_map.index(i as nat).ptr() as nat == i as nat
+                    &&& forall |i: nat|
+                        i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + len as nat
+                            ==> granted_perms_map.index(i as nat).ptr()@.provenance == self.vbq.instance@.provenance()
+                }
+            );
+             */
         }
         for l in 0..len
             invariant
                 l <= len,
                 self.buf_perms@.len() == len - l,
+                /*
                 forall |i: nat|
                     i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
                         ==> granted_perms_map.contains_key(i),
                 forall |i: nat|
                     i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
-                        ==> (granted_perms_map.index(i as nat).ptr() as nat == i as nat
-                            && granted_perms_map.index(i as nat).ptr()@.provenance == self.vbq.instance@.provenance()),
+                        ==> granted_perms_map.index(i as nat).ptr() as nat == i as nat,
+                forall |i: nat|
+                    i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
+                        ==> granted_perms_map.index(i as nat).ptr()@.provenance == self.vbq.instance@.provenance(),
+                */
+                self.vbq.wf(),
+                producer_token.instance_id() == self.vbq.instance@.id(),
+                //producer_token.value() is Idle,
             decreases
                 len - l,
         {
