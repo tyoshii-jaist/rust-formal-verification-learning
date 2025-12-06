@@ -14,9 +14,15 @@ global layout u8 is size == 1, align == 1;
 
 pub enum ProducerState {
     Idle(nat),
-    WriteFilled(nat),
-    WriteAndReadFilled((nat, nat)), // (start, start + sz)
-    Reserved((nat, nat)), // (start, start + sz)
+    GrantWriteLoaded(nat), // write
+    GrantWriteAndReadLoaded((nat, nat)), // (write, read)
+    Reserved((nat, nat)), // (grant_start, grant_start + grant_sz)
+    CommitWriteLoaded((nat, nat, nat)),  // (grant_start, grant_start + grant_sz, write)
+    CommitReserveSubbed((nat, nat, nat)), // (grant_start, grant_start + grant_sz, write)
+    CommitLastLoaded((nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz, write, last)
+    CommitReserveLoaded((nat, nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz, write, last, reserve)
+    CommitLastStored((nat, nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz,  write, last, reserve),
+    CommitWriteStored((nat, nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz,  write, last, reserve),
 }
 
 pub enum ConsumerState {
@@ -72,11 +78,78 @@ pub enum ConsumerState {
 
     #[invariant]
     pub fn valid_storage_all(&self) -> bool {
+        // match 節は統合することもできるが、そうすると SMT solver が flaky エラーを吐くのでばらしている。
         match self.producer {
-            ProducerState::Reserved((start, start_plus_sz)) => {
+            ProducerState::Reserved((grant_start, grant_end)) => {
                 forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + start as nat) || 
-                    (i >= self.base_addr + start_plus_sz && i < self.base_addr + self.length))
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
+            },
+            ProducerState::CommitWriteLoaded((grant_start, grant_end, _)) => {
+                forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
+            },
+            ProducerState::CommitReserveSubbed((grant_start, grant_end, _)) => {
+                forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
+            },
+            ProducerState::CommitLastLoaded((grant_start, grant_end, _, _)) => {
+                forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
+            },
+            ProducerState::CommitReserveLoaded((grant_start, grant_end, _, _, _)) => {
+                forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
+            },
+            ProducerState::CommitLastStored((grant_start, grant_end, _, _, _)) => {
+                forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                        ==> (
+                            self.storage.contains_key(i) &&
+                            self.storage.dom().contains(i) &&
+                            self.storage.index(i).ptr().addr() == i &&
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )            
+            },
+            ProducerState::CommitWriteStored((grant_start, grant_end, _, _, _)) => {
+                forall |i: nat|
+                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
                         ==> (
                             self.storage.contains_key(i) &&
                             self.storage.dom().contains(i) &&
@@ -100,10 +173,16 @@ pub enum ConsumerState {
     #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
         match self.producer {
-            ProducerState::Idle(w) => self.write == w, //&& self.reserve == w,
-            ProducerState::WriteFilled(w) => self.write == w,
-            ProducerState::WriteAndReadFilled((w, _)) => self.write == w,
-            ProducerState::Reserved((_, r)) => self.reserve == r,
+            ProducerState::Idle(write) => self.write == write, //&& self.reserve == w,
+            ProducerState::GrantWriteLoaded(write) => self.write == write,
+            ProducerState::GrantWriteAndReadLoaded((write, _)) => self.write == write,
+            ProducerState::Reserved((_, reserve)) => self.reserve == reserve,
+            ProducerState::CommitWriteLoaded((_, _, write)) => self.write == write,
+            ProducerState::CommitReserveSubbed((_, _, write)) => self.write == write,
+            ProducerState::CommitLastLoaded((_, _, write, last)) => self.write == write && self.last == last,
+            ProducerState::CommitReserveLoaded((_, _, write, last, reserve)) => self.write == write && self.last == last && self.reserve == self.reserve,
+            ProducerState::CommitLastStored((_, _, write, last, reserve)) => self.write == write && self.last == last && self.reserve == self.reserve,
+            ProducerState::CommitWriteStored((_, _, write, last, reserve)) => self.write == write && self.last == last && self.reserve == self.reserve,
         }
     }
 
@@ -117,7 +196,7 @@ pub enum ConsumerState {
         {
             require(
                 forall |i: nat|
-                    i >= base_addr && i < base_addr + length * size_of::<u8>() as nat
+                    i >= base_addr && i < base_addr + length as nat
                         ==> (
                             storage.contains_key(i) &&
                             storage.index(i).ptr().addr() == i &&
@@ -149,21 +228,10 @@ pub enum ConsumerState {
         assert(post.buffer_dealloc is Some);
         assert(
             forall |i: nat|
-                i >= post.base_addr && i < post.base_addr + post.length * size_of::<u8>() as nat
+                i >= post.base_addr && i < post.base_addr + post.length as nat
                     ==> post.storage.contains_key(i)
         );
     }
-
-    /*
-    確かに error: unable to prove inherent safety condition: the value being guarded must be stored が出るな...
-    https://github.com/verus-lang/verus/blob/7b6fdd861b43cbd88e886ad16c7af7cb1186ebc1/examples/scache/rwlock.rs#L308
-     
-    property!{
-        guard_buffer_perm(perm: raw_ptr::PointsToRaw) {
-            guard buffer_perm >= Some(perm);
-        }
-    }
-    */
 
     transition!{
         try_split() {
@@ -182,25 +250,25 @@ pub enum ConsumerState {
     }
 
     transition!{
-        grant_fill_write() {
+        grant_load_write() {
             require(pre.producer is Idle);
 
-            update producer = ProducerState::WriteFilled(pre.write);
+            update producer = ProducerState::GrantWriteLoaded(pre.write);
         }
     }
 
     transition!{
-        grant_fill_read() {
-            require(pre.producer is WriteFilled);
+        grant_load_read() {
+            require(pre.producer is GrantWriteLoaded);
 
-            update producer = ProducerState::WriteAndReadFilled((pre.producer->WriteFilled_0, pre.read));
+            update producer = ProducerState::GrantWriteAndReadLoaded((pre.producer->GrantWriteLoaded_0, pre.read));
         }
     }
 
     transition!{
         do_reserve(start: nat, sz: nat) {
             require(start + sz <= pre.length);
-            require(pre.producer is WriteAndReadFilled);
+            require(pre.producer is GrantWriteAndReadLoaded);
 
             update reserve = start + sz;
 
@@ -248,6 +316,91 @@ pub enum ConsumerState {
 
     transition!{
         grant_end() {
+            // require(pre.producer is Reserved);
+            update write_in_progress = false;
+        }
+    }
+
+    transition!{
+        commit_start() {
+            require(pre.producer is Reserved);
+        }
+    }
+
+    transition!{
+        commit_load_write() {
+            require(pre.producer is Reserved);
+
+            update producer = ProducerState::CommitWriteLoaded((pre.producer->Reserved_0.0, pre.producer->Reserved_0.1, pre.write));
+        }
+    }
+
+    transition!{
+        commit_sub_reserve(commited: nat) {
+            require(pre.producer is CommitWriteLoaded);
+            require(pre.reserve >= commited);
+
+            let new_reserve = (pre.reserve - commited) as nat;
+
+            update reserve = new_reserve;
+            update producer = ProducerState::CommitReserveSubbed((pre.producer->CommitWriteLoaded_0.0, pre.producer->CommitWriteLoaded_0.1, pre.producer->CommitWriteLoaded_0.2));
+        }
+    }    
+
+    transition!{
+        commit_load_last() {
+            require(pre.producer is CommitReserveSubbed);
+
+            update producer = ProducerState::CommitLastLoaded(
+                (pre.producer->CommitReserveSubbed_0.0, pre.producer->CommitReserveSubbed_0.1, pre.producer->CommitReserveSubbed_0.2, pre.last)
+            );
+        }
+    }
+
+    transition!{
+        commit_load_reserve() {
+            require(pre.producer is CommitLastLoaded);
+
+            update producer = ProducerState::CommitReserveLoaded(
+                (pre.producer->CommitLastLoaded_0.0, pre.producer->CommitLastLoaded_0.1, pre.producer->CommitLastLoaded_0.2, pre.producer->CommitLastLoaded_0.3, pre.reserve)
+            );
+        }
+    }
+
+    transition!{
+        commit_store_last(new_last: nat) {
+            require(pre.producer is CommitReserveLoaded);
+
+            update last = new_last;
+
+            update producer = ProducerState::CommitLastStored(
+                (pre.producer->CommitReserveLoaded_0.0, pre.producer->CommitReserveLoaded_0.1, pre.producer->CommitReserveLoaded_0.2, new_last, pre.producer->CommitReserveLoaded_0.4)
+            );
+        }
+    }
+
+    transition!{
+        commit_store_write(new_write: nat) {
+            require(pre.producer is CommitLastStored);
+
+            update write = new_write;
+
+            update producer = ProducerState::CommitWriteStored(
+                (pre.producer->CommitLastStored_0.0, pre.producer->CommitLastStored_0.1, new_write, pre.producer->CommitLastStored_0.3, pre.producer->CommitLastStored_0.4)
+            );
+        }
+    }
+
+    transition!{
+        commit_end(to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
+            require(pre.producer is CommitWriteStored);
+
+            deposit storage += (to_deposit) by {
+                assume(forall |i: nat| to_deposit.contains_key(i)
+                        ==> !pre.storage.contains_key(i));
+            };
+
+            update producer = ProducerState::Idle(pre.producer->CommitWriteStored_0.2);
             update write_in_progress = false;
         }
     }
@@ -258,14 +411,14 @@ pub enum ConsumerState {
     #[inductive(grant_start)]
     fn grant_start_inductive(pre: Self, post: Self) { }
 
-    #[inductive(grant_fill_write)]
-    fn grant_fill_write_inductive(pre: Self, post: Self) {
-        assert(post.producer is WriteFilled);
+    #[inductive(grant_load_write)]
+    fn grant_load_write_inductive(pre: Self, post: Self) {
+        assert(post.producer is GrantWriteLoaded);
     }
 
-    #[inductive(grant_fill_read)]
-    fn grant_fill_read_inductive(pre: Self, post: Self) {
-        assert(post.producer is WriteAndReadFilled);
+    #[inductive(grant_load_read)]
+    fn grant_load_read_inductive(pre: Self, post: Self) {
+        assert(post.producer is GrantWriteAndReadLoaded);
     }
 
     #[inductive(grant_end)]
@@ -276,10 +429,30 @@ pub enum ConsumerState {
         assert(post.producer is Reserved);
         assert(post.producer->Reserved_0.1 == post.reserve);
     }
-/*
-    #[inductive(withdraw_buffer_perm)]
-    fn withdraw_buffer_perm_inductive(pre: Self, post: Self) { }
- */
+
+    #[inductive(commit_start)]
+    fn commit_start_inductive(pre: Self, post: Self) { }
+
+    #[inductive(commit_load_write)]
+    fn commit_load_write_inductive(pre: Self, post: Self) { }
+
+    #[inductive(commit_sub_reserve)]
+    fn commit_sub_reserve_inductive(pre: Self, post: Self, commited: nat) { }
+
+    #[inductive(commit_load_last)]
+    fn commit_load_last_inductive(pre: Self, post: Self) { }
+
+    #[inductive(commit_load_reserve)]
+    fn commit_load_reserve_inductive(pre: Self, post: Self) { }
+
+    #[inductive(commit_store_last)]
+    fn commit_store_last_inductive(pre: Self, post: Self, new_last: nat) { }
+
+    #[inductive(commit_store_write)]
+    fn commit_store_write_inductive(pre: Self, post: Self, new_write: nat) { }
+
+    #[inductive(commit_end)]
+    fn commit_end_inductive(pre: Self, post: Self, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) { }
 }}
 
 struct_with_invariants!{
@@ -301,6 +474,7 @@ struct_with_invariants!{
         predicate {
             &&& self.instance@.length() == self.length
             &&& self.instance@.base_addr() == self.buffer as nat
+            &&& self.instance@.provenance() == self.buffer@.provenance
             &&& self.buffer.addr() + self.length <= usize::MAX + 1
             &&& self.buffer.addr() as int % 1 as int == 0
         }
@@ -348,14 +522,11 @@ struct_with_invariants!{
 
 pub struct Producer {
     vbq: Arc<VBBuffer>,
-    producer: Tracked<VBQueue::producer>,
 }
 
 impl Producer {
     pub closed spec fn wf(&self) -> bool {
         (*self.vbq).wf()
-            && self.producer@.instance_id() == (*self.vbq).instance@.id()
-            && self.producer@.value() is Idle
             //&& (self.tail as int) < (*self.queue).buffer@.len()
     }
 }
@@ -392,7 +563,6 @@ impl VBBuffer
                 }),
             
         */
-            //s.buffer@.provenance == s.instance@.split_guard_buffer_perm().provenance(),
             r.0.wf(),
             r.0.instance@.id() == r.1@.instance_id(),
             r.1@.value() is Idle,
@@ -403,19 +573,19 @@ impl VBBuffer
         // allocate で得た buffer_perm (PointsToRaw) を u8 1バイトごとに分割して、addr => PointsTo の Map として格納する
         let tracked mut buffer_perm = buffer_perm;
         assert(buffer_perm.is_range(buffer_ptr as int, length as int));
-        assert(buffer_ptr as int + length * size_of::<u8>() <= usize::MAX + 1);
+        assert(buffer_ptr as int + length <= usize::MAX + 1);
         let tracked mut points_to_map = Map::<nat, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
 
         for len in 0..length
             invariant
                 len <= length,
-                buffer_ptr as int + length * size_of::<u8>() <= usize::MAX + 1,
-                buffer_perm.is_range(buffer_ptr as int + len * size_of::<u8>() as int, length * size_of::<u8>() - len),
+                buffer_ptr as int + length <= usize::MAX + 1,
+                buffer_perm.is_range(buffer_ptr as int + len as int, length - len),
                 forall |i: nat|
-                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len * size_of::<u8>() as nat
+                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
                         ==> points_to_map.contains_key(i),
                 forall |i: nat|
-                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len * size_of::<u8>() as nat
+                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
                         ==> (points_to_map.index(i as nat).ptr() as nat == i as nat
                             && points_to_map.index(i as nat).ptr()@.provenance == buffer_perm.provenance()),
                 buffer_ptr@.provenance == buffer_perm.provenance(),
@@ -423,11 +593,11 @@ impl VBBuffer
                 length - len,
         {
             proof {
-                let ghost range_base_addr = buffer_ptr as int + len * size_of::<u8>() as int;
-                let ghost range_end_addr = range_base_addr + 1 * size_of::<u8>();
+                let ghost range_base_addr = buffer_ptr as int + len as int;
+                let ghost range_end_addr = range_base_addr + 1;
                 
                 let tracked (top, rest) = buffer_perm.split(crate::set_lib::set_int_range(range_base_addr, range_end_addr as int));
-                assert(top.is_range(range_base_addr as usize as int, size_of::<u8>() as int));
+                assert(top.is_range(range_base_addr as usize as int, 1));
 
                 let tracked top_pointsto = top.into_typed::<u8>(range_base_addr as usize);
                 buffer_perm = rest;
@@ -441,8 +611,6 @@ impl VBBuffer
 
         let tracked (
             Tracked(instance),
-            //Tracked(buffer_perm_token),
-            //Tracked(buffer_dealloc_token),
             Tracked(write_token),
             Tracked(read_token),
             Tracked(last_token),
@@ -485,17 +653,22 @@ impl VBBuffer
         }, Tracked(producer_token), Tracked(consumer_token))
     }
 
-    fn try_split(self, producer_token: Tracked<VBQueue::producer>, consumer_token: Tracked<VBQueue::consumer>) -> (res: Result<(Producer, Consumer),  &'static str>)
+    fn try_split(self, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(consumer_token): Tracked<VBQueue::consumer>) -> (res: Result<(Producer, Consumer),  &'static str>)
         requires
             self.wf(),
-            producer_token@.instance_id() == self.instance@.id(),
-            producer_token@.value() is Idle,
+            old(producer_token).instance_id() == self.instance@.id(),
+            old(producer_token).value() is Idle,
         ensures
             self.wf(),
             match res {
-                Ok((prod, cons)) => prod.wf(), //&& cons.vbq.wf(),
+                Ok((prod, cons)) => {
+                    prod.wf() &&/* //cons.wf(), */
+                    producer_token.instance_id() == prod.vbq.instance@.id()
+                }, 
                 Err(_) => true
-            }
+            },
+            producer_token.instance_id() == self.instance@.id(),
+            producer_token.value() is Idle,
     {
         let already_splitted =
             atomic_with_ghost!(&self.already_split => swap(true);
@@ -522,62 +695,193 @@ impl VBBuffer
         Ok((
             Producer {
                 vbq: vbbuffer_arc.clone(),
-                producer: producer_token,
             },
             Consumer {
                 vbq: vbbuffer_arc.clone(),
             }
         ))
     }
-/*
-    fn experimental(&mut self) -> ()
-        requires
-            old(self).buffer.addr() as int % align_of::<u8>() as int == 0,
-            //old(self).instance@.buffer_perm().is_range(old(self).buffer.addr() as int, size_of::<u8>() as int),
-    {
-        let tracked mut points_to;
-        proof {
-            // そのまま self.buffer_perm を使うと into_typed で move のエラーが出るので、swapしておく。
-            let tracked bufp = self.buffer_perm.borrow();
-            let tracked mut buffer_perm = raw_ptr::PointsToRaw::empty(bufp.provenance());
-            tracked_swap(&mut buffer_perm, self.buffer_perm.borrow_mut());        
-            assert(buffer_perm.dom() == crate::set_lib::set_int_range(
-                self.buffer.addr() as int,
-                self.buffer.addr() as int + size_of::<u8>() as int,
-            ));
-            assert(buffer_perm.is_range(self.buffer.addr() as int, size_of::<u8>() as int));
-            points_to = buffer_perm.into_typed::<u8>(self.buffer.addr() as usize);
-
-            assert(equal(points_to.opt_value(), MemContents::Uninit));
-            //tracked_swap(&mut buffer_perm, self.buffer_perm.borrow_mut());
-        }
-
-        let ptr = self.buffer as *mut u8;
-        proof {
-            assert(equal(points_to.ptr() as usize, self.buffer as usize));
-            // FIXME: assume を取り除く
-            assume(equal(points_to.ptr() as *mut u8, self.buffer as *mut u8));
-        }
-        ptr_mut_write(ptr, Tracked(&mut points_to), 0);
-        assert(equal(points_to.opt_value(), MemContents::Init(0)));
-    }
-     */
-
-    // TODO: try_release を実装する
 }
 
 struct GrantW {
     buf: Vec<*mut u8>,
-    buf_perms: Tracked<Seq<raw_ptr::PointsTo<u8>>>,
     vbq: Arc<VBBuffer>,
     to_commit: usize,
+    buf_perms: Tracked<Seq<raw_ptr::PointsTo<u8>>>,
+}
+
+impl GrantW {
+    pub closed spec fn wf(&self) -> bool {
+        &&& self.buf.len() == self.buf_perms@.len()
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == self.buf_perms@[i].ptr()
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i]@.provenance == self.buf_perms@[i].ptr()@.provenance
+    }
+
+    fn commit(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>)
+        requires
+            old(self).wf(),
+            old(self).vbq.wf(),
+            old(producer_token).value() is Reserved,
+            old(producer_token).instance_id() == old(self).vbq.instance@.id(),
+        ensures
+            producer_token.value() is Idle,
+            self.wf(),
+            self.vbq.wf(),
+    {
+        self.commit_inner(used, Tracked(producer_token));
+        // forget(self); // FIXME
+    }
+
+    pub(crate) fn commit_inner(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>)
+        requires
+            old(self).wf(),
+            old(self).vbq.wf(),
+            old(producer_token).value() is Reserved,
+            old(producer_token).instance_id() == old(self).vbq.instance@.id(),
+        ensures
+            producer_token.value() is Idle,
+            self.wf(),
+            self.vbq.wf(),
+    {
+        // If there is no grant in progress, return early. This
+        // generally means we are dropping the grant within a
+        // wrapper structure
+        
+        let is_write_in_progress =
+            atomic_with_ghost!(&self.vbq.write_in_progress => load();
+                ghost write_in_progress_token => {
+                    let _ = self.vbq.instance.borrow().commit_start(producer_token);
+                }
+        );
+
+        if !is_write_in_progress {
+            assume(producer_token.value() is Idle); // FIXME!
+            return;
+        }
+
+        // Writer component. Must never write to READ,
+        // be careful writing to LAST
+
+        // Saturate the grant commit
+        let len = self.buf.len();
+        let used = if len <= used { len } else { used }; // min の代用。
+
+        let write = atomic_with_ghost!(&self.vbq.write => load();
+            ghost write_token => {
+                let _ = self.vbq.instance.borrow().commit_load_write(&write_token, producer_token);
+            }
+        );
+
+        atomic_with_ghost!(&self.vbq.reserve => fetch_sub(len - used);
+            ghost reserve_token => {
+                assume(reserve_token.value() >= (len - used)); // FIXME!
+                let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, producer_token);
+            }
+        );
+
+        let max = self.vbq.length as usize;
+        let last = atomic_with_ghost!(&self.vbq.last => load();
+            ghost last_token => {
+                let _ = self.vbq.instance.borrow().commit_load_last(&last_token, producer_token);
+            }
+        );
+        
+        let new_write = atomic_with_ghost!(&self.vbq.reserve => load();
+            ghost reserve_token => {
+                let _ = self.vbq.instance.borrow().commit_load_reserve(&reserve_token, producer_token);
+            }
+        );
+
+        if (new_write < write) && (write != max) {
+            // We have already wrapped, but we are skipping some bytes at the end of the ring.
+            // Mark `last` where the write pointer used to be to hold the line here
+            atomic_with_ghost!(&self.vbq.last => store(write);
+                ghost last_token => {
+                    let _ = self.vbq.instance.borrow().commit_store_last(write as nat, &mut last_token, producer_token);
+                }
+            );
+        } else if new_write > last {
+            // We're about to pass the last pointer, which was previously the artificial
+            // end of the ring. Now that we've passed it, we can "unlock" the section
+            // that was previously skipped.
+            //
+            // Since new_write is strictly larger than last, it is safe to move this as
+            // the other thread will still be halted by the (about to be updated) write
+            // value
+            atomic_with_ghost!(&self.vbq.last => store(max);
+                ghost last_token => {
+                    let _ = self.vbq.instance.borrow().commit_store_last(max as nat, &mut last_token, producer_token);
+                }
+            );
+        }
+        // else: If new_write == last, either:
+        // * last == max, so no need to write, OR
+        // * If we write in the end chunk again, we'll update last to max next time
+        // * If we write to the start chunk in a wrap, we'll update last when we
+        //     move write backwards
+
+        // Write must be updated AFTER last, otherwise read could think it was
+        // time to invert early!
+        atomic_with_ghost!(&self.vbq.write => store(new_write);
+            ghost write_token => {
+                let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, &mut write_token, producer_token);
+            }
+        );
+
+        let tracked mut granted_perms_map = Map::<nat, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
+        proof {
+            assert(self.buf.len() == self.buf_perms@.len());
+        }
+        for l in 0..len
+            invariant
+                l <= len,
+                self.buf_perms@.len() == len - l,
+                forall |i: nat|
+                    i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
+                        ==> granted_perms_map.contains_key(i),
+                forall |i: nat|
+                    i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
+                        ==> (granted_perms_map.index(i as nat).ptr() as nat == i as nat
+                            && granted_perms_map.index(i as nat).ptr()@.provenance == self.vbq.instance@.provenance()),
+            decreases
+                len - l,
+        {
+            proof {
+                let points_to = self.buf_perms.borrow_mut().tracked_remove(0);
+                granted_perms_map.insert(points_to.ptr().addr() as nat, points_to);
+            }
+        }
+
+        // Allow subsequent grants
+        atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
+            ghost write_in_progress_token => {
+                let _ = self.vbq.instance.borrow().commit_end(granted_perms_map, granted_perms_map, &mut write_in_progress_token, producer_token);
+                assert(write_in_progress_token.value() == false);
+            }
+        );
+    }
+
+    /// Configures the amount of bytes to be commited on drop.
+    pub fn to_commit(&mut self, amt: usize) {
+        self.to_commit = self.buf.len().min(amt);
+    }
 }
 
 impl Producer {
-    fn grant_exact(&mut self, sz: usize) -> Result<GrantW, &'static str>
+    fn grant_exact(&mut self, sz: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) -> (r: Result<GrantW, &'static str>)
         requires
             old(self).wf(),
-            old(self).producer@.value() is Idle,
+            old(producer_token).instance_id() == old(self).vbq.instance@.id(),
+            old(producer_token).value() is Idle,
+        ensures
+            match r {
+                Ok(wgr) => {
+                    wgr.wf() &&
+                    wgr.buf.len() == sz &&
+                    producer_token.value() is Reserved
+                },
+                _ => true
+            },
     {
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => swap(true);
@@ -600,13 +904,13 @@ impl Producer {
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
-                let _ = self.vbq.instance.borrow().grant_fill_write(&write_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().grant_load_write(&write_token, producer_token);
             }
         );
 
         let read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
-                let _ = self.vbq.instance.borrow().grant_fill_read(&read_token, self.producer.borrow_mut());
+                let _ = self.vbq.instance.borrow().grant_load_read(&read_token, producer_token);
             }
         );
         let max = self.vbq.length as usize;
@@ -667,16 +971,21 @@ impl Producer {
         atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
             ghost reserve_token => {
                 // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
-                let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, self.producer.borrow_mut());
+                let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, producer_token);
                 granted_perms_map = ret.1.get();
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
                 assert(
                     forall |j: nat|
                         j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
                             ==> (
-                                granted_perms_map.contains_key(j)
-                                && granted_perms_map.index(j as nat).ptr().addr() == j
-                                //&& granted_perms_map.index(j as nat).ptr()@.provenance == self.vbq.instance@.provenance()
+                                granted_perms_map.index(j).ptr().addr() == j
+                            )
+                );
+                assert(
+                    forall |j: nat|
+                        j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
+                            ==> (
+                                granted_perms_map.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
                             )
                 );
                 assert(reserve_token.value() == start + sz);
@@ -690,14 +999,15 @@ impl Producer {
         let end_offset = start + sz;
 
         proof {
+            assert(base_ptr@.provenance == self.vbq.instance@.provenance());
             assert(base_ptr as nat == self.vbq.instance@.base_addr());
             assert(
                 forall |j: nat|
                     j >= base_ptr as nat + start as nat && j < base_ptr as nat + start as nat + sz as nat
                         ==> (
                             granted_perms_map.contains_key(j)
-                            && granted_perms_map.index(j as nat).ptr().addr() == j
-                            && granted_perms_map.index(j as nat).ptr()@.provenance == self.vbq.instance@.provenance()
+                            //&& granted_perms_map.index(j as nat).ptr().addr() == j
+                            //&& granted_perms_map.index(j as nat).ptr()@.provenance == self.vbq.instance@.provenance()
                         )
             );
         }
@@ -705,16 +1015,34 @@ impl Producer {
         for idx in start..end_offset
             invariant
                 idx <= end_offset,
-                base_ptr as usize + end_offset * size_of::<u8>() <= usize::MAX + 1,
-                // base_ptr@.provenance == token.provenance(),
+                base_ptr as usize + end_offset <= usize::MAX + 1,
+                base_ptr@.provenance == self.vbq.instance@.provenance(),
                 forall |j: nat|
-                    j >= base_ptr as nat + idx * size_of::<u8>() as nat && j < base_ptr as nat + end_offset * size_of::<u8>() as nat
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + end_offset as nat
                         ==> (
                             granted_perms_map.contains_key(j)
-                            // && granted_perms_map.index(j as nat).ptr().addr() as nat == j as nat
+                            //&& granted_perms_map.index(j as nat).ptr().addr() as nat == j as nat
                             //&& granted_perms_map.index(j as nat).ptr()@.provenance == base_ptr@.provenance
                         ),
-                            
+                forall |j: nat|
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + end_offset as nat
+                        ==> (
+                            granted_perms_map.index(j as nat).ptr().addr() as nat == j as nat
+                            //&& granted_perms_map.index(j as nat).ptr()@.provenance == base_ptr@.provenance
+                        ),
+                forall |j: nat|
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + end_offset as nat
+                        ==> (
+                            granted_perms_map.index(j).ptr()@.provenance == base_ptr@.provenance
+                        ),
+                granted_buf.len() == (idx - start),
+                buf_perms.len() == (idx - start),
+                granted_buf.len() == buf_perms.len(),
+                forall |j: int|
+                    0 <= j && j < (idx - start) as int
+                        ==> (
+                            equal(granted_buf[j], buf_perms[j].ptr())
+                        ),
             decreases
                 end_offset - idx,
         {
@@ -728,29 +1056,17 @@ impl Producer {
                 buf_perms.tracked_push(points_to);
             }
             assert(ptr@.provenance == base_ptr@.provenance);
-            assert(points_to.ptr()@.provenance == ptr@.provenance);
+            assert(points_to.ptr()@.provenance == base_ptr@.provenance);
+            assert(points_to.ptr()@.provenance == self.vbq.instance@.provenance());
             assert(equal(points_to.ptr(), ptr));
-            //ptr_mut_write(ptr, Tracked(&mut points_to), 5);
-            //let val = ptr_ref(ptr, Tracked(&points_to));
-            //assert(val == 5);
         }
-
-        /*
-        proof {
-            let tracked buffer_perm = self.vbq.instance.borrow().withdraw_buffer_perm();
-        } */
-
-        // This is sound, as UnsafeCell, MaybeUninit, and GenericArray
-        // are all `#[repr(Transparent)]
-        // let start_of_buf_ptr = inner.buf.get().cast::<u8>();
-        // let grant_slice = unsafe { from_raw_parts_mut(start_of_buf_ptr.add(start), sz) };
 
         Ok (
             GrantW {
                 buf: granted_buf,
-                buf_perms: Tracked(buf_perms),
                 vbq: self.vbq.clone(),
                 to_commit: sz,
+                buf_perms: Tracked(buf_perms),
             }
         )
     }
@@ -758,16 +1074,29 @@ impl Producer {
 
 fn main() {
     let (vbuf, Tracked(producer_token), Tracked(consumer_token)) = VBBuffer::new(6);
-    let (mut prod, mut cons) = match vbuf.try_split(Tracked(producer_token), Tracked(consumer_token)) {
+    let (mut prod, mut cons) = match vbuf.try_split(Tracked(&mut producer_token), Tracked(consumer_token)) {
         Ok((prod, cons)) => (prod, cons),
         Err(_) => {
             return;
         }
     };
 
+    proof {
+        assert(producer_token.instance_id() == prod.vbq.instance@.id());
+    }
+
     // Request space for one byte
-    let mut wgr = prod.grant_exact(1);
-    
+    match prod.grant_exact(2, Tracked(&mut producer_token)) {
+        Ok(wgr) => {
+            let Tracked(buf_perms) = wgr.buf_perms;
+            let tracked points_to = buf_perms.tracked_remove(0 as int);
+            
+            ptr_mut_write(wgr.buf[0], Tracked(&mut points_to), 5);
+            let val = ptr_ref(wgr.buf[0], Tracked(&points_to));
+            assert(val == 5);
+        },
+        _ => {}
+    }
 }
 
 }
