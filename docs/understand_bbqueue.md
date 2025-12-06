@@ -237,6 +237,22 @@ https://github.com/verus-lang/verus/issues/187
 const N を使う理由もなく、const generics は partially support なので利用をやめる。
 struct_with_invariants! で closed spec の方にどのように N を渡せばよいかも不詳。
 
+ghost の producer を commit 時に渡すように変えないと駄目なようだ。
+
+core::cmp::min もつかえない
+```
+error: `core::cmp::min` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`) (note: the vstd library provides some specification for the Rust std library, but it is currently limited)
+```
+
+
+mut self も使えない。今回は &mut self にした。
+```
+error: The verifier does not yet support the following Rust feature: mut self
+   --> vbqueue_proto_use_allocate_no_const_generics.rs:640:5
+    |
+640 |     pub fn commit(mut self, used: usize) {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
 
 ```
 struct_with_invariants!{

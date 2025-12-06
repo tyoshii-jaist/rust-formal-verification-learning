@@ -254,4 +254,50 @@ piece a of a ghost location γ .
 
 すべての PCM は RA だが、逆はそうではない。
 
-「合成」（⋅）は、同じ資源種の“持ち分”を足し合わせて、全体の資源状態を作る二項演算のことです。Iris の RA（resource algebra）ではこれが中核。
+「合成」（⋅）は、同じ資源種の“持ち分”を足し合わせて、全体の資源状態を作る二項演算のこと。Iris の RA（resource algebra）ではこれが中核。
+
+
+
+
+
+### Iris 元論文もちょい読み
+そもそも Invariant とは。
+
+{R * P} e {R * Q}
+------------------
+R ⊢ {P} e {Q}
+
+上「共有状態に関する invariant R を一緒に持っている前提で e を実行しても、e の前後で invariant R は壊れず、P が Q に変わることを示せている」
+e は R を触って変えてもよいが終わったら R が成立する状態にしておかないと駄目。
+
+下 「R という invariant が存在している ことを前提に、クライアント側では {P} e {Q} という “きれいな” triple として使ってよい」
+
+
+"observably atomic" 実際には物理的には atomic ではないがクライアントからは atomic に見える操作。
+Abstract Data Type に対する操作。stack ADT に対する操作は observably atomic である、みたいに使う。
+
+"contextual refinement" とは何か？
+ADT（並行スタックとかチャネル）の実装が、**「単一のアトミック操作として振る舞う抽象仕様」**を満たすことを証明したい（線形化可能性）。
+
+その抽象仕様だけを使って、クライアントコードの正しさを証明したい。
+「contextual refinement（文脈リファインメント）」は典型的にこう使う：
+ある低レベル実装 impl が、ある高レベルの抽象マシン spec を コンテキストリファインしている：
+「どんなコンテキスト C[·] に埋め込んでも、C[impl] の挙動 ⊆ C[spec] の挙動」
+つまり、「実装を抽象仕様で置き換えても、どんな使われ方をしてもバグが増えたりしない」という性質。
+これを使うと、
+「impl は spec をコンテキストリファインする」と証明
+「クライアント client は spec を使っても安全」とロジック内で証明
+メタな定理として「impl に差し替えても安全（client[impl] も安全）」と結論できる
+
+contextual refinement：
+- ADT 実装 vs 抽象仕様の一致は証明できる
+- でもそれはロジックの外（意味論レベル）でやる
+- しかも「クライアントが内部を覗けない」ような強い型システム前提
+
+Iris でやりたいこと：
+- ロジックの中に “論理的アトミック仕様” を直接持ち込み、
+- 低レベル言語でも ADT 実装とクライアントを同じロジック内で完結して扱う
+
+
+- Monoids enable us to express protocols on shared state.
+- Invariants enable us to enforce protocols on shared state.
