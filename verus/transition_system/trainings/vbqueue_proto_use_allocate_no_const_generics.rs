@@ -13,15 +13,15 @@ verus! {
 global layout u8 is size == 1, align == 1;
 
 pub enum ProducerState {
-    Idle(nat),
-    GrantStarted(nat), // write
-    GrantWriteLoaded(nat), // write
-    GrantWriteAndReadLoaded((nat, nat)), // (write, read)
-    Reserved((nat, nat)), // (grant_start, grant_start + grant_sz)
-    CommitWriteLoaded((nat, nat, nat)),  // (grant_start, grant_start + grant_sz, write)
-    CommitReserveSubbed((nat, nat, nat)), // (grant_start, grant_start + grant_sz, write)
-    CommitLastLoaded((nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz, write, last)
-    CommitReserveLoaded((nat, nat, nat, nat, nat)), // (grant_start, grant_start + grant_sz, write, last, reserve)
+    Idle((bool, nat)), // (write_in_progress, write)
+    GrantStarted((bool, nat)), // (write_in_progress, write)
+    GrantWriteLoaded((bool, nat)), // (write_in_progress, write)
+    GrantWriteAndReadLoaded((bool, nat, nat)), // (write_in_progress, write, read)
+    Reserved((bool, nat, nat)), // (write_in_progress, grant_start, grant_start + grant_sz)
+    CommitWriteLoaded((bool, nat, nat, nat)),  // (write_in_progress, grant_start, grant_start + grant_sz, write)
+    CommitReserveSubbed((bool, nat, nat, nat)), // (write_in_progress, grant_start, grant_start + grant_sz, write)
+    CommitLastLoaded((bool, nat, nat, nat, nat)), // (write_in_progress, grant_start, grant_start + grant_sz, write, last)
+    CommitReserveLoaded((bool, nat, nat, nat, nat, nat)), // (write_in_progress, grant_start, grant_start + grant_sz, write, last, reserve)
 }
 
 pub enum ConsumerState {
@@ -75,15 +75,37 @@ pub enum ConsumerState {
         pub consumer: ConsumerState,
     }
 
+    /*
+    #[invariant]
+    pub fn valid_write_in_progress_in_producer(&self) -> bool {
+        match self.producer {
+            ProducerState::Idle((wip, _)) |
+            ProducerState::GrantStarted((wip, _)) |
+            ProducerState::GrantWriteLoaded((wip, _)) |
+            ProducerState::GrantWriteAndReadLoaded((wip, _, _)) |
+            ProducerState::Reserved((wip, _, _)) |
+            ProducerState::CommitWriteLoaded((wip, _, _, _)) |
+            ProducerState::CommitReserveSubbed((wip, _, _, _)) |
+            ProducerState::CommitLastLoaded((wip, _, _, _, _)) |
+            ProducerState::CommitReserveLoaded((wip, _, _, _, _, _)) => {
+                wip == self.write_in_progress
+            }
+        }
+    } */
+    #[invariant]
+    pub fn no_write_in_progress(&self) -> bool {
+        !self.write_in_progress ==> self.producer is Idle &&
+        self.producer is Idle ==> !self.write_in_progress
+    }
+
     #[invariant]
     pub fn valid_storage_all(&self) -> bool {
-        // match 節は統合することもできるが、そうすると SMT solver が flaky エラーを吐くのでばらしている。
         match self.producer {
-            ProducerState::Reserved((grant_start, grant_end)) |
-            ProducerState::CommitWriteLoaded((grant_start, grant_end, _)) |
-            ProducerState::CommitReserveSubbed((grant_start, grant_end, _)) |
-            ProducerState::CommitLastLoaded((grant_start, grant_end, _, _)) |
-            ProducerState::CommitReserveLoaded((grant_start, grant_end, _, _, _)) => {
+            ProducerState::Reserved((_, grant_start, grant_end)) |
+            ProducerState::CommitWriteLoaded((_, grant_start, grant_end, _)) |
+            ProducerState::CommitReserveSubbed((_, grant_start, grant_end, _)) |
+            ProducerState::CommitLastLoaded((_, grant_start, grant_end, _, _)) |
+            ProducerState::CommitReserveLoaded((_, grant_start, grant_end, _, _, _)) => {
                 &&& forall |i: nat|
                     ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
                     (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
@@ -121,16 +143,16 @@ pub enum ConsumerState {
     #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
         match self.producer {
-            ProducerState::Idle(idle) => self.write == idle,
-            ProducerState::GrantStarted(idle) => self.write == idle,
-            ProducerState::GrantWriteLoaded(write) => self.write == write,
-            ProducerState::GrantWriteAndReadLoaded((write, _)) => self.write == write,
-            ProducerState::Reserved((_, reserve_end)) => self.reserve == reserve_end,
+            ProducerState::Idle((wip, idle)) => self.write_in_progress == false && wip == self.write_in_progress && self.write == idle,
+            ProducerState::GrantStarted((wip, idle)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == idle,
+            ProducerState::GrantWriteLoaded((wip, write)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write,
+            ProducerState::GrantWriteAndReadLoaded((wip, write, _)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write,
+            ProducerState::Reserved((wip, _, reserve_end)) => self.write_in_progress == true && wip == self.write_in_progress && self.reserve == reserve_end,
             // (reserve_start, reserve_end, write, last, reserve)
-            ProducerState::CommitWriteLoaded((reserve_start, reserve_end, write)) => self.write == write && self.reserve == reserve_end,
-            ProducerState::CommitReserveSubbed((reserve_start, reserve_end, write)) => self.write == write,
-            ProducerState::CommitLastLoaded((reserve_start, reserve_end, write, last)) => self.write == write && self.last == last,
-            ProducerState::CommitReserveLoaded((reserve_start, reserve_end, write, last, reserve)) => self.write == write && self.reserve == reserve && self.last == last,
+            ProducerState::CommitWriteLoaded((wip, reserve_start, reserve_end, write)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write && self.reserve == reserve_end,
+            ProducerState::CommitReserveSubbed((wip, reserve_start, reserve_end, write)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write,
+            ProducerState::CommitLastLoaded((wip, reserve_start, reserve_end, write, last)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write && self.last == last,
+            ProducerState::CommitReserveLoaded((wip, reserve_start, reserve_end, write, last, reserve)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write && self.reserve == reserve && self.last == last,
         }
     }
 
@@ -164,7 +186,7 @@ pub enum ConsumerState {
             init write_in_progress = false;
             init already_split = false;
 
-            init producer = ProducerState::Idle(0);
+            init producer = ProducerState::Idle((false, 0));
             init consumer = ConsumerState::Idle(0);
         }
     }
@@ -190,15 +212,15 @@ pub enum ConsumerState {
             require(pre.write_in_progress == false);
 
             update write_in_progress = true;
-            update producer = ProducerState::GrantStarted(pre.producer->Idle_0);
+            update producer = ProducerState::GrantStarted((true, pre.producer->Idle_0.1));
         }
     }
 
     transition!{
         grant_load_write() {
-            require(pre.producer is Idle);
+            require(pre.producer is GrantStarted);
 
-            update producer = ProducerState::GrantWriteLoaded(pre.write);
+            update producer = ProducerState::GrantWriteLoaded((pre.producer->GrantStarted_0.0, pre.write));
         }
     }
 
@@ -206,7 +228,7 @@ pub enum ConsumerState {
         grant_load_read() {
             require(pre.producer is GrantWriteLoaded);
 
-            update producer = ProducerState::GrantWriteAndReadLoaded((pre.producer->GrantWriteLoaded_0, pre.read));
+            update producer = ProducerState::GrantWriteAndReadLoaded((pre.producer->GrantWriteLoaded_0.0, pre.producer->GrantWriteLoaded_0.1, pre.read));
         }
     }
 
@@ -239,7 +261,7 @@ pub enum ConsumerState {
                 }
             };
             
-            update producer = ProducerState::Reserved((start, start + sz));
+            update producer = ProducerState::Reserved((pre.producer->GrantWriteAndReadLoaded_0.0, start, start + sz));
 
             assert(
                 withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr))
@@ -260,26 +282,21 @@ pub enum ConsumerState {
     }
 
     transition!{
-        grant_end() {
-            update write_in_progress = false;
-        }
-    }
-
-    transition!{
         grant_fail() {
             require(pre.producer is GrantWriteAndReadLoaded);
 
-            update producer = ProducerState::Idle(pre.producer->GrantWriteAndReadLoaded_0.0);
             update write_in_progress = false;
+            update producer = ProducerState::Idle((false, pre.producer->GrantWriteAndReadLoaded_0.1));
         }
     }
 
     transition!{
         commit_start() {
-            if pre.write_in_progress != true {
+            require(pre.producer is Idle || pre.producer is Reserved);
+            //assert(!pre.write_in_progress ==> pre.producer is Idle && pre.producer is Idle ==> !pre.write_in_progress);
+            if !pre.write_in_progress {
                 require(pre.producer is Idle);
-            }
-            else {
+            } else {
                 require(pre.producer is Reserved);
             }
         }
@@ -289,7 +306,7 @@ pub enum ConsumerState {
         commit_load_write() {
             require(pre.producer is Reserved);
 
-            update producer = ProducerState::CommitWriteLoaded((pre.producer->Reserved_0.0, pre.producer->Reserved_0.1, pre.write));
+            update producer = ProducerState::CommitWriteLoaded((pre.producer->Reserved_0.0, pre.producer->Reserved_0.1, pre.producer->Reserved_0.2, pre.write));
         }
     }
 
@@ -301,7 +318,7 @@ pub enum ConsumerState {
             let new_reserve = (pre.reserve - commited) as nat;
 
             update reserve = new_reserve;
-            update producer = ProducerState::CommitReserveSubbed((pre.producer->CommitWriteLoaded_0.0, pre.producer->CommitWriteLoaded_0.1, pre.producer->CommitWriteLoaded_0.2));
+            update producer = ProducerState::CommitReserveSubbed((pre.producer->CommitWriteLoaded_0.0, pre.producer->CommitWriteLoaded_0.1, pre.producer->CommitWriteLoaded_0.2, pre.producer->CommitWriteLoaded_0.3));
         }
     }    
 
@@ -310,7 +327,7 @@ pub enum ConsumerState {
             require(pre.producer is CommitReserveSubbed);
 
             update producer = ProducerState::CommitLastLoaded(
-                (pre.producer->CommitReserveSubbed_0.0, pre.producer->CommitReserveSubbed_0.1, pre.producer->CommitReserveSubbed_0.2, pre.last)
+                (pre.producer->CommitReserveSubbed_0.0, pre.producer->CommitReserveSubbed_0.1, pre.producer->CommitReserveSubbed_0.2, pre.producer->CommitReserveSubbed_0.3, pre.last)
             );
         }
     }
@@ -320,7 +337,7 @@ pub enum ConsumerState {
             require(pre.producer is CommitLastLoaded);
 
             update producer = ProducerState::CommitReserveLoaded(
-                (pre.producer->CommitLastLoaded_0.0, pre.producer->CommitLastLoaded_0.1, pre.producer->CommitLastLoaded_0.2, pre.producer->CommitLastLoaded_0.3, pre.reserve)
+                (pre.producer->CommitLastLoaded_0.0, pre.producer->CommitLastLoaded_0.1, pre.producer->CommitLastLoaded_0.2, pre.producer->CommitLastLoaded_0.3, pre.producer->CommitLastLoaded_0.4, pre.reserve)
             );
         }
     }
@@ -332,7 +349,7 @@ pub enum ConsumerState {
             update last = new_last;
 
             update producer = ProducerState::CommitReserveLoaded(
-                (pre.producer->CommitReserveLoaded_0.0, pre.producer->CommitReserveLoaded_0.1, pre.producer->CommitReserveLoaded_0.2, new_last, pre.producer->CommitReserveLoaded_0.4)
+                (pre.producer->CommitReserveLoaded_0.0, pre.producer->CommitReserveLoaded_0.1, pre.producer->CommitReserveLoaded_0.2, pre.producer->CommitReserveLoaded_0.3, new_last, pre.producer->CommitReserveLoaded_0.5)
             );
         }
     }
@@ -344,7 +361,7 @@ pub enum ConsumerState {
             update write = new_write;
 
             update producer = ProducerState::CommitReserveLoaded(
-                (pre.producer->CommitReserveLoaded_0.0, pre.producer->CommitReserveLoaded_0.1, new_write, pre.producer->CommitReserveLoaded_0.3, pre.producer->CommitReserveLoaded_0.4)
+                (pre.producer->CommitReserveLoaded_0.0, pre.producer->CommitReserveLoaded_0.1, pre.producer->CommitReserveLoaded_0.2, new_write, pre.producer->CommitReserveLoaded_0.4, pre.producer->CommitReserveLoaded_0.5)
             );
         }
     }
@@ -358,8 +375,8 @@ pub enum ConsumerState {
                         ==> !pre.storage.contains_key(i));
             };
 
-            update producer = ProducerState::Idle(pre.producer->CommitReserveLoaded_0.2);
             update write_in_progress = false;
+            update producer = ProducerState::Idle((false, pre.producer->CommitReserveLoaded_0.3));
         }
     }
 
@@ -379,9 +396,6 @@ pub enum ConsumerState {
         assert(post.producer is GrantWriteAndReadLoaded);
     }
 
-    #[inductive(grant_end)]
-    fn grant_end_inductive(pre: Self, post: Self) { }
-
     #[inductive(grant_fail)]
     fn grant_fail_inductive(pre: Self, post: Self) { }
 
@@ -389,7 +403,7 @@ pub enum ConsumerState {
     fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {        
         assert(post.producer is Reserved);
         // assert(post.producer->Reserved_0.0 == post.write);
-        assert(post.producer->Reserved_0.1 == post.reserve);
+        assert(post.producer->Reserved_0.2 == post.reserve);
     }
 
     #[inductive(commit_start)]
@@ -708,8 +722,8 @@ impl GrantW {
         requires
             old(self).wf(),
             old(self).vbq.wf(),
-            old(producer_token).value() is Reserved,
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
+            old(producer_token).value() is Idle || old(producer_token).value() is Reserved
         ensures
             producer_token.value() is Idle,
             self.vbq.wf(),
@@ -722,8 +736,8 @@ impl GrantW {
         requires
             old(self).wf(),
             old(self).vbq.wf(),
-            old(producer_token).value() is Reserved,
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
+            old(producer_token).value() is Idle || old(producer_token).value() is Reserved
         ensures
             producer_token.value() is Idle,
             self.vbq.wf(),
@@ -731,10 +745,17 @@ impl GrantW {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
         // wrapper structure
+
+        proof {
+            assert(producer_token.value() is Idle || producer_token.value() is Reserved);
+        }
         
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => load();
+                update prev -> next;
+                returning ret;
                 ghost write_in_progress_token => {
+                    assert(producer_token.value() is Idle || producer_token.value() is Reserved);
                     let _ = self.vbq.instance.borrow().commit_start(&write_in_progress_token, producer_token);
                 }
         );
