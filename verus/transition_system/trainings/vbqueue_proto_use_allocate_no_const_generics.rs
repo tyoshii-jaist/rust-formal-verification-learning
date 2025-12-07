@@ -14,6 +14,7 @@ global layout u8 is size == 1, align == 1;
 
 pub enum ProducerState {
     Idle(nat),
+    GrantStarted(nat), // write
     GrantWriteLoaded(nat), // write
     GrantWriteAndReadLoaded((nat, nat)), // (write, read)
     Reserved((nat, nat)), // (grant_start, grant_start + grant_sz)
@@ -120,14 +121,16 @@ pub enum ConsumerState {
     #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
         match self.producer {
-            ProducerState::Idle(write) => self.write == write, //&& self.reserve == w,
+            ProducerState::Idle(idle) => self.write == idle,
+            ProducerState::GrantStarted(idle) => self.write == idle,
             ProducerState::GrantWriteLoaded(write) => self.write == write,
             ProducerState::GrantWriteAndReadLoaded((write, _)) => self.write == write,
-            ProducerState::Reserved((_, reserve)) => self.reserve == reserve,
-            ProducerState::CommitWriteLoaded((_, _, write)) => self.write == write,
-            ProducerState::CommitReserveSubbed((_, _, write)) => self.write == write,
-            ProducerState::CommitLastLoaded((_, _, write, last)) => self.write == write && self.last == last,
-            ProducerState::CommitReserveLoaded((_, _, write, last, reserve)) => self.write == write && self.last == last && self.reserve == self.reserve,
+            ProducerState::Reserved((_, reserve_end)) => self.reserve == reserve_end,
+            // (reserve_start, reserve_end, write, last, reserve)
+            ProducerState::CommitWriteLoaded((reserve_start, reserve_end, write)) => self.write == write && self.reserve == reserve_end,
+            ProducerState::CommitReserveSubbed((reserve_start, reserve_end, write)) => self.write == write,
+            ProducerState::CommitLastLoaded((reserve_start, reserve_end, write, last)) => self.write == write && self.last == last,
+            ProducerState::CommitReserveLoaded((reserve_start, reserve_end, write, last, reserve)) => self.write == write && self.reserve == reserve && self.last == last,
         }
     }
 
@@ -183,9 +186,11 @@ pub enum ConsumerState {
 
     transition!{
         grant_start() {
+            require(pre.producer is Idle);
             require(pre.write_in_progress == false);
 
             update write_in_progress = true;
+            update producer = ProducerState::GrantStarted(pre.producer->Idle_0);
         }
     }
 
@@ -256,14 +261,27 @@ pub enum ConsumerState {
 
     transition!{
         grant_end() {
-            // require(pre.producer is Reserved);
+            update write_in_progress = false;
+        }
+    }
+
+    transition!{
+        grant_fail() {
+            require(pre.producer is GrantWriteAndReadLoaded);
+
+            update producer = ProducerState::Idle(pre.producer->GrantWriteAndReadLoaded_0.0);
             update write_in_progress = false;
         }
     }
 
     transition!{
         commit_start() {
-            require(pre.producer is Reserved);
+            if pre.write_in_progress != true {
+                require(pre.producer is Idle);
+            }
+            else {
+                require(pre.producer is Reserved);
+            }
         }
     }
 
@@ -364,14 +382,29 @@ pub enum ConsumerState {
     #[inductive(grant_end)]
     fn grant_end_inductive(pre: Self, post: Self) { }
 
+    #[inductive(grant_fail)]
+    fn grant_fail_inductive(pre: Self, post: Self) { }
+
     #[inductive(do_reserve)]
     fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {        
         assert(post.producer is Reserved);
+        // assert(post.producer->Reserved_0.0 == post.write);
         assert(post.producer->Reserved_0.1 == post.reserve);
     }
 
     #[inductive(commit_start)]
-    fn commit_start_inductive(pre: Self, post: Self) { }
+    fn commit_start_inductive(pre: Self, post: Self) {
+        if post.producer is Idle {
+            assume(
+                {
+                    &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.contains_key(i)
+                    &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.dom().contains(i)
+                    &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i
+                    &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance
+                }
+            );
+        }
+    }
 
     #[inductive(commit_load_write)]
     fn commit_load_write_inductive(pre: Self, post: Self) { }
@@ -702,12 +735,12 @@ impl GrantW {
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => load();
                 ghost write_in_progress_token => {
-                    let _ = self.vbq.instance.borrow().commit_start(producer_token);
+                    let _ = self.vbq.instance.borrow().commit_start(&write_in_progress_token, producer_token);
                 }
         );
 
         if !is_write_in_progress {
-            assume(producer_token.value() is Idle); // FIXME!
+            assert(producer_token.value() is Idle);
             return;
         }
 
@@ -866,16 +899,28 @@ impl Producer {
                         assert(prev == false);
                         assert(next == true);
                         assert(write_in_progress_token.value() == false);
-                        let _ = self.vbq.instance.borrow().grant_start(&mut write_in_progress_token);
+                        let _ = self.vbq.instance.borrow().grant_start(&mut write_in_progress_token, producer_token);
                         assert(write_in_progress_token.value() == true);
+                        assert(producer_token.value() is GrantStarted);
+                        assert(ret == false);
+                    } else {
+                        assert(write_in_progress_token.value() == true);
+                        assert(producer_token.value() is Idle);
+                        assert(ret == true);
                     };
                 }
         );
 
         if is_write_in_progress {
+            proof {
+                assert(producer_token.value() is Idle);
+            }
             return Err("write in progress");
         }
 
+        proof {
+            assert(producer_token.value() is GrantStarted);
+        }
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
                 let _ = self.vbq.instance.borrow().grant_load_write(&write_token, producer_token);
@@ -899,7 +944,7 @@ impl Producer {
                 // Inverted, no room is available
                 atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                     ghost write_in_progress_token => {
-                        let _ = self.vbq.instance.borrow().grant_end(&mut write_in_progress_token);
+                        let _ = self.vbq.instance.borrow().grant_fail(&mut write_in_progress_token, producer_token);
                         assert(write_in_progress_token.value() == false);
                     }
                 );
@@ -922,7 +967,7 @@ impl Producer {
                     // Not invertible, no space
                     atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                         ghost write_in_progress_token => {
-                            let _ = self.vbq.instance.borrow().grant_end(&mut write_in_progress_token);
+                            let _ = self.vbq.instance.borrow().grant_fail(&mut write_in_progress_token, producer_token);
                             assert(write_in_progress_token.value() == false);
                         }
                     );
