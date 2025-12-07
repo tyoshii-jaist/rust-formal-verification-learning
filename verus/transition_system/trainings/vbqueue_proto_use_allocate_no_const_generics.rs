@@ -679,7 +679,6 @@ impl GrantW {
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
         ensures
             producer_token.value() is Idle,
-            self.wf(),
             self.vbq.wf(),
     {
         self.commit_inner(used, Tracked(producer_token));
@@ -694,7 +693,6 @@ impl GrantW {
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
         ensures
             producer_token.value() is Idle,
-            self.wf(),
             self.vbq.wf(),
     {
         // If there is no grant in progress, return early. This
