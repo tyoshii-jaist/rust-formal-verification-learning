@@ -313,6 +313,7 @@ pub enum ConsumerState {
     transition!{
         commit_sub_reserve(commited: nat) {
             require(pre.producer is CommitWriteLoaded);
+            assert(pre.reserve == pre.producer->CommitWriteLoaded_0.2); // 重要!
             require(pre.reserve >= commited);
 
             let new_reserve = (pre.reserve - commited) as nat;
@@ -421,10 +422,14 @@ pub enum ConsumerState {
     }
 
     #[inductive(commit_load_write)]
-    fn commit_load_write_inductive(pre: Self, post: Self) { }
+    fn commit_load_write_inductive(pre: Self, post: Self) {
+        assert(post.producer->CommitWriteLoaded_0.2 == post.reserve);
+    }
 
     #[inductive(commit_sub_reserve)]
-    fn commit_sub_reserve_inductive(pre: Self, post: Self, commited: nat) { }
+    fn commit_sub_reserve_inductive(pre: Self, post: Self, commited: nat) {
+        assert(pre.producer->CommitWriteLoaded_0.2 == pre.reserve);
+    }
 
     #[inductive(commit_load_last)]
     fn commit_load_last_inductive(pre: Self, post: Self) { }
@@ -718,12 +723,27 @@ impl GrantW {
         &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i]@.provenance == self.buf_perms@[i].ptr()@.provenance
     }
 
+    pub closed spec fn wf_with_producer(&self, producer_token: ProducerState) -> bool {
+        match producer_token {
+            ProducerState::Reserved((wip, reserve_start, reserve_end)) |
+            ProducerState::CommitWriteLoaded((wip, reserve_start, reserve_end, _)) |
+            ProducerState::CommitReserveSubbed((wip, reserve_start, reserve_end, _)) |
+            ProducerState::CommitLastLoaded((wip, reserve_start, reserve_end, _, _)) |
+            ProducerState::CommitReserveLoaded((wip, reserve_start, reserve_end, _, _, _)) => {
+                wip == true && self.buf.len() == reserve_end - reserve_start
+            },
+            ProducerState::Idle(_) => true,
+            _ => false,
+        }
+    }
+
     fn commit(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>)
         requires
             old(self).wf(),
             old(self).vbq.wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
-            old(producer_token).value() is Idle || old(producer_token).value() is Reserved
+            old(producer_token).value() is Idle || old(producer_token).value() is Reserved,
+            old(self).wf_with_producer(old(producer_token).value())
         ensures
             producer_token.value() is Idle,
             self.vbq.wf(),
@@ -737,7 +757,8 @@ impl GrantW {
             old(self).wf(),
             old(self).vbq.wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
-            old(producer_token).value() is Idle || old(producer_token).value() is Reserved
+            old(producer_token).value() is Idle || old(producer_token).value() is Reserved,
+            old(self).wf_with_producer(old(producer_token).value())
         ensures
             producer_token.value() is Idle,
             self.vbq.wf(),
@@ -746,10 +767,6 @@ impl GrantW {
         // generally means we are dropping the grant within a
         // wrapper structure
 
-        proof {
-            assert(producer_token.value() is Idle || producer_token.value() is Reserved);
-        }
-        
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => load();
                 update prev -> next;
@@ -773,15 +790,29 @@ impl GrantW {
         let len = self.buf.len();
         let used = if len <= used { len } else { used }; // min の代用。
 
+        proof {
+            assert(used <= len);
+            assert(producer_token.value() is Reserved);
+        }
+
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
                 let _ = self.vbq.instance.borrow().commit_load_write(&write_token, producer_token);
+                assert(producer_token.value()->CommitWriteLoaded_0.2 - producer_token.value()->CommitWriteLoaded_0.1 == len);
+                assert(producer_token.value()->CommitWriteLoaded_0.2 >= producer_token.value()->CommitWriteLoaded_0.1);
+                assert(producer_token.value()->CommitWriteLoaded_0.2 >= len);
             }
         );
 
+        proof {
+            assert(producer_token.value() is CommitWriteLoaded);
+            assert(self.wf_with_producer(producer_token.value()));
+        }
+
         atomic_with_ghost!(&self.vbq.reserve => fetch_sub(len - used);
+            update prev -> next;
+            returning ret;
             ghost reserve_token => {
-                assume(reserve_token.value() >= (len - used)); // FIXME!
                 let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, producer_token);
             }
         );
