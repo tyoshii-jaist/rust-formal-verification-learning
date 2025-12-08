@@ -410,7 +410,7 @@ pub enum ConsumerState {
     #[inductive(commit_start)]
     fn commit_start_inductive(pre: Self, post: Self) {
         if post.producer is Idle {
-            assume(
+            assert(
                 {
                     &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.contains_key(i)
                     &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.dom().contains(i)
