@@ -1032,10 +1032,6 @@ impl Producer {
         assert(start + sz <= max);
         assert(start + sz <= self.vbq.length);
 
-        proof {
-            assume(start + sz < usize::MAX); // FIXME!
-            assume(start + sz <= self.vbq.instance@.length());  // FIXME!
-        }
         // Safe write, only viewed by this task
 
         let tracked mut granted_perms_map;
