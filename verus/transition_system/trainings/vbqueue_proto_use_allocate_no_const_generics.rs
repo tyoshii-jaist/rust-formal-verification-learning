@@ -295,9 +295,9 @@ pub enum ConsumerState {
             require(pre.producer is Idle || pre.producer is Reserved);
             //assert(!pre.write_in_progress ==> pre.producer is Idle && pre.producer is Idle ==> !pre.write_in_progress);
             if !pre.write_in_progress {
-                require(pre.producer is Idle);
+                assert(pre.producer is Idle);
             } else {
-                require(pre.producer is Reserved);
+                assert(pre.producer is Reserved);
             }
         }
     }
@@ -756,6 +756,7 @@ impl GrantW {
                 returning ret;
                 ghost write_in_progress_token => {
                     assert(producer_token.value() is Idle || producer_token.value() is Reserved);
+                    assert(!(producer_token.value() is Idle) ==> producer_token.value() is Reserved);
                     let _ = self.vbq.instance.borrow().commit_start(&write_in_progress_token, producer_token);
                 }
         );
