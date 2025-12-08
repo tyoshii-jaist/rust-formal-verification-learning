@@ -987,10 +987,9 @@ impl Producer {
         );
         let max = self.vbq.length as usize;
         let already_inverted = write < read;
-        assume(write + sz < usize::MAX);  // FIXME!
 
         let start: usize = if already_inverted {
-            if (write + sz) < read {
+            if ((write as u128 + sz as u128) as u128) < read as u128 {
                 // Inverted, room is still available
                 write
             } else {
@@ -1004,7 +1003,7 @@ impl Producer {
                 return Err("Inverted, no room is available");
             }
         } else {
-            if write + sz <= max {
+            if ((write as u128 + sz as u128) as u128) <= max as u128 {
                 // Non inverted condition
                 write
             } else {
