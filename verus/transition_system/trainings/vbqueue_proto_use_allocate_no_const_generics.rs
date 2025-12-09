@@ -357,7 +357,7 @@ pub enum ConsumerState {
             require(pre.producer is CommitReserveLoaded);
 
             deposit storage += (to_deposit) by {
-                assume(forall |i: nat| to_deposit.contains_key(i)
+                assert(forall |i: nat| to_deposit.contains_key(i)
                         ==> !pre.storage.contains_key(i));
             };
 
@@ -710,7 +710,9 @@ impl GrantW {
             ProducerState::CommitReserveSubbed((wip, reserve_start, reserve_end, _)) |
             ProducerState::CommitLastLoaded((wip, reserve_start, reserve_end, _, _)) |
             ProducerState::CommitReserveLoaded((wip, reserve_start, reserve_end, _, _, _)) => {
-                wip == true && self.buf.len() == reserve_end - reserve_start
+                &&& wip == true
+                &&& self.buf.len() == reserve_end - reserve_start
+                &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf_perms@[i].ptr().addr() == self.vbq.instance@.base_addr() as nat + reserve_start + i as nat
             },
             ProducerState::Idle(_) => true,
             _ => false,
@@ -847,39 +849,23 @@ impl GrantW {
         );
 
         let tracked mut granted_perms_map = Map::<nat, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
-        proof {
-            assert(self.buf.len() == self.buf_perms@.len());
-            /*
-            assert(
-                {
-                    &&& forall |i: nat|
-                        i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + len as nat
-                            ==> granted_perms_map.contains_key(i)
-                    &&& forall |i: nat|
-                        i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + len as nat
-                            ==> granted_perms_map.index(i as nat).ptr() as nat == i as nat
-                    &&& forall |i: nat|
-                        i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + len as nat
-                            ==> granted_perms_map.index(i as nat).ptr()@.provenance == self.vbq.instance@.provenance()
-                }
-            );
-             */
-        }
         for l in 0..len
             invariant
+                0 <= l,
                 l <= len,
-                self.buf_perms@.len() == len - l,
-                /*
-                forall |i: nat|
-                    i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
-                        ==> granted_perms_map.contains_key(i),
+                self.buf_perms@.len() == len,// - l,
+                self.buf_perms@.len() == self.buf.len(),
+                forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == self.buf_perms@[i].ptr(),
+                forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf_perms@[i].ptr().addr() == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 + i as nat,
+                /*forall |i: nat|
+                    i >= self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 && i < self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 + l as nat
+                        <==> granted_perms_map.contains_key(i),
                 forall |i: nat|
                     i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
                         ==> granted_perms_map.index(i as nat).ptr() as nat == i as nat,
                 forall |i: nat|
                     i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
-                        ==> granted_perms_map.index(i as nat).ptr()@.provenance == self.vbq.instance@.provenance(),
-                */
+                        ==> granted_perms_map.index(i as nat).ptr()@.provenance == self.vbq.instance@.provenance(), */
                 self.vbq.wf(),
                 producer_token.instance_id() == self.vbq.instance@.id(),
                 //producer_token.value() is Idle,
@@ -887,10 +873,42 @@ impl GrantW {
                 len - l,
         {
             proof {
-                let points_to = self.buf_perms.borrow_mut().tracked_remove(0);
-                granted_perms_map.insert(points_to.ptr().addr() as nat, points_to);
+                //let points_to = self.buf_perms.borrow_mut().tracked_remove(0);
+                assert(self.buf_perms@[l as int].ptr().addr() == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 as nat + l as nat);
+                //assert(points_to.ptr().addr() as nat == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 as nat + l as nat);
+                //assert(points_to.ptr().addr() as nat == points_to.ptr() as nat);
+                //granted_perms_map.insert(points_to.ptr().addr() as nat, points_to);
             }
         }
+/*
+        for l in 0..len
+            invariant
+                l <= len,
+                self.buf_perms@.len() == len,// - l,
+                forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == self.buf_perms@[i].ptr(),
+                /*forall |i: nat|
+                    i >= self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 && i < self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 + l as nat
+                        <==> granted_perms_map.contains_key(i),
+                forall |i: nat|
+                    i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
+                        ==> granted_perms_map.index(i as nat).ptr() as nat == i as nat,
+                forall |i: nat|
+                    i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
+                        ==> granted_perms_map.index(i as nat).ptr()@.provenance == self.vbq.instance@.provenance(), */
+                self.vbq.wf(),
+                producer_token.instance_id() == self.vbq.instance@.id(),
+                //producer_token.value() is Idle,
+            decreases
+                len - l,
+        {
+            proof {
+                //let points_to = self.buf_perms.borrow_mut().tracked_remove(0);
+                assert(self.buf[l as int].ptr().addr() == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 as nat + l as nat);
+                //assert(points_to.ptr().addr() as nat == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 as nat + l as nat);
+                //assert(points_to.ptr().addr() as nat == points_to.ptr() as nat);
+                //granted_perms_map.insert(points_to.ptr().addr() as nat, points_to);
+            }
+        } */
 
         // Allow subsequent grants
         atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
@@ -1021,6 +1039,9 @@ impl Producer {
                 let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, producer_token);
                 granted_perms_map = ret.1.get();
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
+                assert(
+                    forall |j: nat| j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat 
+                        <==> granted_perms_map.contains_key(j));
                 assert(
                     forall |j: nat|
                         j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
