@@ -113,10 +113,9 @@ pub enum ConsumerState {
                             self.storage.contains_key(i)
                         )
                 &&& forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
-                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                    (i >= self.base_addr + grant_start && i < self.base_addr + grant_end as nat)
                         ==> (
-                            self.storage.dom().contains(i)
+                            !self.storage.contains_key(i)
                         )
                 &&& forall |i: nat|
                     ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
@@ -133,7 +132,6 @@ pub enum ConsumerState {
             },
             _ => {
                 &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.contains_key(i)
-                &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.dom().contains(i)
                 &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.index(i).ptr().addr() == i
                 &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.index(i).ptr()@.provenance == self.provenance
             },
@@ -166,8 +164,7 @@ pub enum ConsumerState {
         {
             require(
                 {
-                    &&& forall |i: nat| i >= base_addr && i < base_addr + length ==> storage.contains_key(i)
-                    &&& forall |i: nat| i >= base_addr && i < base_addr + length ==> storage.dom().contains(i)
+                    &&& forall |i: nat| i >= base_addr && i < base_addr + length <==> storage.contains_key(i)
                     &&& forall |i: nat| i >= base_addr && i < base_addr + length ==> storage.index(i).ptr().addr() == i
                     &&& forall |i: nat| i >= base_addr && i < base_addr + length ==> storage.index(i).ptr()@.provenance == provenance
                 }
@@ -240,7 +237,7 @@ pub enum ConsumerState {
             update reserve = start + sz;
 
             birds_eye let range_keys = Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + start + sz);
-            // restrict を使わないとうまく pre.storage の情報が引き継がれない
+            // restrict を使わないとうまく pre.storage の情報が引き継がれない?
             birds_eye let withdraw_range_map = pre.storage.restrict(range_keys);
 
             withdraw storage -= (withdraw_range_map) by {
@@ -584,10 +581,7 @@ impl VBBuffer
                 buffer_perm.is_range(buffer_ptr as int + len as int, length - len),
                 forall |i: nat|
                     i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
-                        ==> points_to_map.contains_key(i),
-                forall |i: nat|
-                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
-                        ==> points_to_map.dom().contains(i),
+                        <==> points_to_map.contains_key(i),
                 forall |i: nat|
                     i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
                         ==> points_to_map.index(i as nat).ptr() as nat == i as nat,
