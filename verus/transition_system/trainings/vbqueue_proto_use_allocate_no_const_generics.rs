@@ -131,7 +131,7 @@ pub enum ConsumerState {
                         )
             },
             _ => {
-                &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.contains_key(i)
+                &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length <==> self.storage.contains_key(i)
                 &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.index(i).ptr().addr() == i
                 &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.index(i).ptr()@.provenance == self.provenance
             },
@@ -246,15 +246,9 @@ pub enum ConsumerState {
                     // assert(Set::new(|i: nat| i >= pre.base_addr && i < pre.base_addr + pre.length).subset_of(pre.storage.dom()));
                     assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr)));
                     assert(pre.valid_storage_all());
-                    assert(
-                        forall |j: nat|
-                            j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz
-                                ==> (
-                                    pre.storage.contains_key(j)
-                                    && pre.storage[j].ptr().addr() == j
-                                    && pre.storage[j].ptr()@.provenance == pre.provenance
-                                )
-                    );
+                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.contains_key(j));
+                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.index(j).ptr().addr() == j);
+                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.index(j).ptr()@.provenance == pre.provenance);
                 }
             };
             
@@ -266,15 +260,9 @@ pub enum ConsumerState {
             assert(
                 Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr).subset_of(withdraw_range_map.dom())
             );
-            assert(
-                forall |j: nat|
-                    j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz
-                        ==> (
-                            withdraw_range_map.contains_key(j)
-                            && withdraw_range_map[j].ptr().addr() == j
-                            && withdraw_range_map[j].ptr()@.provenance == pre.provenance
-                        )
-            );
+            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> withdraw_range_map.contains_key(j));
+            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> withdraw_range_map.index(j).ptr().addr() == j);
+            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> withdraw_range_map.index(j).ptr()@.provenance == pre.provenance);
         }
     }
 
@@ -410,7 +398,6 @@ pub enum ConsumerState {
             assert(
                 {
                     &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.contains_key(i)
-                    &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.dom().contains(i)
                     &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i
                     &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance
                 }
@@ -444,8 +431,7 @@ pub enum ConsumerState {
     fn commit_end_inductive(pre: Self, post: Self, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
         assume(
             {
-                &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.contains_key(i)
-                &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.dom().contains(i)
+                &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length <==> post.storage.contains_key(i)
                 &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i
                 &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance
             }
