@@ -246,7 +246,7 @@ pub enum ConsumerState {
                     // assert(Set::new(|i: nat| i >= pre.base_addr && i < pre.base_addr + pre.length).subset_of(pre.storage.dom()));
                     assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr)));
                     assert(pre.valid_storage_all());
-                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.contains_key(j));
+                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz <==> pre.storage.contains_key(j));
                     assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.index(j).ptr().addr() == j);
                     assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.index(j).ptr()@.provenance == pre.provenance);
                 }
@@ -693,17 +693,16 @@ struct GrantW {
     buf: Vec<*mut u8>,
     vbq: Arc<VBBuffer>,
     to_commit: usize,
-    buf_perms: Tracked<Map<nat, raw_ptr::PointsTo<u8>>>,
 }
 
 impl GrantW {
-    pub closed spec fn wf(&self) -> bool {
-        &&& self.buf.len() == self.buf_perms@.len()
-        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == self.buf_perms@.index(self.buf[i] as nat).ptr()
-        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i]@.provenance == self.buf_perms@.index(self.buf[i] as nat).ptr()@.provenance
+    pub closed spec fn wf_with_buf_perms(&self, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
+        &&& self.buf.len() == buf_perms.len()
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == buf_perms.index(self.buf[i] as nat).ptr()
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i]@.provenance == buf_perms.index(self.buf[i] as nat).ptr()@.provenance
     }
 
-    pub closed spec fn wf_with_producer(&self, producer_token: ProducerState) -> bool {
+    pub closed spec fn wf_with_producer(&self, producer_token: ProducerState, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
         match producer_token {
             ProducerState::Reserved((wip, reserve_start, reserve_end)) |
             ProducerState::CommitWriteLoaded((wip, reserve_start, reserve_end, _)) |
@@ -712,35 +711,43 @@ impl GrantW {
             ProducerState::CommitReserveLoaded((wip, reserve_start, reserve_end, _, _, _)) => {
                 &&& wip == true
                 &&& self.buf.len() == reserve_end - reserve_start
-                &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf_perms@.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + reserve_start + i as nat
+                &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + reserve_start + i as nat
             },
             ProducerState::Idle(_) => true,
             _ => false,
         }
     }
 
-    fn commit(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>)
+    fn commit(&mut self,
+        used: usize,
+        Tracked(producer_token): Tracked<&mut VBQueue::producer>, 
+        Tracked(buf_perms): Tracked<Map<nat, raw_ptr::PointsTo<u8>>>
+    )
         requires
-            old(self).wf(),
+            old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value() is Idle || old(producer_token).value() is Reserved,
-            old(self).wf_with_producer(old(producer_token).value())
+            old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
             producer_token.value() is Idle,
             self.vbq.wf(),
     {
-        self.commit_inner(used, Tracked(producer_token));
+        self.commit_inner(used, Tracked(producer_token), Tracked(buf_perms));
         // forget(self); // FIXME
     }
 
-    pub(crate) fn commit_inner(&mut self, used: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>)
+    pub(crate) fn commit_inner(&mut self,
+        used: usize,
+        Tracked(producer_token): Tracked<&mut VBQueue::producer>, 
+        Tracked(buf_perms): Tracked<Map<nat, raw_ptr::PointsTo<u8>>>
+    )
         requires
-            old(self).wf(),
+            old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value() is Idle || old(producer_token).value() is Reserved,
-            old(self).wf_with_producer(old(producer_token).value())
+            old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
             producer_token.value() is Idle,
             self.vbq.wf(),
@@ -788,7 +795,7 @@ impl GrantW {
 
         proof {
             assert(producer_token.value() is CommitWriteLoaded);
-            assert(self.wf_with_producer(producer_token.value()));
+            assert(self.wf_with_producer(producer_token.value(), buf_perms));
         }
 
         atomic_with_ghost!(&self.vbq.reserve => fetch_sub(len - used);
@@ -853,10 +860,10 @@ impl GrantW {
             invariant
                 0 <= l,
                 l <= len,
-                self.buf_perms@.len() == len,// - l,
-                self.buf_perms@.len() == self.buf.len(),
-                forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == self.buf_perms@.index(self.buf[i] as nat).ptr(),
-                forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf_perms@.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 + i as nat,
+                buf_perms.len() == len,// - l,
+                buf_perms.len() == self.buf.len(),
+                forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == buf_perms.index(self.buf[i] as nat).ptr(),
+                forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 + i as nat,
                 /*forall |i: nat|
                     i >= self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 && i < self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 + l as nat
                         <==> granted_perms_map.contains_key(i),
@@ -874,7 +881,7 @@ impl GrantW {
         {
             proof {
                 //let points_to = self.buf_perms.borrow_mut().tracked_remove(0);
-                assert(self.buf_perms@.index(self.buf[l as int] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 as nat + l as nat);
+                assert(buf_perms.index(self.buf[l as int] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 as nat + l as nat);
                 //assert(points_to.ptr().addr() as nat == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 as nat + l as nat);
                 //assert(points_to.ptr().addr() as nat == points_to.ptr() as nat);
                 //granted_perms_map.insert(points_to.ptr().addr() as nat, points_to);
@@ -913,7 +920,7 @@ impl GrantW {
         // Allow subsequent grants
         atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
             ghost write_in_progress_token => {
-                let _ = self.vbq.instance.borrow().commit_end(self.buf_perms.borrow(), self.buf_perms.borrow(), &mut write_in_progress_token, producer_token);
+                let _ = self.vbq.instance.borrow().commit_end(buf_perms, buf_perms, &mut write_in_progress_token, producer_token);
                 assert(write_in_progress_token.value() == false);
             }
         );
@@ -926,15 +933,15 @@ impl GrantW {
 }
 
 impl Producer {
-    fn grant_exact(&mut self, sz: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) -> (r: Result<GrantW, &'static str>)
+    fn grant_exact(&mut self, sz: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) -> (r: Result<(GrantW, Tracked<Map<nat, PointsTo<u8>>>), &'static str>)
         requires
             old(self).wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value() is Idle,
         ensures
             match r {
-                Ok(wgr) => {
-                    wgr.wf() &&
+                Ok((wgr, buf_perms)) => {
+                    wgr.wf_with_buf_perms(buf_perms@) &&
                     wgr.buf.len() == sz &&
                     producer_token.value() is Reserved
                 },
@@ -1057,6 +1064,7 @@ impl Producer {
                             )
                 );
                 assert(reserve_token.value() == start + sz);
+                assume(granted_perms_map.len() == sz);
             }
         );
 
@@ -1077,10 +1085,12 @@ impl Producer {
                             //&& granted_perms_map.index(j as nat).ptr()@.provenance == self.vbq.instance@.provenance()
                         )
             );
+            assert(granted_buf.len() == 0);
         }
 
         for idx in start..end_offset
             invariant
+                granted_buf.len() == idx - start,
                 idx <= end_offset,
                 base_ptr as usize + end_offset <= usize::MAX + 1,
                 base_ptr@.provenance == self.vbq.instance@.provenance(),
@@ -1123,12 +1133,13 @@ impl Producer {
         }
 
         Ok (
-            GrantW {
-                buf: granted_buf,
-                vbq: self.vbq.clone(),
-                to_commit: sz,
-                buf_perms: Tracked(granted_perms_map),
-            }
+            (
+                GrantW {
+                    buf: granted_buf,
+                    vbq: self.vbq.clone(),
+                    to_commit: sz,
+                }, Tracked(granted_perms_map)
+            )
         )
     }
 }
@@ -1148,8 +1159,8 @@ fn main() {
 
     // Request space for one byte
     match prod.grant_exact(2, Tracked(&mut producer_token)) {
-        Ok(wgr) => {
-            let Tracked(buf_perms) = wgr.buf_perms;
+        Ok((wgr, buf_perms)) => {
+            let tracked buf_perms = buf_perms.get();
             let tracked points_to = buf_perms.tracked_remove(wgr.buf[0] as nat);
             
             ptr_mut_write(wgr.buf[0], Tracked(&mut points_to), 5);
