@@ -109,11 +109,11 @@ pub enum ConsumerState {
                 &&& forall |i: nat|
                     ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
                     (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
-                        ==> (
+                        <==> (
                             self.storage.contains_key(i)
                         )
                 &&& forall |i: nat|
-                    (i >= self.base_addr + grant_start && i < self.base_addr + grant_end as nat)
+                    (i >= self.base_addr + grant_start as nat && i < self.base_addr + grant_end)
                         ==> (
                             !self.storage.contains_key(i)
                         )
@@ -356,9 +356,21 @@ pub enum ConsumerState {
         commit_end(to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
             require(pre.producer is CommitReserveLoaded);
 
+            require(
+                forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
+                    <==> to_deposit.contains_key(j));
+
             deposit storage += (to_deposit) by {
-                assert(forall |i: nat| to_deposit.contains_key(i)
-                        ==> !pre.storage.contains_key(i));
+                assert(pre.valid_storage_all());
+                assert(forall |i: nat| to_deposit.contains_key(i) ==> !pre.storage.contains_key(i)) by {
+                    assert(to_deposit.dom().subset_of(
+                        Set::new(|i: nat| i >= pre.producer->CommitReserveLoaded_0.1 + pre.base_addr && i < pre.producer->CommitReserveLoaded_0.2 + pre.base_addr)
+                    )) by {
+                        assert(
+                        forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
+                            <==> to_deposit.contains_key(j));
+                        };
+                }
             };
 
             update write_in_progress = false;
@@ -713,6 +725,8 @@ impl GrantW {
                 &&& wip == true
                 &&& self.buf.len() == reserve_end - reserve_start
                 &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + reserve_start + i as nat
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
+                    <==> buf_perms.contains_key(j)
             },
             ProducerState::Idle(_) => true,
             _ => false,
@@ -765,6 +779,7 @@ impl GrantW {
                     assert(producer_token.value() is Idle || producer_token.value() is Reserved);
                     assert(!(producer_token.value() is Idle) ==> producer_token.value() is Reserved);
                     let _ = self.vbq.instance.borrow().commit_start(&write_in_progress_token, producer_token);
+                    assert(self.wf_with_producer(producer_token.value(), buf_perms));
                 }
         );
 
@@ -791,6 +806,7 @@ impl GrantW {
                 assert(producer_token.value()->CommitWriteLoaded_0.2 - producer_token.value()->CommitWriteLoaded_0.1 == len);
                 assert(producer_token.value()->CommitWriteLoaded_0.2 >= producer_token.value()->CommitWriteLoaded_0.1);
                 assert(producer_token.value()->CommitWriteLoaded_0.2 >= len);
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
             }
         );
 
@@ -804,6 +820,7 @@ impl GrantW {
             returning ret;
             ghost reserve_token => {
                 let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, producer_token);
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
             }
         );
 
@@ -811,12 +828,14 @@ impl GrantW {
         let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
                 let _ = self.vbq.instance.borrow().commit_load_last(&last_token, producer_token);
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
             }
         );
         
         let new_write = atomic_with_ghost!(&self.vbq.reserve => load();
             ghost reserve_token => {
                 let _ = self.vbq.instance.borrow().commit_load_reserve(&reserve_token, producer_token);
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
             }
         );
 
@@ -826,6 +845,7 @@ impl GrantW {
             atomic_with_ghost!(&self.vbq.last => store(write);
                 ghost last_token => {
                     let _ = self.vbq.instance.borrow().commit_store_last(write as nat, &mut last_token, producer_token);
+                    assert(self.wf_with_producer(producer_token.value(), buf_perms));
                 }
             );
         } else if new_write > last {
@@ -839,6 +859,7 @@ impl GrantW {
             atomic_with_ghost!(&self.vbq.last => store(max);
                 ghost last_token => {
                     let _ = self.vbq.instance.borrow().commit_store_last(max as nat, &mut last_token, producer_token);
+                    assert(self.wf_with_producer(producer_token.value(), buf_perms));
                 }
             );
         }
@@ -853,74 +874,18 @@ impl GrantW {
         atomic_with_ghost!(&self.vbq.write => store(new_write);
             ghost write_token => {
                 let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, &mut write_token, producer_token);
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
             }
         );
-
-        let tracked mut granted_perms_map = Map::<nat, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
-        for l in 0..len
-            invariant
-                0 <= l,
-                l <= len,
-                buf_perms.len() == len,// - l,
-                buf_perms.len() == self.buf.len(),
-                forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == buf_perms.index(self.buf[i] as nat).ptr(),
-                forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 + i as nat,
-                /*forall |i: nat|
-                    i >= self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 && i < self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 + l as nat
-                        <==> granted_perms_map.contains_key(i),
-                forall |i: nat|
-                    i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
-                        ==> granted_perms_map.index(i as nat).ptr() as nat == i as nat,
-                forall |i: nat|
-                    i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
-                        ==> granted_perms_map.index(i as nat).ptr()@.provenance == self.vbq.instance@.provenance(), */
-                self.vbq.wf(),
-                producer_token.instance_id() == self.vbq.instance@.id(),
-                //producer_token.value() is Idle,
-            decreases
-                len - l,
-        {
-            proof {
-                //let points_to = self.buf_perms.borrow_mut().tracked_remove(0);
-                assert(buf_perms.index(self.buf[l as int] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 as nat + l as nat);
-                //assert(points_to.ptr().addr() as nat == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 as nat + l as nat);
-                //assert(points_to.ptr().addr() as nat == points_to.ptr() as nat);
-                //granted_perms_map.insert(points_to.ptr().addr() as nat, points_to);
-            }
-        }
-/*
-        for l in 0..len
-            invariant
-                l <= len,
-                self.buf_perms@.len() == len,// - l,
-                forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == self.buf_perms@[i].ptr(),
-                /*forall |i: nat|
-                    i >= self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 && i < self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 + l as nat
-                        <==> granted_perms_map.contains_key(i),
-                forall |i: nat|
-                    i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
-                        ==> granted_perms_map.index(i as nat).ptr() as nat == i as nat,
-                forall |i: nat|
-                    i >= self.vbq.instance@.base_addr() as nat && i < self.vbq.instance@.base_addr() as nat + l as nat
-                        ==> granted_perms_map.index(i as nat).ptr()@.provenance == self.vbq.instance@.provenance(), */
-                self.vbq.wf(),
-                producer_token.instance_id() == self.vbq.instance@.id(),
-                //producer_token.value() is Idle,
-            decreases
-                len - l,
-        {
-            proof {
-                //let points_to = self.buf_perms.borrow_mut().tracked_remove(0);
-                assert(self.buf[l as int].ptr().addr() == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 as nat + l as nat);
-                //assert(points_to.ptr().addr() as nat == self.vbq.instance@.base_addr() as nat + producer_token.value()->CommitReserveLoaded_0.1 as nat + l as nat);
-                //assert(points_to.ptr().addr() as nat == points_to.ptr() as nat);
-                //granted_perms_map.insert(points_to.ptr().addr() as nat, points_to);
-            }
-        } */
 
         // Allow subsequent grants
         atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
             ghost write_in_progress_token => {
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
+                assert(
+                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
+                        <==> buf_perms.contains_key(j));
+                assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
                 let _ = self.vbq.instance.borrow().commit_end(buf_perms, buf_perms, &mut write_in_progress_token, producer_token);
                 assert(write_in_progress_token.value() == false);
             }
