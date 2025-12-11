@@ -246,7 +246,7 @@ pub enum ConsumerState {
                     // assert(Set::new(|i: nat| i >= pre.base_addr && i < pre.base_addr + pre.length).subset_of(pre.storage.dom()));
                     assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr)));
                     assert(pre.valid_storage_all());
-                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz <==> pre.storage.contains_key(j));
+                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.contains_key(j));
                     assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.index(j).ptr().addr() == j);
                     assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.index(j).ptr()@.provenance == pre.provenance);
                 }
@@ -698,6 +698,7 @@ struct GrantW {
 impl GrantW {
     pub closed spec fn wf_with_buf_perms(&self, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
         &&& self.buf.len() == buf_perms.len()
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.contains_key(self.buf[i] as nat)
         &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == buf_perms.index(self.buf[i] as nat).ptr()
         &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i]@.provenance == buf_perms.index(self.buf[i] as nat).ptr()@.provenance
     }
@@ -1094,6 +1095,7 @@ impl Producer {
                 idx <= end_offset,
                 base_ptr as usize + end_offset <= usize::MAX + 1,
                 base_ptr@.provenance == self.vbq.instance@.provenance(),
+                forall |i: int| 0 <= i && i < granted_buf.len() ==> granted_perms_map.contains_key(granted_buf[i] as nat),
                 forall |j: nat|
                     j >= base_ptr as nat + idx as nat && j < base_ptr as nat + end_offset as nat
                         ==> (
