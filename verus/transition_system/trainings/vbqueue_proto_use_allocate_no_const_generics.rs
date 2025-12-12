@@ -274,7 +274,7 @@ pub enum ConsumerState {
                     // assert(Set::new(|i: nat| i >= pre.base_addr && i < pre.base_addr + pre.length).subset_of(pre.storage.dom()));
                     assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr)));
                     assert(pre.valid_storage_all());
-                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.contains_key(j));
+                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz <==> pre.storage.contains_key(j));
                     assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.index(j).ptr().addr() == j);
                     assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.index(j).ptr()@.provenance == pre.provenance);
                 }
@@ -386,19 +386,22 @@ pub enum ConsumerState {
 
             require(
                 forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
-                    <==> to_deposit.contains_key(j));
+                    <==> to_deposit.contains_key(j)
+            );
+
+            require(
+                forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
+                     ==> to_deposit.index(j).ptr().addr() == j
+            );
+
+            require(
+                forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
+                    ==> to_deposit.index(j).ptr()@.provenance == pre.provenance
+            );
 
             deposit storage += (to_deposit) by {
                 assert(pre.valid_storage_all());
-                assert(forall |i: nat| to_deposit.contains_key(i) ==> !pre.storage.contains_key(i)) by {
-                    assert(to_deposit.dom().subset_of(
-                        Set::new(|i: nat| i >= pre.producer->CommitReserveLoaded_0.1 + pre.base_addr && i < pre.producer->CommitReserveLoaded_0.2 + pre.base_addr)
-                    )) by {
-                        assert(
-                        forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
-                            <==> to_deposit.contains_key(j));
-                        };
-                }
+                assert(forall |i: nat| to_deposit.contains_key(i) ==> !pre.storage.contains_key(i));
             };
 
             update write_in_progress = false;
@@ -437,7 +440,7 @@ pub enum ConsumerState {
         if post.producer is Idle {
             assert(
                 {
-                    &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.contains_key(i)
+                    &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length <==> post.storage.contains_key(i)
                     &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i
                     &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance
                 }
@@ -469,7 +472,63 @@ pub enum ConsumerState {
 
     #[inductive(commit_end)]
     fn commit_end_inductive(pre: Self, post: Self, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
-        assume(
+        assert(forall |i: nat| post.base_addr <= i && i < post.base_addr + post.length ==> post.storage.contains_key(i)) by {
+            assert(forall |i: nat| pre.base_addr + pre.producer->CommitReserveLoaded_0.1 <= i && i < pre.base_addr + pre.producer->CommitReserveLoaded_0.2 ==> {
+                if pre.base_addr + pre.producer->CommitReserveLoaded_0.1 <= i && i < pre.base_addr + pre.producer->CommitReserveLoaded_0.2 {
+                    // デポジットした範囲内なら to_deposit にあるはず
+                    to_deposit.contains_key(i)
+                } else {
+                    // それ以外なら、元々の storage にあったはず
+                    pre.storage.contains_key(i)
+                }
+            });
+        };
+
+        assert(forall |i: nat| post.storage.contains_key(i) ==> post.base_addr <= i && i < post.base_addr + post.length) by {
+            // マップの合成法則により、キーはどちらかにある
+            assert(post.storage.dom() =~= pre.storage.dom() + to_deposit.dom());
+            
+            assert(forall |i: nat| post.storage.contains_key(i) ==> {
+                // ケース1: 今回追加した分
+                if to_deposit.contains_key(i) {
+                    pre.base_addr + pre.producer->CommitReserveLoaded_0.1 <= i && i < pre.base_addr + pre.producer->CommitReserveLoaded_0.2  // これは start..end の内側
+                } 
+                // ケース2: 元々あった分
+                else if pre.storage.contains_key(i) {
+                    // pre.storage の不変条件より、start..end の内側であるはず
+                    // (必要ならここで pre.valid_storage_all() などを参照)
+                    post.base_addr <= i && i < post.base_addr + post.length
+                } else {
+                    false // ここには来ない（postにあるならどちらかにあるはずだから）
+                }
+            });
+        };
+
+        assert(forall |i: nat| post.base_addr <= i && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i) by {
+            assert(forall |i: nat| pre.base_addr + pre.producer->CommitReserveLoaded_0.1 <= i && i < pre.base_addr + pre.producer->CommitReserveLoaded_0.2 ==> {
+                if pre.base_addr + pre.producer->CommitReserveLoaded_0.1 <= i && i < pre.base_addr + pre.producer->CommitReserveLoaded_0.2 {
+                    // ケースA: デポジットした範囲内なら to_deposit にあるはず
+                    to_deposit.index(i).ptr().addr() == i
+                } else {
+                    // ケースB: それ以外なら、元々の storage にあったはず
+                    pre.storage.index(i).ptr().addr() == i
+                }
+            });
+        };
+
+        assert(forall |i: nat| post.base_addr <= i && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance) by {
+            assert(forall |i: nat| pre.base_addr + pre.producer->CommitReserveLoaded_0.1 <= i && i < pre.base_addr + pre.producer->CommitReserveLoaded_0.2 ==> {
+                if pre.base_addr + pre.producer->CommitReserveLoaded_0.1 <= i && i < pre.base_addr + pre.producer->CommitReserveLoaded_0.2 {
+                    // ケースA: デポジットした範囲内なら to_deposit にあるはず
+                    to_deposit.index(i).ptr()@.provenance == pre.provenance
+                } else {
+                    // ケースB: それ以外なら、元々の storage にあったはず
+                    pre.storage.index(i).ptr()@.provenance == pre.provenance
+                }
+            });
+        };
+
+        assert(
             {
                 &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length <==> post.storage.contains_key(i)
                 &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i
@@ -913,6 +972,18 @@ impl GrantW {
                 assert(
                     forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
                         <==> buf_perms.contains_key(j));
+                assume(
+                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
+                        ==> (
+                            buf_perms.index(j).ptr().addr() == j
+                        )
+                );
+                assume(
+                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
+                        ==> (
+                            buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
+                        )
+                );
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
                 let _ = self.vbq.instance.borrow().commit_end(buf_perms, buf_perms, &mut write_in_progress_token, producer_token);
                 assert(write_in_progress_token.value() == false);
@@ -1080,7 +1151,7 @@ impl Producer {
             assert(
                 forall |j: nat|
                     j >= base_ptr as nat + start as nat && j < base_ptr as nat + start as nat + sz as nat
-                        ==> (
+                        <==> (
                             granted_perms_map.contains_key(j)
                             //&& granted_perms_map.index(j as nat).ptr().addr() == j
                             //&& granted_perms_map.index(j as nat).ptr()@.provenance == self.vbq.instance@.provenance()
@@ -1097,8 +1168,8 @@ impl Producer {
                 base_ptr@.provenance == self.vbq.instance@.provenance(),
                 forall |i: int| 0 <= i && i < granted_buf.len() ==> granted_perms_map.contains_key(granted_buf[i] as nat),
                 forall |j: nat|
-                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + end_offset as nat
-                        ==> (
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + start as nat + sz as nat
+                        <==> (
                             granted_perms_map.contains_key(j)
                             //&& granted_perms_map.index(j as nat).ptr().addr() as nat == j as nat
                             //&& granted_perms_map.index(j as nat).ptr()@.provenance == base_ptr@.provenance
@@ -1128,6 +1199,7 @@ impl Producer {
             
             granted_buf.push(ptr);
             assert(granted_perms_map.contains_key(addr as nat));
+            assert(addr as nat >= base_ptr as nat && addr as nat <= base_ptr as nat + idx as nat);
             assert(ptr@.provenance == base_ptr@.provenance);
             assert(granted_perms_map.index(addr as nat).ptr()@.provenance == base_ptr@.provenance);
             assert(granted_perms_map.index(addr as nat).ptr()@.provenance == self.vbq.instance@.provenance());
