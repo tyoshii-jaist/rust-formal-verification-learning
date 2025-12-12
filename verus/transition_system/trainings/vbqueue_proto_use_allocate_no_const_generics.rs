@@ -12,6 +12,34 @@ use std::sync::Arc;
 verus! {
 global layout u8 is size == 1, align == 1;
 
+spec fn range_set(base: nat, sz: nat) -> Set<nat> {
+    Set::new(|i: nat| base <= i && i < base + sz)
+}
+
+proof fn lemma_range_set_len(base: nat, sz: nat)
+    ensures
+        // ここを |i: nat| に合わせる
+        Set::new(|i: nat| base <= i && i < base + sz).len() == sz,
+        Set::new(|i: nat| base <= i && i < base + sz).finite(),
+    decreases sz
+{
+    // 定義をあわせる
+    let s_target = Set::new(|i: nat| base <= i && i < base + sz);
+
+    if sz == 0 {
+        assert(s_target =~= Set::empty()); 
+    } else {
+        lemma_range_set_len(base, (sz - 1) as nat);
+        
+        let s_prev = Set::new(|i: nat| base <= i && i < base + (sz - 1));
+        // nat 同士の計算なので、sz >= 1 なら (base + sz - 1) は安全
+        let last_elem = (base + sz - 1) as nat;
+
+        assert(s_target =~= s_prev.insert(last_elem));
+        assert(!s_prev.contains(last_elem));
+    }
+}
+
 pub enum ProducerState {
     Idle((bool, nat)), // (write_in_progress, write)
     GrantStarted((bool, nat)), // (write_in_progress, write)
@@ -260,7 +288,7 @@ pub enum ConsumerState {
             assert(
                 Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr).subset_of(withdraw_range_map.dom())
             );
-            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> withdraw_range_map.contains_key(j));
+            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz <==> withdraw_range_map.contains_key(j));
             assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> withdraw_range_map.index(j).ptr().addr() == j);
             assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> withdraw_range_map.index(j).ptr()@.provenance == pre.provenance);
         }
@@ -1029,8 +1057,15 @@ impl Producer {
                                 granted_perms_map.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
                             )
                 );
+                // lemma で set の数と len() が一致することを示す。
+                let base = self.vbq.buffer as nat + start as nat;
+                let expected_dom = range_set(base, sz as nat);
+                assert(granted_perms_map.dom() =~= expected_dom);
+                assert(granted_perms_map.len() == sz) by {
+                    lemma_range_set_len(base, sz as nat);
+                };
+
                 assert(reserve_token.value() == start + sz);
-                assume(granted_perms_map.len() == sz);
             }
         );
 
