@@ -134,6 +134,8 @@ pub enum ConsumerState {
             ProducerState::CommitReserveSubbed((_, grant_start, grant_end, _)) |
             ProducerState::CommitLastLoaded((_, grant_start, grant_end, _, _)) |
             ProducerState::CommitReserveLoaded((_, grant_start, grant_end, _, _, _)) => {
+                &&& grant_start as nat <= self.length
+                &&& grant_end as nat <= self.length
                 &&& forall |i: nat|
                     ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
                     (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
@@ -395,18 +397,9 @@ pub enum ConsumerState {
                 forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
                     ==> to_deposit.index(j).ptr()@.provenance == pre.provenance
             );
-
             deposit storage += (to_deposit) by {
                 assert(pre.valid_storage_all());
-                assert(forall |i: nat| to_deposit.contains_key(i) ==> !pre.storage.contains_key(i)) by {
-                    assert(to_deposit.dom().subset_of(
-                        Set::new(|i: nat| i >= pre.producer->CommitReserveLoaded_0.1 + pre.base_addr && i < pre.producer->CommitReserveLoaded_0.2 + pre.base_addr)
-                    )) by {
-                        assert(
-                        forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
-                            <==> to_deposit.contains_key(j));
-                        };
-                }
+                assert(forall |i: nat| to_deposit.contains_key(i) ==> !pre.storage.contains_key(i));
             };
 
             update write_in_progress = false;
@@ -445,7 +438,7 @@ pub enum ConsumerState {
         if post.producer is Idle {
             assert(
                 {
-                    &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.contains_key(i)
+                    &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length <==> post.storage.contains_key(i)
                     &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i
                     &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance
                 }
@@ -477,7 +470,33 @@ pub enum ConsumerState {
 
     #[inductive(commit_end)]
     fn commit_end_inductive(pre: Self, post: Self, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
-        assume(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length <==> post.storage.contains_key(i));
+        assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.contains_key(i));
+
+        let start = post.base_addr;
+        let end = post.base_addr + post.length;
+        let dep_start = pre.base_addr + pre.producer->CommitReserveLoaded_0.1;
+        let dep_end = pre.base_addr + pre.producer->CommitReserveLoaded_0.2;
+
+        // 証明したい式: post.storage のキーはすべて範囲内である
+        assert(forall |i: nat| post.storage.contains_key(i) ==> start <= i && i < end) 
+        by {
+            // ヒント1: 今回追加した分 (to_deposit) は範囲内であることをVerusに教える
+            // (論理式の中に assert を書くのではなく、assert で事実を積み上げる)
+            assert(forall |i: nat| to_deposit.contains_key(i) ==> start <= i && i < end) by {
+                // to_deposit のキーは dep_start..dep_end にある
+                // そして dep_start..dep_end は start..end の部分集合である
+                assert(start <= dep_start && dep_end <= end); 
+            };
+
+            // ヒント2: 元々あった分 (pre.storage) も範囲内であることを教える
+            assert(forall |i: nat| pre.storage.contains_key(i) ==> start <= i && i < end) by {
+                // これは不変条件から自明
+                assert(pre.valid_storage_all());
+            };
+
+            // Verus は「post は to_deposit と pre の和集合」であることを知っているため、
+            // 上記2つのヒントがあれば、自動的に全体の証明が完了します。
+        };
         assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i);
         assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance);
     }
