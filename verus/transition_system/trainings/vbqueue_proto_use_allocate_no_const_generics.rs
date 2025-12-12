@@ -722,223 +722,6 @@ impl VBBuffer
     }
 }
 
-struct GrantW {
-    buf: Vec<*mut u8>,
-    vbq: Arc<VBBuffer>,
-    to_commit: usize,
-}
-
-impl GrantW {
-    pub closed spec fn wf_with_buf_perms(&self, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
-        &&& self.buf.len() == buf_perms.len()
-        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.contains_key(self.buf[i] as nat)
-        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == buf_perms.index(self.buf[i] as nat).ptr()
-        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i]@.provenance == buf_perms.index(self.buf[i] as nat).ptr()@.provenance
-    }
-
-    pub closed spec fn wf_with_producer(&self, producer_token: ProducerState, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
-        match producer_token {
-            ProducerState::Reserved((wip, reserve_start, reserve_end)) |
-            ProducerState::CommitWriteLoaded((wip, reserve_start, reserve_end, _)) |
-            ProducerState::CommitReserveSubbed((wip, reserve_start, reserve_end, _)) |
-            ProducerState::CommitLastLoaded((wip, reserve_start, reserve_end, _, _)) |
-            ProducerState::CommitReserveLoaded((wip, reserve_start, reserve_end, _, _, _)) => {
-                &&& wip == true
-                &&& self.buf.len() == reserve_end - reserve_start
-                &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + reserve_start + i as nat
-                &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
-                    <==> buf_perms.contains_key(j)
-                &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
-                    ==> (
-                        buf_perms.index(j).ptr().addr() == j
-                    )
-                &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
-                    ==> (
-                        buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
-                    )
-            },
-            ProducerState::Idle(_) => true,
-            _ => false,
-        }
-    }
-
-    fn commit(&mut self,
-        used: usize,
-        Tracked(producer_token): Tracked<&mut VBQueue::producer>, 
-        Tracked(buf_perms): Tracked<Map<nat, raw_ptr::PointsTo<u8>>>
-    )
-        requires
-            old(self).wf_with_buf_perms(buf_perms),
-            old(self).vbq.wf(),
-            old(producer_token).instance_id() == old(self).vbq.instance@.id(),
-            old(producer_token).value() is Idle || old(producer_token).value() is Reserved,
-            old(self).wf_with_producer(old(producer_token).value(), buf_perms)
-        ensures
-            producer_token.value() is Idle,
-            self.vbq.wf(),
-    {
-        self.commit_inner(used, Tracked(producer_token), Tracked(buf_perms));
-        // forget(self); // FIXME
-    }
-
-    pub(crate) fn commit_inner(&mut self,
-        used: usize,
-        Tracked(producer_token): Tracked<&mut VBQueue::producer>, 
-        Tracked(buf_perms): Tracked<Map<nat, raw_ptr::PointsTo<u8>>>
-    )
-        requires
-            old(self).wf_with_buf_perms(buf_perms),
-            old(self).vbq.wf(),
-            old(producer_token).instance_id() == old(self).vbq.instance@.id(),
-            old(producer_token).value() is Idle || old(producer_token).value() is Reserved,
-            old(self).wf_with_producer(old(producer_token).value(), buf_perms)
-        ensures
-            producer_token.value() is Idle,
-            self.vbq.wf(),
-    {
-        // If there is no grant in progress, return early. This
-        // generally means we are dropping the grant within a
-        // wrapper structure
-
-        let is_write_in_progress =
-            atomic_with_ghost!(&self.vbq.write_in_progress => load();
-                update prev -> next;
-                returning ret;
-                ghost write_in_progress_token => {
-                    assert(producer_token.value() is Idle || producer_token.value() is Reserved);
-                    assert(!(producer_token.value() is Idle) ==> producer_token.value() is Reserved);
-                    let _ = self.vbq.instance.borrow().commit_start(&write_in_progress_token, producer_token);
-                    assert(self.wf_with_producer(producer_token.value(), buf_perms));
-                }
-        );
-
-        if !is_write_in_progress {
-            assert(producer_token.value() is Idle);
-            return;
-        }
-
-        // Writer component. Must never write to READ,
-        // be careful writing to LAST
-
-        // Saturate the grant commit
-        let len = self.buf.len();
-        let used = if len <= used { len } else { used }; // min の代用。
-
-        proof {
-            assert(used <= len);
-            assert(producer_token.value() is Reserved);
-        }
-
-        let write = atomic_with_ghost!(&self.vbq.write => load();
-            ghost write_token => {
-                let _ = self.vbq.instance.borrow().commit_load_write(&write_token, producer_token);
-                assert(producer_token.value()->CommitWriteLoaded_0.2 - producer_token.value()->CommitWriteLoaded_0.1 == len);
-                assert(producer_token.value()->CommitWriteLoaded_0.2 >= producer_token.value()->CommitWriteLoaded_0.1);
-                assert(producer_token.value()->CommitWriteLoaded_0.2 >= len);
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
-            }
-        );
-
-        proof {
-            assert(producer_token.value() is CommitWriteLoaded);
-            assert(self.wf_with_producer(producer_token.value(), buf_perms));
-        }
-
-        atomic_with_ghost!(&self.vbq.reserve => fetch_sub(len - used);
-            update prev -> next;
-            returning ret;
-            ghost reserve_token => {
-                let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, producer_token);
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
-            }
-        );
-
-        let max = self.vbq.length as usize;
-        let last = atomic_with_ghost!(&self.vbq.last => load();
-            ghost last_token => {
-                let _ = self.vbq.instance.borrow().commit_load_last(&last_token, producer_token);
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
-            }
-        );
-        
-        let new_write = atomic_with_ghost!(&self.vbq.reserve => load();
-            ghost reserve_token => {
-                let _ = self.vbq.instance.borrow().commit_load_reserve(&reserve_token, producer_token);
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
-            }
-        );
-
-        if (new_write < write) && (write != max) {
-            // We have already wrapped, but we are skipping some bytes at the end of the ring.
-            // Mark `last` where the write pointer used to be to hold the line here
-            atomic_with_ghost!(&self.vbq.last => store(write);
-                ghost last_token => {
-                    let _ = self.vbq.instance.borrow().commit_store_last(write as nat, &mut last_token, producer_token);
-                    assert(self.wf_with_producer(producer_token.value(), buf_perms));
-                }
-            );
-        } else if new_write > last {
-            // We're about to pass the last pointer, which was previously the artificial
-            // end of the ring. Now that we've passed it, we can "unlock" the section
-            // that was previously skipped.
-            //
-            // Since new_write is strictly larger than last, it is safe to move this as
-            // the other thread will still be halted by the (about to be updated) write
-            // value
-            atomic_with_ghost!(&self.vbq.last => store(max);
-                ghost last_token => {
-                    let _ = self.vbq.instance.borrow().commit_store_last(max as nat, &mut last_token, producer_token);
-                    assert(self.wf_with_producer(producer_token.value(), buf_perms));
-                }
-            );
-        }
-        // else: If new_write == last, either:
-        // * last == max, so no need to write, OR
-        // * If we write in the end chunk again, we'll update last to max next time
-        // * If we write to the start chunk in a wrap, we'll update last when we
-        //     move write backwards
-
-        // Write must be updated AFTER last, otherwise read could think it was
-        // time to invert early!
-        atomic_with_ghost!(&self.vbq.write => store(new_write);
-            ghost write_token => {
-                let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, &mut write_token, producer_token);
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
-            }
-        );
-
-        // Allow subsequent grants
-        atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
-            ghost write_in_progress_token => {
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
-                assert(
-                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
-                        <==> buf_perms.contains_key(j));
-                assert(
-                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
-                        ==> (
-                            buf_perms.index(j).ptr().addr() == j
-                        )
-                );
-                assert(
-                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
-                        ==> (
-                            buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
-                        )
-                );
-                assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
-                let _ = self.vbq.instance.borrow().commit_end(buf_perms, buf_perms, &mut write_in_progress_token, producer_token);
-                assert(write_in_progress_token.value() == false);
-            }
-        );
-    }
-
-    /// Configures the amount of bytes to be commited on drop.
-    pub fn to_commit(&mut self, amt: usize) {
-        self.to_commit = self.buf.len().min(amt);
-    }
-}
-
 impl Producer {
     fn grant_exact(&mut self, sz: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) -> (r: Result<(GrantW, Tracked<Map<nat, PointsTo<u8>>>), &'static str>)
         requires
@@ -1156,6 +939,224 @@ impl Producer {
                 }, Tracked(granted_perms_map)
             )
         )
+    }
+}
+
+
+struct GrantW {
+    buf: Vec<*mut u8>,
+    vbq: Arc<VBBuffer>,
+    to_commit: usize,
+}
+
+impl GrantW {
+    pub closed spec fn wf_with_buf_perms(&self, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
+        &&& self.buf.len() == buf_perms.len()
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.contains_key(self.buf[i] as nat)
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == buf_perms.index(self.buf[i] as nat).ptr()
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i]@.provenance == buf_perms.index(self.buf[i] as nat).ptr()@.provenance
+    }
+
+    pub closed spec fn wf_with_producer(&self, producer_token: ProducerState, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
+        match producer_token {
+            ProducerState::Reserved((wip, reserve_start, reserve_end)) |
+            ProducerState::CommitWriteLoaded((wip, reserve_start, reserve_end, _)) |
+            ProducerState::CommitReserveSubbed((wip, reserve_start, reserve_end, _)) |
+            ProducerState::CommitLastLoaded((wip, reserve_start, reserve_end, _, _)) |
+            ProducerState::CommitReserveLoaded((wip, reserve_start, reserve_end, _, _, _)) => {
+                &&& wip == true
+                &&& self.buf.len() == reserve_end - reserve_start
+                &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + reserve_start + i as nat
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
+                    <==> buf_perms.contains_key(j)
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
+                    ==> (
+                        buf_perms.index(j).ptr().addr() == j
+                    )
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
+                    ==> (
+                        buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
+                    )
+            },
+            ProducerState::Idle(_) => true,
+            _ => false,
+        }
+    }
+
+    fn commit(&mut self,
+        used: usize,
+        Tracked(producer_token): Tracked<&mut VBQueue::producer>, 
+        Tracked(buf_perms): Tracked<Map<nat, raw_ptr::PointsTo<u8>>>
+    )
+        requires
+            old(self).wf_with_buf_perms(buf_perms),
+            old(self).vbq.wf(),
+            old(producer_token).instance_id() == old(self).vbq.instance@.id(),
+            old(producer_token).value() is Idle || old(producer_token).value() is Reserved,
+            old(self).wf_with_producer(old(producer_token).value(), buf_perms)
+        ensures
+            producer_token.value() is Idle,
+            self.vbq.wf(),
+    {
+        self.commit_inner(used, Tracked(producer_token), Tracked(buf_perms));
+        // forget(self); // FIXME
+    }
+
+    pub(crate) fn commit_inner(&mut self,
+        used: usize,
+        Tracked(producer_token): Tracked<&mut VBQueue::producer>, 
+        Tracked(buf_perms): Tracked<Map<nat, raw_ptr::PointsTo<u8>>>
+    )
+        requires
+            old(self).wf_with_buf_perms(buf_perms),
+            old(self).vbq.wf(),
+            old(producer_token).instance_id() == old(self).vbq.instance@.id(),
+            old(producer_token).value() is Idle || old(producer_token).value() is Reserved,
+            old(self).wf_with_producer(old(producer_token).value(), buf_perms)
+        ensures
+            producer_token.value() is Idle,
+            self.vbq.wf(),
+    {
+        // If there is no grant in progress, return early. This
+        // generally means we are dropping the grant within a
+        // wrapper structure
+
+        let is_write_in_progress =
+            atomic_with_ghost!(&self.vbq.write_in_progress => load();
+                update prev -> next;
+                returning ret;
+                ghost write_in_progress_token => {
+                    assert(producer_token.value() is Idle || producer_token.value() is Reserved);
+                    assert(!(producer_token.value() is Idle) ==> producer_token.value() is Reserved);
+                    let _ = self.vbq.instance.borrow().commit_start(&write_in_progress_token, producer_token);
+                    assert(self.wf_with_producer(producer_token.value(), buf_perms));
+                }
+        );
+
+        if !is_write_in_progress {
+            assert(producer_token.value() is Idle);
+            return;
+        }
+
+        // Writer component. Must never write to READ,
+        // be careful writing to LAST
+
+        // Saturate the grant commit
+        let len = self.buf.len();
+        let used = if len <= used { len } else { used }; // min の代用。
+
+        proof {
+            assert(used <= len);
+            assert(producer_token.value() is Reserved);
+        }
+
+        let write = atomic_with_ghost!(&self.vbq.write => load();
+            ghost write_token => {
+                let _ = self.vbq.instance.borrow().commit_load_write(&write_token, producer_token);
+                assert(producer_token.value()->CommitWriteLoaded_0.2 - producer_token.value()->CommitWriteLoaded_0.1 == len);
+                assert(producer_token.value()->CommitWriteLoaded_0.2 >= producer_token.value()->CommitWriteLoaded_0.1);
+                assert(producer_token.value()->CommitWriteLoaded_0.2 >= len);
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
+            }
+        );
+
+        proof {
+            assert(producer_token.value() is CommitWriteLoaded);
+            assert(self.wf_with_producer(producer_token.value(), buf_perms));
+        }
+
+        atomic_with_ghost!(&self.vbq.reserve => fetch_sub(len - used);
+            update prev -> next;
+            returning ret;
+            ghost reserve_token => {
+                let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, producer_token);
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
+            }
+        );
+
+        let max = self.vbq.length as usize;
+        let last = atomic_with_ghost!(&self.vbq.last => load();
+            ghost last_token => {
+                let _ = self.vbq.instance.borrow().commit_load_last(&last_token, producer_token);
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
+            }
+        );
+        
+        let new_write = atomic_with_ghost!(&self.vbq.reserve => load();
+            ghost reserve_token => {
+                let _ = self.vbq.instance.borrow().commit_load_reserve(&reserve_token, producer_token);
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
+            }
+        );
+
+        if (new_write < write) && (write != max) {
+            // We have already wrapped, but we are skipping some bytes at the end of the ring.
+            // Mark `last` where the write pointer used to be to hold the line here
+            atomic_with_ghost!(&self.vbq.last => store(write);
+                ghost last_token => {
+                    let _ = self.vbq.instance.borrow().commit_store_last(write as nat, &mut last_token, producer_token);
+                    assert(self.wf_with_producer(producer_token.value(), buf_perms));
+                }
+            );
+        } else if new_write > last {
+            // We're about to pass the last pointer, which was previously the artificial
+            // end of the ring. Now that we've passed it, we can "unlock" the section
+            // that was previously skipped.
+            //
+            // Since new_write is strictly larger than last, it is safe to move this as
+            // the other thread will still be halted by the (about to be updated) write
+            // value
+            atomic_with_ghost!(&self.vbq.last => store(max);
+                ghost last_token => {
+                    let _ = self.vbq.instance.borrow().commit_store_last(max as nat, &mut last_token, producer_token);
+                    assert(self.wf_with_producer(producer_token.value(), buf_perms));
+                }
+            );
+        }
+        // else: If new_write == last, either:
+        // * last == max, so no need to write, OR
+        // * If we write in the end chunk again, we'll update last to max next time
+        // * If we write to the start chunk in a wrap, we'll update last when we
+        //     move write backwards
+
+        // Write must be updated AFTER last, otherwise read could think it was
+        // time to invert early!
+        atomic_with_ghost!(&self.vbq.write => store(new_write);
+            ghost write_token => {
+                let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, &mut write_token, producer_token);
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
+            }
+        );
+
+        // Allow subsequent grants
+        atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
+            ghost write_in_progress_token => {
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
+                assert(
+                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
+                        <==> buf_perms.contains_key(j));
+                assert(
+                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
+                        ==> (
+                            buf_perms.index(j).ptr().addr() == j
+                        )
+                );
+                assert(
+                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
+                        ==> (
+                            buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
+                        )
+                );
+                assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
+                let _ = self.vbq.instance.borrow().commit_end(buf_perms, buf_perms, &mut write_in_progress_token, producer_token);
+                assert(write_in_progress_token.value() == false);
+            }
+        );
+    }
+
+    /// Configures the amount of bytes to be commited on drop.
+    pub fn to_commit(&mut self, amt: usize) {
+        self.to_commit = self.buf.len().min(amt);
     }
 }
 
