@@ -387,6 +387,14 @@ pub enum ConsumerState {
             require(
                 forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
                     <==> to_deposit.contains_key(j));
+            require(
+                forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
+                     ==> to_deposit.index(j).ptr().addr() == j
+            );
+            require(
+                forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
+                    ==> to_deposit.index(j).ptr()@.provenance == pre.provenance
+            );
 
             deposit storage += (to_deposit) by {
                 assert(pre.valid_storage_all());
@@ -469,13 +477,9 @@ pub enum ConsumerState {
 
     #[inductive(commit_end)]
     fn commit_end_inductive(pre: Self, post: Self, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
-        assume(
-            {
-                &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length <==> post.storage.contains_key(i)
-                &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i
-                &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance
-            }
-        );
+        assume(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length <==> post.storage.contains_key(i));
+        assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i);
+        assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance);
     }
 }}
 
@@ -755,6 +759,14 @@ impl GrantW {
                 &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + reserve_start + i as nat
                 &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
                     <==> buf_perms.contains_key(j)
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
+                    ==> (
+                        buf_perms.index(j).ptr().addr() == j
+                    )
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
+                    ==> (
+                        buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
+                    )
             },
             ProducerState::Idle(_) => true,
             _ => false,
@@ -913,6 +925,18 @@ impl GrantW {
                 assert(
                     forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
                         <==> buf_perms.contains_key(j));
+                assert(
+                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
+                        ==> (
+                            buf_perms.index(j).ptr().addr() == j
+                        )
+                );
+                assert(
+                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
+                        ==> (
+                            buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
+                        )
+                );
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
                 let _ = self.vbq.instance.borrow().commit_end(buf_perms, buf_perms, &mut write_in_progress_token, producer_token);
                 assert(write_in_progress_token.value() == false);
