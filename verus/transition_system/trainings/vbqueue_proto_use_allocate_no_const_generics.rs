@@ -1,11 +1,7 @@
 use state_machines_macros::tokenized_state_machine;
 use vstd::atomic_ghost::*;
-//use vstd::atomic_ghost::*;
 use vstd::raw_ptr::*;
-//use vstd::cell::*;
-//use vstd::map::*;
 use vstd::{prelude::*, *};
-//use vstd::modes::*;
 use vstd::layout::*;
 use std::sync::Arc;
 
@@ -16,14 +12,13 @@ spec fn range_set(base: nat, sz: nat) -> Set<nat> {
     Set::new(|i: nat| base <= i && i < base + sz)
 }
 
+// base から sz 分の集合の len が sz であることを示す補題
 proof fn lemma_range_set_len(base: nat, sz: nat)
     ensures
-        // ここを |i: nat| に合わせる
         Set::new(|i: nat| base <= i && i < base + sz).len() == sz,
         Set::new(|i: nat| base <= i && i < base + sz).finite(),
     decreases sz
 {
-    // 定義をあわせる
     let s_target = Set::new(|i: nat| base <= i && i < base + sz);
 
     if sz == 0 {
@@ -103,23 +98,6 @@ pub enum ConsumerState {
         pub consumer: ConsumerState,
     }
 
-    /*
-    #[invariant]
-    pub fn valid_write_in_progress_in_producer(&self) -> bool {
-        match self.producer {
-            ProducerState::Idle((wip, _)) |
-            ProducerState::GrantStarted((wip, _)) |
-            ProducerState::GrantWriteLoaded((wip, _)) |
-            ProducerState::GrantWriteAndReadLoaded((wip, _, _)) |
-            ProducerState::Reserved((wip, _, _)) |
-            ProducerState::CommitWriteLoaded((wip, _, _, _)) |
-            ProducerState::CommitReserveSubbed((wip, _, _, _)) |
-            ProducerState::CommitLastLoaded((wip, _, _, _, _)) |
-            ProducerState::CommitReserveLoaded((wip, _, _, _, _, _)) => {
-                wip == self.write_in_progress
-            }
-        }
-    } */
     #[invariant]
     pub fn no_write_in_progress(&self) -> bool {
         !self.write_in_progress ==> self.producer is Idle &&
@@ -272,8 +250,6 @@ pub enum ConsumerState {
 
             withdraw storage -= (withdraw_range_map) by {
                 assert(withdraw_range_map.submap_of(pre.storage)) by {
-                    // assert(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz  + pre.base_addr).subset_of(Set::new(|i: nat| i >= pre.base_addr && i < pre.base_addr + pre.length)));
-                    // assert(Set::new(|i: nat| i >= pre.base_addr && i < pre.base_addr + pre.length).subset_of(pre.storage.dom()));
                     assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr)));
                     assert(pre.valid_storage_all());
                     assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.contains_key(j));
@@ -429,7 +405,6 @@ pub enum ConsumerState {
     #[inductive(do_reserve)]
     fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {        
         assert(post.producer is Reserved);
-        // assert(post.producer->Reserved_0.0 == post.write);
         assert(post.producer->Reserved_0.2 == post.reserve);
     }
 
@@ -477,25 +452,21 @@ pub enum ConsumerState {
         let dep_start = pre.base_addr + pre.producer->CommitReserveLoaded_0.1;
         let dep_end = pre.base_addr + pre.producer->CommitReserveLoaded_0.2;
 
-        // 証明したい式: post.storage のキーはすべて範囲内である
+        // post.storage のキーはすべて範囲内であることを示す
         assert(forall |i: nat| post.storage.contains_key(i) ==> start <= i && i < end) 
         by {
-            // ヒント1: 今回追加した分 (to_deposit) は範囲内であることをVerusに教える
-            // (論理式の中に assert を書くのではなく、assert で事実を積み上げる)
+            // ヒント1: 今回追加した分 (to_deposit) は範囲内である
             assert(forall |i: nat| to_deposit.contains_key(i) ==> start <= i && i < end) by {
-                // to_deposit のキーは dep_start..dep_end にある
-                // そして dep_start..dep_end は start..end の部分集合である
                 assert(start <= dep_start && dep_end <= end); 
             };
 
             // ヒント2: 元々あった分 (pre.storage) も範囲内であることを教える
             assert(forall |i: nat| pre.storage.contains_key(i) ==> start <= i && i < end) by {
-                // これは不変条件から自明
                 assert(pre.valid_storage_all());
             };
 
-            // Verus は「post は to_deposit と pre の和集合」であることを知っているため、
-            // 上記2つのヒントがあれば、自動的に全体の証明が完了します。
+            // 「post は to_deposit と pre の和集合」であることを知っているため、
+            // 上記2つのヒントがあれば、自動的に全体の証明が完了する
         };
         assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i);
         assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance);
@@ -574,7 +545,6 @@ pub struct Producer {
 impl Producer {
     pub closed spec fn wf(&self) -> bool {
         (*self.vbq).wf()
-            //&& (self.tail as int) < (*self.queue).buffer@.len()
     }
 }
 
