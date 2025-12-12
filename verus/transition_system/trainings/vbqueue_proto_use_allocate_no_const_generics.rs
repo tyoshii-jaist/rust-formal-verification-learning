@@ -538,30 +538,6 @@ struct_with_invariants!{
     }
 }
 
-pub struct Producer {
-    vbq: Arc<VBBuffer>,
-}
-
-impl Producer {
-    pub closed spec fn wf(&self) -> bool {
-        (*self.vbq).wf()
-    }
-}
-
-pub struct Consumer {
-    vbq: Arc<VBBuffer>,
-}
-
-/*
-impl<T> Consumer<T> {
-    pub closed spec fn wf(&self) -> bool {
-        (*self.queue).wf()
-            && self.consumer@.instance_id() === (*self.queue).instance@.id()
-            && self.consumer@.value() === ConsumerState::Idle(self.head as nat)
-            && (self.head as int) < (*self.queue).buffer@.len()
-    }
-}
- */
 impl VBBuffer
 {
     fn new(length: usize) -> (r:(Self, Tracked<VBQueue::producer>,Tracked<VBQueue::consumer>))
@@ -719,6 +695,16 @@ impl VBBuffer
                 vbq: vbbuffer_arc.clone(),
             }
         ))
+    }
+}
+
+pub struct Producer {
+    vbq: Arc<VBBuffer>,
+}
+
+impl Producer {
+    pub closed spec fn wf(&self) -> bool {
+        (*self.vbq).wf()
     }
 }
 
@@ -942,7 +928,6 @@ impl Producer {
     }
 }
 
-
 struct GrantW {
     buf: Vec<*mut u8>,
     vbq: Arc<VBBuffer>,
@@ -1158,6 +1143,120 @@ impl GrantW {
     pub fn to_commit(&mut self, amt: usize) {
         self.to_commit = self.buf.len().min(amt);
     }
+}
+
+pub struct Consumer {
+    vbq: Arc<VBBuffer>,
+}
+
+impl Consumer {
+    pub closed spec fn wf(&self) -> bool {
+        (*self.vbq).wf()
+    }
+}
+
+impl Consumer {
+    fn read(&mut self) ->  (r: Result<(GrantR, Tracked<Map<nat, PointsTo<u8>>>), &'static str>) {
+        let is_read_in_progress =
+            atomic_with_ghost!(&self.vbq.read_in_progress => swap(true);
+                update prev -> next;
+                returning ret;
+                ghost read_in_progress_token => {
+                    if !ret {
+                        let _ = self.vbq.instance.borrow().read_start(&mut read_in_progress_token, consumer_token);
+                        assert(read_in_progress_token.value() == true);
+                        assert(consumer_token.value() is ReadStarted);
+                        assert(ret == false);
+                    } else {
+                        assert(read_in_progress_token.value() == true);
+                        assert(consumer_token.value() is Idle);
+                        assert(ret == true);
+                    };
+                }
+        );
+
+        if is_read_in_progress {
+            proof {
+                assert(consumer_token.value() is Idle);
+            }
+            return Err("read in progress");
+        }
+
+        let write = atomic_with_ghost!(&self.vbq.write => load();
+            ghost write_token => {
+                let _ = self.vbq.instance.borrow().read_load_write(&write_token, consumer_token);
+            }
+        );
+
+                let last = atomic_with_ghost!(&self.vbq.last => load();
+            ghost last_token => {
+                let _ = self.vbq.instance.borrow().read_load_last(&last_token, consumer_token);
+                assert(self.wf_with_producer(consumer_token.value(), buf_perms));
+            }
+        );
+
+        let mut read = atomic_with_ghost!(&self.vbq.read => load();
+            ghost read_token => {
+                let _ = self.vbq.instance.borrow().read_load_read(&read_token, consumer_token);
+            }
+        );
+
+        // Resolve the inverted case or end of read
+        if (read == last) && (write < read) {
+            read = 0;
+            // This has some room for error, the other thread reads this
+            // Impact to Grant:
+            //   Grant checks if read < write to see if inverted. If not inverted, but
+            //     no space left, Grant will initiate an inversion, but will not trigger it
+            // Impact to Commit:
+            //   Commit does not check read, but if Grant has started an inversion,
+            //   grant could move Last to the prior write position
+            // MOVING READ BACKWARDS!
+            atomic_with_ghost!(&self.vbq.read => store(0);
+                ghost read_token => {
+                    let _ = self.vbq.instance.borrow().read_store_read(0, &mut read_token, consumer_token);
+                }
+            );
+        }
+
+        let sz = if write < read {
+            // Inverted, only believe last
+            last
+        } else {
+            // Not inverted, only believe write
+            write
+        } - read;
+
+        if sz == 0 {
+            atomic_with_ghost!(&self.vbq.read_in_progress => store(false);
+                ghost read_in_progress_token => {
+                    let _ = self.vbq.instance.borrow().read_fail(&mut read_in_progress_token, consumer_token);
+                    assert(read_in_progress_token.value() == false);
+                }
+            );
+            return Err("Insufficient size");
+        }
+
+        // This is sound, as UnsafeCell, MaybeUninit, and GenericArray
+        // are all `#[repr(Transparent)]
+        let start_of_buf_ptr = inner.buf.get().cast::<u8>();
+        let grant_slice = unsafe { from_raw_parts_mut(start_of_buf_ptr.offset(read as isize), sz) };
+
+        Ok(GrantR {
+            buf: grant_slice,
+            vbq: self.bbq,
+            to_release: 0,
+        })
+    }
+}
+
+struct GrantR {
+    buf: Vec<*mut u8>,
+    vbq: Arc<VBBuffer>,
+    to_release: usize,
+}
+
+impl GrantR {
 }
 
 fn main() {
