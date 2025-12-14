@@ -569,12 +569,22 @@ pub enum ConsumerState {
         read_load_read() {
             require(pre.consumer is ReadWriteAndLastLoaded);
 
-            update reserve = start + sz;
+            birds_eye let start = pre.read;
+            birds_eys let sz = pre.consumer->ReadWriteAndLastLoaded_0.1 - start; // write - read
+
+            // inverted case
+            if pre.read == pre.consumer->ReadWriteAndLastLoaded_0.2 && pre.consumer->ReadWriteAndLastLoaded_0.1 < pre.read {
+                start = 0;
+            }
+
+            if pre.consumer->ReadWriteAndLastLoaded_0.1 < pre.read {
+                sz = pre.consumer->ReadWriteAndLastLoaded_0.2 - pre.read; // last - read
+            }
+
 
             birds_eye let range_keys = Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + start + sz);
             // restrict を使わないとうまく pre.storage の情報が引き継がれない?
             birds_eye let withdraw_range_map = pre.storage.restrict(range_keys);
-
             withdraw storage -= (withdraw_range_map) by {
                 assert(withdraw_range_map.submap_of(pre.storage)) by {
                     assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr)));
@@ -585,7 +595,7 @@ pub enum ConsumerState {
                 }
             };
             
-            update producer = ProducerState::ReadGranted((pre.producer->GrantWriteAndReadLoaded_0.0, start, start + sz));
+            update consumer = ConsumerState::ReadGranted((pre.consumer->ReadWriteAndLastLoaded_0.0, start, start + sz));
 
             assert(
                 withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr))
@@ -696,6 +706,30 @@ pub enum ConsumerState {
         assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i);
         assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance);
     }
+
+    #[inductive(read_start)]
+    fn read_start_inductive(pre: Self, post: Self) { }
+
+    #[inductive(read_load_write)]
+    fn read_load_write_inductive(pre: Self, post: Self) {
+        assert(post.producer is ReadtWriteLoaded);
+    }
+
+    #[inductive(read_load_last)]
+    fn read_load_last_inductive(pre: Self, post: Self) {
+        assert(post.producer is ReadWriteAndLastLoaded);
+    }
+
+    #[inductive(grant_load_read)]
+    fn read_load_read_inductive(pre: Self, post: Self) {
+    }
+
+    #[inductive(read_store_read)]
+    fn read_store_read(pre: Self, post: Self, start: nat, sz: nat) {        
+    }
+
+    #[inductive(read_fail)]
+    fn read_fail_inductive(pre: Self, post: Self) { }
 }}
 
 struct_with_invariants!{
