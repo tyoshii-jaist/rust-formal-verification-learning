@@ -40,15 +40,19 @@ pub enum ProducerState {
     GrantStarted((bool, nat)), // (write_in_progress, write)
     GrantWriteLoaded((bool, nat)), // (write_in_progress, write)
     GrantWriteAndReadLoaded((bool, nat, nat)), // (write_in_progress, write, read)
-    Reserved((bool, nat, nat)), // (write_in_progress, grant_start, grant_start + grant_sz)
-    CommitWriteLoaded((bool, nat, nat, nat)),  // (write_in_progress, grant_start, grant_start + grant_sz, write)
-    CommitReserveSubbed((bool, nat, nat, nat)), // (write_in_progress, grant_start, grant_start + grant_sz, write)
-    CommitLastLoaded((bool, nat, nat, nat, nat)), // (write_in_progress, grant_start, grant_start + grant_sz, write, last)
-    CommitReserveLoaded((bool, nat, nat, nat, nat, nat)), // (write_in_progress, grant_start, grant_start + grant_sz, write, last, reserve)
+    Reserved((bool, nat, nat)), // (write_in_progress, grantw_start, grantw_start + grant_sz)
+    CommitWriteLoaded((bool, nat, nat, nat)),  // (write_in_progress, grantw_start, grantw_start + grant_sz, write)
+    CommitReserveSubbed((bool, nat, nat, nat)), // (write_in_progress, grantw_start, grantw_start + grant_sz, write)
+    CommitLastLoaded((bool, nat, nat, nat, nat)), // (write_in_progress, grantw_start, grantw_start + grant_sz, write, last)
+    CommitReserveLoaded((bool, nat, nat, nat, nat, nat)), // (write_in_progress, grantw_start, grantw_start + grant_sz, write, last, reserve)
 }
 
 pub enum ConsumerState {
-    Idle(nat),
+    Idle((bool, nat)), // (read_in_progress, read)
+    ReadStarted((bool, nat)), // (read_in_progress, read)
+    ReadWriteLoaded((bool, nat)), // (read_in_progress, write)
+    ReadWriteAndLastLoaded((bool, nat, nat)), // (read_in_progress, write, last)
+    ReadGranted((bool, nat, nat)), // (read_in_progress, grantr_start, grantr_end)
 }
 
  tokenized_state_machine!{VBQueue {
@@ -106,39 +110,180 @@ pub enum ConsumerState {
 
     #[invariant]
     pub fn valid_storage_all(&self) -> bool {
-        match self.producer {
-            ProducerState::Reserved((_, grant_start, grant_end)) |
-            ProducerState::CommitWriteLoaded((_, grant_start, grant_end, _)) |
-            ProducerState::CommitReserveSubbed((_, grant_start, grant_end, _)) |
-            ProducerState::CommitLastLoaded((_, grant_start, grant_end, _, _)) |
-            ProducerState::CommitReserveLoaded((_, grant_start, grant_end, _, _, _)) => {
-                &&& grant_start as nat <= self.length
-                &&& grant_end as nat <= self.length
-                &&& forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
-                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+        match (self.producer, self.consumer) {
+            (
+                ProducerState::Reserved((_, grantw_start, grantw_end)) |
+                ProducerState::CommitWriteLoaded((_, grantw_start, grantw_end, _)) |
+                ProducerState::CommitReserveSubbed((_, grantw_start, grantw_end, _)) |
+                ProducerState::CommitLastLoaded((_, grantw_start, grantw_end, _, _)) |
+                ProducerState::CommitReserveLoaded((_, grantw_start, grantw_end, _, _, _)) ,
+                ConsumerState::ReadGranted((_, grantr_start, grantr_end))
+            ) => {
+                &&& grantw_start as nat <= self.length
+                &&& grantw_end as nat <= self.length
+                &&& grantw_start <= grantw_end
+                &&& grantr_start as nat <= self.length
+                &&& grantr_end as nat <= self.length
+                &&& grantr_start <= grantr_end
+                &&& grantw_end <= grantr_start || grantr_end <= grantw_start
+                &&& grantw_end <= grantr_start ==> forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.grantr_start) ||
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.length)
+                    )
                         <==> (
                             self.storage.contains_key(i)
                         )
-                &&& forall |i: nat|
-                    (i >= self.base_addr + grant_start as nat && i < self.base_addr + grant_end)
+                &&& grantw_end <= grantr_start ==> forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.grantr_start) ||
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.length)
+                    )
                         ==> (
                             !self.storage.contains_key(i)
                         )
-                &&& forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
-                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                &&& grantw_end <= grantr_start ==> forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.grantr_start) ||
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.length)
+                    )
                         ==> (
                             self.storage.index(i).ptr().addr() == i
                         )
-                &&& forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
-                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                &&& grantw_end <= grantr_start ==> forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.grantr_start) ||
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.length)
+                    )
+                        ==> (
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )
+                &&& grantr_end <= grantw_start ==> forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantr_start as nat) || 
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.grantw_start) ||
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.length)
+                    )
+                        <==> (
+                            self.storage.contains_key(i)
+                        )
+                &&& grantr_end <= grantw_start ==> forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantr_start as nat) || 
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.grantw_start) ||
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.length)
+                    )
+                        ==> (
+                            !self.storage.contains_key(i)
+                        )
+                &&& grantr_end <= grantw_start ==> forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantr_start as nat) || 
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.grantw_start) ||
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.length)
+                    )
+                        ==> (
+                            self.storage.index(i).ptr().addr() == i
+                        )
+                &&& grantr_end <= grantw_start ==> forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantr_start as nat) || 
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.grantw_start) ||
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.length)
+                    )
                         ==> (
                             self.storage.index(i).ptr()@.provenance == self.provenance
                         )
             },
-            _ => {
+            (
+                ProducerState::Reserved((_, grantw_start, grantw_end)) |
+                ProducerState::CommitWriteLoaded((_, grantw_start, grantw_end, _)) |
+                ProducerState::CommitReserveSubbed((_, grantw_start, grantw_end, _)) |
+                ProducerState::CommitLastLoaded((_, grantw_start, grantw_end, _, _)) |
+                ProducerState::CommitReserveLoaded((_, grantw_start, grantw_end, _, _, _)),
+                _
+            ) => {
+                &&& grantw_start as nat <= self.length
+                &&& grantw_end as nat <= self.length
+                &&& grantw_start <= grantw_end
+                &&& forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantw_start as nat) ||
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.length)
+                    )
+                        <==> (
+                            self.storage.contains_key(i)
+                        )
+                &&& forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantw_start as nat) ||
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.length)
+                    )
+                        ==> (
+                            !self.storage.contains_key(i)
+                        )
+                &&& forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.length)
+                    )
+                        ==> (
+                            self.storage.index(i).ptr().addr() == i
+                        )
+                &&& forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.length)
+                    )
+                        ==> (
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )
+            },
+            (
+                _,
+                ConsumerState::ReadGranted((_, grantr_start, grantr_end))
+            ) => {
+                &&& grantr_start as nat <= self.length
+                &&& grantr_end as nat <= self.length
+                &&& grantr_start <= grantr_end
+                &&& forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantr_start as nat) ||
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.length)
+                    )
+                        <==> (
+                            self.storage.contains_key(i)
+                        )
+                &&& forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantr_start as nat) ||
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.length)
+                    )
+                        ==> (
+                            !self.storage.contains_key(i)
+                        )
+                &&& forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantr_start as nat) || 
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.length)
+                    )
+                        ==> (
+                            self.storage.index(i).ptr().addr() == i
+                        )
+                &&& forall |i: nat|
+                    (
+                        (i >= self.base_addr && i < self.base_addr + grantr_start as nat) || 
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.length)
+                    )
+                        ==> (
+                            self.storage.index(i).ptr()@.provenance == self.provenance
+                        )
+            },
+            (_, _) => {
                 &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length <==> self.storage.contains_key(i)
                 &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.index(i).ptr().addr() == i
                 &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.index(i).ptr()@.provenance == self.provenance
@@ -159,6 +304,17 @@ pub enum ConsumerState {
             ProducerState::CommitReserveSubbed((wip, reserve_start, reserve_end, write)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write,
             ProducerState::CommitLastLoaded((wip, reserve_start, reserve_end, write, last)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write && self.last == last,
             ProducerState::CommitReserveLoaded((wip, reserve_start, reserve_end, write, last, reserve)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write && self.reserve == reserve && self.last == last,
+        }
+    }
+
+    #[invariant]
+    pub fn valid_consumer_local_state(&self) -> bool {
+        match self.consumer {
+            ConsumerState::Idle((rip, idle)) => self.read_in_progress == false && rip == self.read_in_progress && self.read == idle,
+            ConsumerState::ReadStarted((rip, idle)) => self.read_in_progress == true && rip == self.read_in_progress && self.read == idle,
+            ConsumerState::ReadWriteLoaded((rip, _)) => self.read_in_progress == true && rip == self.read_in_progress,
+            ConsumerState::ReadWriteAndLastLoaded((rip, _, _)) => self.read_in_progress == true && rip == self.read_in_progress,
+            ConsumerState::ReadGranted((rip, grant_start, grant_end)) => self.read_in_progress == true && rip == self.read_in_progress && self.read == grant_start,
         }
     }
 
@@ -192,7 +348,7 @@ pub enum ConsumerState {
             init already_split = false;
 
             init producer = ProducerState::Idle((false, 0));
-            init consumer = ConsumerState::Idle(0);
+            init consumer = ConsumerState::Idle((false, 0));
         }
     }
 
@@ -380,6 +536,84 @@ pub enum ConsumerState {
 
             update write_in_progress = false;
             update producer = ProducerState::Idle((false, pre.producer->CommitReserveLoaded_0.3));
+        }
+    }
+
+    transition!{
+        read_start() {
+            require(pre.consumer is Idle);
+            require(pre.read_in_progress == false);
+
+            update read_in_progress = true;
+            update consumer = ConsumerState::ReadStarted((true, pre.consumer->Idle_0.1));
+        }
+    }
+
+    transition!{
+        read_load_write() {
+            require(pre.consumer is ReadStarted);
+
+            update consumer = ConsumerState::ReadWriteLoaded((pre.producer->ReadStarted_0.0, pre.write));
+        }
+    }
+
+    transition!{
+        read_load_last() {
+            require(pre.consumer is ReadWriteLoaded);
+
+            update consumer = ProducerState::ReadWriteAndLastLoaded((pre.producer->ReadWriteLoaded_0.0, pre.producer->ReadWriteLoaded_0.1, pre.last));
+        }
+    }
+
+    transition!{
+        read_load_read() {
+            require(pre.producer is GrantWriteLoaded);
+
+            update producer = ProducerState::GrantWriteAndReadLoaded((pre.producer->GrantWriteLoaded_0.0, pre.producer->GrantWriteLoaded_0.1, pre.read));
+        }
+    }
+
+    transition!{
+        do_reserve(start: nat, sz: nat) {
+            require(start + sz <= pre.length);
+            require(pre.producer is GrantWriteAndReadLoaded);
+
+            update reserve = start + sz;
+
+            birds_eye let range_keys = Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + start + sz);
+            // restrict を使わないとうまく pre.storage の情報が引き継がれない?
+            birds_eye let withdraw_range_map = pre.storage.restrict(range_keys);
+
+            withdraw storage -= (withdraw_range_map) by {
+                assert(withdraw_range_map.submap_of(pre.storage)) by {
+                    assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr)));
+                    assert(pre.valid_storage_all());
+                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.contains_key(j));
+                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.index(j).ptr().addr() == j);
+                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.index(j).ptr()@.provenance == pre.provenance);
+                }
+            };
+            
+            update producer = ProducerState::Reserved((pre.producer->GrantWriteAndReadLoaded_0.0, start, start + sz));
+
+            assert(
+                withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr))
+            );
+            assert(
+                Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr).subset_of(withdraw_range_map.dom())
+            );
+            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz <==> withdraw_range_map.contains_key(j));
+            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> withdraw_range_map.index(j).ptr().addr() == j);
+            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> withdraw_range_map.index(j).ptr()@.provenance == pre.provenance);
+        }
+    }
+
+    transition!{
+        grant_fail() {
+            require(pre.producer is GrantWriteAndReadLoaded);
+
+            update write_in_progress = false;
+            update producer = ProducerState::Idle((false, pre.producer->GrantWriteAndReadLoaded_0.1));
         }
     }
 
@@ -1188,16 +1422,49 @@ impl Consumer {
             }
         );
 
-                let last = atomic_with_ghost!(&self.vbq.last => load();
+        let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
                 let _ = self.vbq.instance.borrow().read_load_last(&last_token, consumer_token);
                 assert(self.wf_with_producer(consumer_token.value(), buf_perms));
             }
         );
-
+        
+        let tracked mut read_perms_map;
         let mut read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
                 let _ = self.vbq.instance.borrow().read_load_read(&read_token, consumer_token);
+                // TODOメモ: ここでは、あとで read を 0 に巻き戻すケース以外の借り出しを行う。
+                // すなわち (read == last) && (write < read) 以外のケース。
+                // すなわち、(末端まで読んでいて、かつ、 writeが更新されている)以外のケース
+                // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
+                read_perms_map = ret.1.get();
+                assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
+                assert(
+                    forall |j: nat| j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat 
+                        <==> read_perms_map.contains_key(j));
+                assert(
+                    forall |j: nat|
+                        j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
+                            ==> (
+                                read_perms_map.index(j).ptr().addr() == j
+                            )
+                );
+                assert(
+                    forall |j: nat|
+                        j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
+                            ==> (
+                                read_perms_map.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
+                            )
+                );
+                // lemma で set の数と len() が一致することを示す。
+                let base = self.vbq.buffer as nat + start as nat;
+                let expected_dom = range_set(base, sz as nat);
+                assert(read_perms_map.dom() =~= expected_dom);
+                assert(read_perms_map.len() == sz) by {
+                    lemma_range_set_len(base, sz as nat);
+                };
+
+                assert(read_token.value() == start + sz);
             }
         );
 
@@ -1214,6 +1481,7 @@ impl Consumer {
             // MOVING READ BACKWARDS!
             atomic_with_ghost!(&self.vbq.read => store(0);
                 ghost read_token => {
+                    // TODO: ここで read (0) ~ write までを借り出すか、先に借りだしはやっておいてもよいのかもしれない。
                     let _ = self.vbq.instance.borrow().read_store_read(0, &mut read_token, consumer_token);
                 }
             );
