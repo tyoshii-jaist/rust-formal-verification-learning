@@ -569,18 +569,18 @@ pub enum ConsumerState {
         read_load_read() {
             require(pre.consumer is ReadWriteAndLastLoaded);
 
-            birds_eye let start = pre.read;
-            birds_eys let sz = pre.consumer->ReadWriteAndLastLoaded_0.1 - start; // write - read
-
             // inverted case
-            if pre.read == pre.consumer->ReadWriteAndLastLoaded_0.2 && pre.consumer->ReadWriteAndLastLoaded_0.1 < pre.read {
-                start = 0;
-            }
+            let start = if pre.read == pre.consumer->ReadWriteAndLastLoaded_0.2 && pre.consumer->ReadWriteAndLastLoaded_0.1 < pre.read {
+                0
+            } else {
+                pre.read
+            };
 
-            if pre.consumer->ReadWriteAndLastLoaded_0.1 < pre.read {
-                sz = pre.consumer->ReadWriteAndLastLoaded_0.2 - pre.read; // last - read
-            }
-
+            let sz = if pre.consumer->ReadWriteAndLastLoaded_0.1 < pre.read {
+                pre.consumer->ReadWriteAndLastLoaded_0.2 - pre.read // last - read
+            } else {
+                pre.consumer->ReadWriteAndLastLoaded_0.1 - start // write - read
+            };
 
             birds_eye let range_keys = Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + start + sz);
             // restrict を使わないとうまく pre.storage の情報が引き継がれない?
@@ -606,6 +606,14 @@ pub enum ConsumerState {
             assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz <==> withdraw_range_map.contains_key(j));
             assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> withdraw_range_map.index(j).ptr().addr() == j);
             assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> withdraw_range_map.index(j).ptr()@.provenance == pre.provenance);
+        }
+    }
+
+    transition!{
+        read_store_read() {
+            require(pre.consumer is ReadGranted);
+
+            update read = 0;
         }
     }
 
@@ -720,12 +728,12 @@ pub enum ConsumerState {
         assert(post.producer is ReadWriteAndLastLoaded);
     }
 
-    #[inductive(grant_load_read)]
+    #[inductive(read_load_read)]
     fn read_load_read_inductive(pre: Self, post: Self) {
     }
 
     #[inductive(read_store_read)]
-    fn read_store_read(pre: Self, post: Self, start: nat, sz: nat) {        
+    fn read_store_read_inductive(pre: Self, post: Self) {        
     }
 
     #[inductive(read_fail)]
@@ -1507,7 +1515,7 @@ impl Consumer {
             atomic_with_ghost!(&self.vbq.read => store(0);
                 ghost read_token => {
                     // TODO: ここで read (0) ~ write までを借り出すか、先に借りだしはやっておいてもよいのかもしれない。
-                    let _ = self.vbq.instance.borrow().read_store_read(0, &mut read_token, consumer_token);
+                    let _ = self.vbq.instance.borrow().read_store_read(&mut read_token, consumer_token);
                 }
             );
         }
