@@ -561,22 +561,13 @@ pub enum ConsumerState {
         read_load_last() {
             require(pre.consumer is ReadWriteLoaded);
 
-            update consumer = ProducerState::ReadWriteAndLastLoaded((pre.producer->ReadWriteLoaded_0.0, pre.producer->ReadWriteLoaded_0.1, pre.last));
+            update consumer = ConsumerState::ReadWriteAndLastLoaded((pre.producer->ReadWriteLoaded_0.0, pre.producer->ReadWriteLoaded_0.1, pre.last));
         }
     }
 
     transition!{
         read_load_read() {
-            require(pre.producer is GrantWriteLoaded);
-
-            update producer = ProducerState::GrantWriteAndReadLoaded((pre.producer->GrantWriteLoaded_0.0, pre.producer->GrantWriteLoaded_0.1, pre.read));
-        }
-    }
-
-    transition!{
-        do_reserve(start: nat, sz: nat) {
-            require(start + sz <= pre.length);
-            require(pre.producer is GrantWriteAndReadLoaded);
+            require(pre.consumer is ReadWriteAndLastLoaded);
 
             update reserve = start + sz;
 
@@ -594,7 +585,7 @@ pub enum ConsumerState {
                 }
             };
             
-            update producer = ProducerState::Reserved((pre.producer->GrantWriteAndReadLoaded_0.0, start, start + sz));
+            update producer = ProducerState::ReadGranted((pre.producer->GrantWriteAndReadLoaded_0.0, start, start + sz));
 
             assert(
                 withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr))
@@ -609,11 +600,11 @@ pub enum ConsumerState {
     }
 
     transition!{
-        grant_fail() {
-            require(pre.producer is GrantWriteAndReadLoaded);
+        read_fail() {
+            require(pre.consumer is ReadGranted);
 
-            update write_in_progress = false;
-            update producer = ProducerState::Idle((false, pre.producer->GrantWriteAndReadLoaded_0.1));
+            update read_in_progress = false;
+            update consumer = ConsumerState::Idle((false, pre.consumer->ReadGranted_0.1));
         }
     }
 
