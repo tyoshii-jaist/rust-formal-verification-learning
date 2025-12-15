@@ -125,7 +125,7 @@ pub enum ConsumerState {
                 &&& grantr_start as nat <= self.length
                 &&& grantr_end as nat <= self.length
                 &&& grantr_start <= grantr_end
-                &&& grantw_end <= grantr_start || grantr_end <= grantw_start
+                &&& (grantw_end <= grantr_start || grantr_end <= grantw_start)
                 &&& grantw_end <= grantr_start ==> forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
@@ -135,7 +135,7 @@ pub enum ConsumerState {
                         <==> (
                             self.storage.contains_key(i)
                         )
-                &&& grantw_end <= grantr_start ==> forall |i: nat|
+                /*&&& grantw_end <= grantr_start ==> forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
                         (i >= self.base_addr + grantw_end && i < self.base_addr + grantr_start) ||
@@ -143,7 +143,7 @@ pub enum ConsumerState {
                     )
                         ==> (
                             !self.storage.contains_key(i)
-                        )
+                        )*/
                 &&& grantw_end <= grantr_start ==> forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
@@ -199,13 +199,17 @@ pub enum ConsumerState {
                             self.storage.index(i).ptr()@.provenance == self.provenance
                         )
             },
+            // Only Producer has grant
             (
                 ProducerState::Reserved((_, grantw_start, grantw_end)) |
                 ProducerState::CommitWriteLoaded((_, grantw_start, grantw_end, _)) |
                 ProducerState::CommitReserveSubbed((_, grantw_start, grantw_end, _)) |
                 ProducerState::CommitLastLoaded((_, grantw_start, grantw_end, _, _)) |
                 ProducerState::CommitReserveLoaded((_, grantw_start, grantw_end, _, _, _)),
-                _
+                ConsumerState::Idle(_) |
+                ConsumerState::ReadStarted(_) |
+                ConsumerState::ReadWriteLoaded(_) |
+                ConsumerState::ReadWriteAndLastLoaded(_),
             ) => {
                 &&& grantw_start as nat <= self.length
                 &&& grantw_end as nat <= self.length
@@ -218,6 +222,7 @@ pub enum ConsumerState {
                         <==> (
                             self.storage.contains_key(i)
                         )
+                /*
                 &&& forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantw_start as nat) ||
@@ -225,7 +230,7 @@ pub enum ConsumerState {
                     )
                         ==> (
                             !self.storage.contains_key(i)
-                        )
+                        ) */
                 &&& forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
@@ -243,8 +248,12 @@ pub enum ConsumerState {
                             self.storage.index(i).ptr()@.provenance == self.provenance
                         )
             },
+            // Only Consumer has grant
             (
-                _,
+                ProducerState::Idle(_) |
+                ProducerState::GrantStarted(_) |
+                ProducerState::GrantWriteLoaded(_) |
+                ProducerState::GrantWriteAndReadLoaded(_),
                 ConsumerState::ReadGranted((_, grantr_start, grantr_end))
             ) => {
                 &&& grantr_start as nat <= self.length
@@ -314,7 +323,7 @@ pub enum ConsumerState {
             ConsumerState::ReadStarted((rip, idle)) => self.read_in_progress == true && rip == self.read_in_progress && self.read == idle,
             ConsumerState::ReadWriteLoaded((rip, _)) => self.read_in_progress == true && rip == self.read_in_progress,
             ConsumerState::ReadWriteAndLastLoaded((rip, _, _)) => self.read_in_progress == true && rip == self.read_in_progress,
-            ConsumerState::ReadGranted((rip, grant_start, grant_end)) => self.read_in_progress == true && rip == self.read_in_progress && self.read == grant_start,
+            ConsumerState::ReadGranted((rip, grant_start, grant_end)) => self.read_in_progress == true && rip == self.read_in_progress// && self.read == grant_start,
         }
     }
 
@@ -570,16 +579,11 @@ pub enum ConsumerState {
             require(pre.consumer is ReadWriteAndLastLoaded);
 
             // inverted case
-            let start = if pre.read == pre.consumer->ReadWriteAndLastLoaded_0.2 && pre.consumer->ReadWriteAndLastLoaded_0.1 < pre.read {
-                0
-            } else {
-                pre.read
-            };
-
+            let start = pre.read;
             let sz: nat = if pre.consumer->ReadWriteAndLastLoaded_0.1 < pre.read {
                 (pre.consumer->ReadWriteAndLastLoaded_0.2 - pre.read) as nat // last - read
             } else {
-                (pre.consumer->ReadWriteAndLastLoaded_0.1 - start) as nat // write - read
+                (pre.consumer->ReadWriteAndLastLoaded_0.1 - pre.read) as nat // write - read
             };
 
             birds_eye let range_keys = Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + start + sz);
@@ -1035,8 +1039,11 @@ impl Producer {
         );
 
         let read = atomic_with_ghost!(&self.vbq.read => load();
+            returning ret;
             ghost read_token => {
                 let _ = self.vbq.instance.borrow().grant_load_read(&read_token, producer_token);
+                assert(read_token.value() == producer_token.value()->GrantWriteAndReadLoaded_0.2);
+                assert(ret == producer_token.value()->GrantWriteAndReadLoaded_0.2);
             }
         );
         let max = self.vbq.length as usize;
@@ -1490,7 +1497,12 @@ impl Consumer {
                 // すなわち、(末端まで読んでいて、かつ、 writeが更新されている)以外のケース
                 // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
                 read_perms_map = ret.1.get();
-                /*
+                let ghost start = read_token.value();
+                let ghost sz = if consumer_token.value()->ReadWriteAndLastLoaded_0.1 < start {
+                    (consumer_token.value()->ReadWriteAndLastLoaded_0.2 - start) as nat // last - read
+                } else {
+                    (consumer_token.value()->ReadWriteAndLastLoaded_0.1 - start) as nat // write - read
+                };
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
                 assert(
                     forall |j: nat| j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat 
@@ -1518,7 +1530,6 @@ impl Consumer {
                 };
 
                 assert(read_token.value() == start + sz);
-                 */
             }
         );
 
