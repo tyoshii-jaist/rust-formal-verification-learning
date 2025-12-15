@@ -129,7 +129,7 @@ pub enum ConsumerState {
                 &&& grantw_end <= grantr_start ==> forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
-                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.grantr_start) ||
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + grantr_start) ||
                         (i >= self.base_addr + grantr_end && i < self.base_addr + self.length)
                     )
                         <==> (
@@ -138,7 +138,7 @@ pub enum ConsumerState {
                 &&& grantw_end <= grantr_start ==> forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
-                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.grantr_start) ||
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + grantr_start) ||
                         (i >= self.base_addr + grantr_end && i < self.base_addr + self.length)
                     )
                         ==> (
@@ -147,7 +147,7 @@ pub enum ConsumerState {
                 &&& grantw_end <= grantr_start ==> forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
-                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.grantr_start) ||
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + grantr_start) ||
                         (i >= self.base_addr + grantr_end && i < self.base_addr + self.length)
                     )
                         ==> (
@@ -156,7 +156,7 @@ pub enum ConsumerState {
                 &&& grantw_end <= grantr_start ==> forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantw_start as nat) || 
-                        (i >= self.base_addr + grantw_end && i < self.base_addr + self.grantr_start) ||
+                        (i >= self.base_addr + grantw_end && i < self.base_addr + grantr_start) ||
                         (i >= self.base_addr + grantr_end && i < self.base_addr + self.length)
                     )
                         ==> (
@@ -165,7 +165,7 @@ pub enum ConsumerState {
                 &&& grantr_end <= grantw_start ==> forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantr_start as nat) || 
-                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.grantw_start) ||
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + grantw_start) ||
                         (i >= self.base_addr + grantw_end && i < self.base_addr + self.length)
                     )
                         <==> (
@@ -174,7 +174,7 @@ pub enum ConsumerState {
                 &&& grantr_end <= grantw_start ==> forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantr_start as nat) || 
-                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.grantw_start) ||
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + grantw_start) ||
                         (i >= self.base_addr + grantw_end && i < self.base_addr + self.length)
                     )
                         ==> (
@@ -183,7 +183,7 @@ pub enum ConsumerState {
                 &&& grantr_end <= grantw_start ==> forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantr_start as nat) || 
-                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.grantw_start) ||
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + grantw_start) ||
                         (i >= self.base_addr + grantw_end && i < self.base_addr + self.length)
                     )
                         ==> (
@@ -192,7 +192,7 @@ pub enum ConsumerState {
                 &&& grantr_end <= grantw_start ==> forall |i: nat|
                     (
                         (i >= self.base_addr && i < self.base_addr + grantr_start as nat) || 
-                        (i >= self.base_addr + grantr_end && i < self.base_addr + self.grantw_start) ||
+                        (i >= self.base_addr + grantr_end && i < self.base_addr + grantw_start) ||
                         (i >= self.base_addr + grantw_end && i < self.base_addr + self.length)
                     )
                         ==> (
@@ -553,7 +553,7 @@ pub enum ConsumerState {
         read_load_write() {
             require(pre.consumer is ReadStarted);
 
-            update consumer = ConsumerState::ReadWriteLoaded((pre.producer->ReadStarted_0.0, pre.write));
+            update consumer = ConsumerState::ReadWriteLoaded((pre.consumer->ReadStarted_0.0, pre.write));
         }
     }
 
@@ -561,7 +561,7 @@ pub enum ConsumerState {
         read_load_last() {
             require(pre.consumer is ReadWriteLoaded);
 
-            update consumer = ConsumerState::ReadWriteAndLastLoaded((pre.producer->ReadWriteLoaded_0.0, pre.producer->ReadWriteLoaded_0.1, pre.last));
+            update consumer = ConsumerState::ReadWriteAndLastLoaded((pre.consumer->ReadWriteLoaded_0.0, pre.consumer->ReadWriteLoaded_0.1, pre.last));
         }
     }
 
@@ -576,10 +576,10 @@ pub enum ConsumerState {
                 pre.read
             };
 
-            let sz = if pre.consumer->ReadWriteAndLastLoaded_0.1 < pre.read {
-                pre.consumer->ReadWriteAndLastLoaded_0.2 - pre.read // last - read
+            let sz: nat = if pre.consumer->ReadWriteAndLastLoaded_0.1 < pre.read {
+                (pre.consumer->ReadWriteAndLastLoaded_0.2 - pre.read) as nat // last - read
             } else {
-                pre.consumer->ReadWriteAndLastLoaded_0.1 - start // write - read
+                (pre.consumer->ReadWriteAndLastLoaded_0.1 - start) as nat // write - read
             };
 
             birds_eye let range_keys = Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + start + sz);
@@ -720,12 +720,12 @@ pub enum ConsumerState {
 
     #[inductive(read_load_write)]
     fn read_load_write_inductive(pre: Self, post: Self) {
-        assert(post.producer is ReadtWriteLoaded);
+        assert(post.consumer is ReadWriteLoaded);
     }
 
     #[inductive(read_load_last)]
     fn read_load_last_inductive(pre: Self, post: Self) {
-        assert(post.producer is ReadWriteAndLastLoaded);
+        assert(post.consumer is ReadWriteAndLastLoaded);
     }
 
     #[inductive(read_load_read)]
@@ -826,6 +826,8 @@ impl VBBuffer
             r.0.wf(),
             r.0.instance@.id() == r.1@.instance_id(),
             r.1@.value() is Idle,
+            r.0.instance@.id() == r.2@.instance_id(),
+            r.2@.value() is Idle,
     {
         // TODO: 元の BBQueue は静的に確保している。
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
@@ -915,17 +917,21 @@ impl VBBuffer
         }, Tracked(producer_token), Tracked(consumer_token))
     }
 
-    fn try_split(self, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(consumer_token): Tracked<VBQueue::consumer>) -> (res: Result<(Producer, Consumer),  &'static str>)
+    fn try_split(self, Tracked(producer_token): Tracked<&VBQueue::producer>, Tracked(consumer_token): Tracked<&VBQueue::consumer>) -> (res: Result<(Producer, Consumer),  &'static str>)
         requires
             self.wf(),
-            old(producer_token).instance_id() == self.instance@.id(),
-            old(producer_token).value() is Idle,
+            producer_token.instance_id() == self.instance@.id(),
+            producer_token.value() is Idle,
+            consumer_token.instance_id() == self.instance@.id(),
+            consumer_token.value() is Idle,
         ensures
             self.wf(),
             match res {
                 Ok((prod, cons)) => {
-                    prod.wf() &&/* //cons.wf(), */
-                    producer_token.instance_id() == prod.vbq.instance@.id()
+                    prod.wf() &&
+                    producer_token.instance_id() == prod.vbq.instance@.id() &&
+                    cons.wf() &&
+                    consumer_token.instance_id() == cons.vbq.instance@.id()
                 }, 
                 Err(_) => true
             },
@@ -1423,7 +1429,21 @@ impl Consumer {
 }
 
 impl Consumer {
-    fn read(&mut self) ->  (r: Result<(GrantR, Tracked<Map<nat, PointsTo<u8>>>), &'static str>) {
+    fn read(&mut self, Tracked(consumer_token): Tracked<&mut VBQueue::consumer>) ->  (r: Result<(GrantR, Tracked<Map<nat, PointsTo<u8>>>), &'static str>)
+        requires
+            old(self).wf(),
+            old(consumer_token).instance_id() == old(self).vbq.instance@.id(),
+            old(consumer_token).value() is Idle,
+        ensures
+            match r {
+                Ok((rgr, buf_perms)) => {
+                    rgr.wf_with_buf_perms(buf_perms@) &&
+                    //rgr.buf.len() == sz &&
+                    consumer_token.value() is ReadGranted
+                },
+                _ => true
+            },
+    {
         let is_read_in_progress =
             atomic_with_ghost!(&self.vbq.read_in_progress => swap(true);
                 update prev -> next;
@@ -1458,19 +1478,19 @@ impl Consumer {
         let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
                 let _ = self.vbq.instance.borrow().read_load_last(&last_token, consumer_token);
-                assert(self.wf_with_producer(consumer_token.value(), buf_perms));
             }
         );
         
         let tracked mut read_perms_map;
         let mut read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
-                let _ = self.vbq.instance.borrow().read_load_read(&read_token, consumer_token);
+                let tracked ret = self.vbq.instance.borrow().read_load_read(&read_token, consumer_token);
                 // TODOメモ: ここでは、あとで read を 0 に巻き戻すケース以外の借り出しを行う。
                 // すなわち (read == last) && (write < read) 以外のケース。
                 // すなわち、(末端まで読んでいて、かつ、 writeが更新されている)以外のケース
                 // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
                 read_perms_map = ret.1.get();
+                /*
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
                 assert(
                     forall |j: nat| j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat 
@@ -1498,6 +1518,7 @@ impl Consumer {
                 };
 
                 assert(read_token.value() == start + sz);
+                 */
             }
         );
 
@@ -1522,9 +1543,11 @@ impl Consumer {
 
         let sz = if write < read {
             // Inverted, only believe last
+            assume(last >= read);
             last
         } else {
             // Not inverted, only believe write
+            assume(write >= read);
             write
         } - read;
 
@@ -1540,14 +1563,60 @@ impl Consumer {
 
         // This is sound, as UnsafeCell, MaybeUninit, and GenericArray
         // are all `#[repr(Transparent)]
-        let start_of_buf_ptr = inner.buf.get().cast::<u8>();
-        let grant_slice = unsafe { from_raw_parts_mut(start_of_buf_ptr.offset(read as isize), sz) };
+        //let start_of_buf_ptr = inner.buf.get().cast::<u8>();
+        //let grant_slice = unsafe { from_raw_parts_mut(start_of_buf_ptr.offset(read as isize), sz) };
+        let mut granted_buf: Vec<*mut u8> = Vec::new();
+        let base_ptr = self.vbq.buffer;
 
-        Ok(GrantR {
-            buf: grant_slice,
-            vbq: self.bbq,
-            to_release: 0,
-        })
+        for idx in read..(read + sz)
+            invariant
+                granted_buf.len() == idx - read,
+                idx <= (read + sz),
+                base_ptr as usize + (read + sz) <= usize::MAX + 1,
+                base_ptr@.provenance == self.vbq.instance@.provenance(),
+                forall |i: int| 0 <= i && i < granted_buf.len() ==> read_perms_map.contains_key(granted_buf[i] as nat),
+                forall |j: nat|
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + (read + sz) as nat
+                        ==> (
+                            read_perms_map.contains_key(j)
+                        ),
+                forall |j: nat|
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + (read + sz) as nat
+                        ==> (
+                            read_perms_map.index(j as nat).ptr().addr() as nat == j as nat
+                        ),
+                forall |j: nat|
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + (read + sz) as nat
+                        ==> (
+                            read_perms_map.index(j).ptr()@.provenance == base_ptr@.provenance
+                        ),
+                granted_buf.len() == (idx - read),
+                forall |j: int|
+                    0 <= j && j < (idx - read) as int
+                        ==> (
+                            equal(granted_buf[j], read_perms_map.index(granted_buf[j] as nat).ptr())
+                        ),
+            decreases
+                (read + sz) - idx,
+        {
+            let addr = base_ptr as usize + idx; // * size_of::<u8>();
+            let ptr: *mut u8 = with_exposed_provenance(addr, expose_provenance(base_ptr));
+            
+            granted_buf.push(ptr);
+            assert(read_perms_map.contains_key(addr as nat));
+            assert(ptr@.provenance == base_ptr@.provenance);
+            assert(read_perms_map.index(addr as nat).ptr()@.provenance == base_ptr@.provenance);
+            assert(read_perms_map.index(addr as nat).ptr()@.provenance == self.vbq.instance@.provenance());
+            assert(equal(read_perms_map.index(addr as nat).ptr(), ptr));
+        }
+
+        Ok(
+            (GrantR {
+                buf: granted_buf,
+                vbq: self.vbq.clone(),
+                to_release: 0,
+            }, Tracked(read_perms_map))
+        )
     }
 }
 
@@ -1558,11 +1627,39 @@ struct GrantR {
 }
 
 impl GrantR {
+    pub closed spec fn wf_with_buf_perms(&self, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
+        &&& self.buf.len() == buf_perms.len()
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.contains_key(self.buf[i] as nat)
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == buf_perms.index(self.buf[i] as nat).ptr()
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i]@.provenance == buf_perms.index(self.buf[i] as nat).ptr()@.provenance
+    }
+
+    pub closed spec fn wf_with_consumer(&self, consumer_state: ConsumerState, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
+        match consumer_state {
+            ConsumerState::ReadGranted((rip, grantr_start, grantr_end)) => {
+                &&& rip == true
+                &&& self.buf.len() == grantr_end - grantr_start
+                &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + grantr_start + i as nat
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + grantr_start && j < self.vbq.buffer as nat + grantr_end
+                    <==> buf_perms.contains_key(j)
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + grantr_start && j < self.vbq.buffer as nat + grantr_end
+                    ==> (
+                        buf_perms.index(j).ptr().addr() == j
+                    )
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + grantr_start && j < self.vbq.buffer as nat + grantr_end
+                    ==> (
+                        buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
+                    )
+            },
+            ConsumerState::Idle(_) => true,
+            _ => false,
+        }
+    }
 }
 
 fn main() {
     let (vbuf, Tracked(producer_token), Tracked(consumer_token)) = VBBuffer::new(6);
-    let (mut prod, mut cons) = match vbuf.try_split(Tracked(&mut producer_token), Tracked(consumer_token)) {
+    let (mut prod, mut cons) = match vbuf.try_split(Tracked(&producer_token), Tracked(&consumer_token)) {
         Ok((prod, cons)) => (prod, cons),
         Err(_) => {
             return;
