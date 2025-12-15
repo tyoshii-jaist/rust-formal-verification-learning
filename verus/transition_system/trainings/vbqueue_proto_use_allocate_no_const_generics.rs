@@ -403,7 +403,19 @@ pub enum ConsumerState {
     fn grant_fail_inductive(pre: Self, post: Self) { }
 
     #[inductive(do_reserve)]
-    fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {        
+    fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
+        assert(pre.producer->GrantWriteAndReadLoaded_0.1 == pre.write);
+        let write = pre.write;
+        let read = pre.producer->GrantWriteAndReadLoaded_0.2;
+        let max = pre.length;
+        
+        assert(
+            (start == write && write < read && write + sz < read) ||
+            (start == write && !(write < read) && write + sz <= max) ||
+            (start == 0 && !(write < read) && (write + sz > max && sz < read))
+        );
+
+        //assert(write <= post.producer->Reserved_0.1 || (post.producer->Reserved_0.2 < read && read <= write));
         assert(post.producer is Reserved);
         assert(post.producer->Reserved_0.2 == post.reserve);
     }
@@ -778,6 +790,7 @@ impl Producer {
         let read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
                 let _ = self.vbq.instance.borrow().grant_load_read(&read_token, producer_token);
+                assert(producer_token.value()->GrantWriteAndReadLoaded_0.2 == read_token.value());
             }
         );
         let max = self.vbq.length as usize;
@@ -823,8 +836,12 @@ impl Producer {
             }
         };
         // 上記のエラーケース以外の条件を集約
-        assert(start + sz < read || start + sz <= max || (start == 0 && sz < read));
-        assert(start + sz <= max);
+        assert(producer_token.value()->GrantWriteAndReadLoaded_0.2 == read);
+        assert(
+            (start == write && write < read && write + sz < read) ||
+            (start == write && !(write < read) && write + sz <= max) ||
+            (start == 0 && !(write < read) && (write + sz > max && sz < read))
+        );
         assert(start + sz <= self.vbq.length);
 
         // Safe write, only viewed by this task
