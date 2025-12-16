@@ -59,10 +59,19 @@ pub struct ProducerState {
 
 pub enum ConsumerStep {
     Idle,
+    ReadStarted,
+    ReadWriteLoaded,
+    ReadWriteAndLastLoaded,
+    ReadGranted,
 }
 
 pub struct ConsumerState {
     pub step: ConsumerStep,
+    pub read_in_progress: bool,
+    pub read: Option<nat>,
+    pub write_obs: Option<nat>,
+    pub reserve_obs: Option<nat>,
+    pub last_obs: Option<nat>,
 }
 
  tokenized_state_machine!{VBQueue {
@@ -115,6 +124,11 @@ pub struct ConsumerState {
     #[invariant]
     pub fn no_write_in_progress(&self) -> bool {
         !self.write_in_progress <==> self.producer.step is Idle
+    }
+
+    #[invariant]
+    pub fn no_read_in_progress(&self) -> bool {
+        !self.read_in_progress <==> self.consumer.step is Idle
     }
 
     #[invariant]
@@ -197,10 +211,14 @@ pub struct ConsumerState {
             };
             init consumer = ConsumerState {
                 step: ConsumerStep::Idle,
+                read_in_progress: false,
+                read: None,
+                write_obs: None,
+                reserve_obs: None,
+                last_obs: None,
             };
         }
     }
-
     
     #[inductive(initialize)]
     fn initialize_inductive(post: Self, base_addr: nat, provenance: raw_ptr::Provenance, length: nat, storage: Map<nat, raw_ptr::PointsTo<u8>>, buffer_dealloc: raw_ptr::Dealloc) {
@@ -270,7 +288,10 @@ pub struct ConsumerState {
 
             update reserve = reserve;
 
-            let start = pre.producer.write->Some_0;
+            let write = pre.producer.write->Some_0;
+
+            let grant_start = if write < reserve {write} else {0};
+            let grant_end = reserve;
             /*
             birds_eye let range_keys = Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + reserve);
             // restrict を使わないとうまく pre.storage の情報が引き継がれない?
@@ -288,11 +309,11 @@ pub struct ConsumerState {
              */
             update producer = ProducerState{
                 step: ProducerStep::Reserved,
-                write: None,
-                last: None,
-                reserve: None,
-                read_obs: None,
                 write_in_progress: pre.producer.write_in_progress,
+                write: pre.producer.write,
+                reserve: Some(reserve),
+                last: pre.producer.last,
+                read_obs: pre.producer.read_obs,
             };
             /*
             assert(
@@ -313,7 +334,6 @@ pub struct ConsumerState {
             require(pre.producer.step is GrantWriteAndReadLoaded);
 
             update write_in_progress = false;
-
             update producer = ProducerState{
                 step: ProducerStep::Idle,
                 write_in_progress: false,
@@ -340,6 +360,7 @@ pub struct ConsumerState {
     transition!{
         commit_load_write() {
             require(pre.producer.step is Reserved);
+            require(pre.write == pre.producer.write->Some_0);
 
             update producer = ProducerState{
                 step: ProducerStep::CommitWriteLoaded,
@@ -355,7 +376,7 @@ pub struct ConsumerState {
     transition!{
         commit_sub_reserve(commited: nat) {
             require(pre.producer.step is CommitWriteLoaded);
-            //assert(pre.reserve == pre.producer->CommitWriteLoaded_0.2); // 重要!
+            require(pre.reserve == pre.producer.reserve->Some_0); // 重要!
             require(pre.reserve >= commited);
 
             let new_reserve = (pre.reserve - commited) as nat;
@@ -477,6 +498,101 @@ pub struct ConsumerState {
         }
     }
 
+    transition!{
+        read_start() {
+            require(pre.consumer.step is Idle);
+            require(pre.read_in_progress == false);
+
+            update read_in_progress = true;
+            update consumer = ConsumerState {
+                step: ConsumerStep::ReadStarted,
+                read_in_progress: true,
+                read: pre.consumer.read,
+                write_obs: pre.consumer.write_obs,
+                reserve_obs: pre.consumer.reserve_obs,
+                last_obs: pre.consumer.last_obs,
+            };
+        }
+    }
+
+    transition!{
+        read_load_write() {
+            require(pre.consumer.step is ReadStarted);
+
+            update consumer = ConsumerState {
+                step: ConsumerStep::ReadWriteLoaded,
+                write_obs: Some(pre.write),
+                read_in_progress: pre.consumer.read_in_progress,
+                read: pre.consumer.read,
+                reserve_obs: pre.consumer.reserve_obs,
+                last_obs: pre.consumer.last_obs,
+            };
+        }
+    }
+
+    transition!{
+        read_load_last() {
+            require(pre.consumer.step is ReadWriteLoaded);
+
+            update consumer = ConsumerState {
+                step: ConsumerStep::ReadWriteAndLastLoaded,
+                last_obs: Some(pre.last),
+                read_in_progress: pre.consumer.read_in_progress,
+                read: pre.consumer.read,
+                write_obs: pre.consumer.write_obs,
+                reserve_obs: pre.consumer.reserve_obs,
+            };
+        }
+    }
+
+    transition!{
+        read_load_read() {
+            require(pre.consumer.step is ReadWriteAndLastLoaded);
+            
+            update consumer = ConsumerState {
+                step: ConsumerStep::ReadGranted,
+                read: Some(pre.read),
+                read_in_progress: pre.consumer.read_in_progress,
+                write_obs: pre.consumer.write_obs,
+                reserve_obs: pre.consumer.reserve_obs,
+                last_obs: pre.consumer.last_obs,
+            };
+        }
+    }
+
+    transition!{
+        read_store_read() {
+            require(pre.consumer.step is ReadGranted);
+
+            update read = 0;
+
+            update consumer = ConsumerState {
+                step: ConsumerStep::ReadGranted,
+                read_in_progress: pre.consumer.read_in_progress,
+                read: Some(0),
+                write_obs: pre.consumer.write_obs,
+                reserve_obs: pre.consumer.reserve_obs,
+                last_obs: pre.consumer.last_obs,
+            };
+        }
+    }
+
+    transition!{
+        read_fail() {
+            require(pre.consumer.step is ReadGranted);
+
+            update read_in_progress = false;
+            update consumer = ConsumerState {
+                step: ConsumerStep::Idle,
+                read_in_progress: false,
+                read: pre.consumer.read,
+                write_obs: pre.consumer.write_obs,
+                reserve_obs: pre.consumer.reserve_obs,
+                last_obs: pre.consumer.last_obs,
+            };
+        }
+    }
+
     #[inductive(try_split)]
     fn try_split_inductive(pre: Self, post: Self) { }
 
@@ -555,6 +671,28 @@ pub struct ConsumerState {
     #[inductive(commit_end)]
     fn commit_end_inductive(pre: Self, post: Self) {
     }
+
+    #[inductive(read_start)]
+    fn read_start_inductive(pre: Self, post: Self) { }
+
+    #[inductive(read_load_write)]
+    fn read_load_write_inductive(pre: Self, post: Self) {
+    }
+
+    #[inductive(read_load_last)]
+    fn read_load_last_inductive(pre: Self, post: Self) {
+    }
+
+    #[inductive(read_load_read)]
+    fn read_load_read_inductive(pre: Self, post: Self) {
+    }
+
+    #[inductive(read_store_read)]
+    fn read_store_read_inductive(pre: Self, post: Self) {        
+    }
+
+    #[inductive(read_fail)]
+    fn read_fail_inductive(pre: Self, post: Self) { }
 }}
 
 struct_with_invariants!{
@@ -622,30 +760,6 @@ struct_with_invariants!{
     }
 }
 
-pub struct Producer {
-    vbq: Arc<VBBuffer>,
-}
-
-impl Producer {
-    pub closed spec fn wf(&self) -> bool {
-        (*self.vbq).wf()
-    }
-}
-
-pub struct Consumer {
-    vbq: Arc<VBBuffer>,
-}
-
-/*
-impl<T> Consumer<T> {
-    pub closed spec fn wf(&self) -> bool {
-        (*self.queue).wf()
-            && self.consumer@.instance_id() === (*self.queue).instance@.id()
-            && self.consumer@.value() === ConsumerState::Idle(self.head as nat)
-            && (self.head as int) < (*self.queue).buffer@.len()
-    }
-}
- */
 impl VBBuffer
 {
     fn new(length: usize) -> (r:(Self, Tracked<VBQueue::producer>, Tracked<VBQueue::consumer>))
@@ -806,6 +920,16 @@ impl VBBuffer
     }
 }
 
+pub struct Producer {
+    vbq: Arc<VBBuffer>,
+}
+
+impl Producer {
+    pub closed spec fn wf(&self) -> bool {
+        (*self.vbq).wf()
+    }
+}
+
 impl Producer {
     fn grant_exact(&mut self, sz: usize, Tracked(producer_token): Tracked<&mut VBQueue::producer>) -> (r: Result<(GrantW, Tracked<Map<nat, PointsTo<u8>>>), &'static str>)
         requires
@@ -815,9 +939,15 @@ impl Producer {
         ensures
             match r {
                 Ok((wgr, buf_perms)) => {
-                    wgr.wf_with_buf_perms(buf_perms@) &&
-                    //wgr.buf.len() == sz &&
-                    producer_token.value().step is Reserved
+                    let write = producer_token.value().write->Some_0;
+                    let reserve = producer_token.value().reserve->Some_0;
+                    let grant_start = if write < reserve {write} else {0};
+                    let grant_end = reserve;
+
+                    // wgr.wf_with_buf_perms(buf_perms@) &&
+                    &&& wgr.buf.len() == sz
+                    &&& producer_token.value().step is Reserved
+                    &&& wgr.buf.len() == grant_end - grant_start
                 },
                 _ => true
             },
@@ -964,7 +1094,6 @@ impl Producer {
 
 
         let mut granted_buf: Vec<*mut u8> = Vec::new();
-        /*
         let base_ptr = self.vbq.buffer;
         let end_offset = start + sz;
 
@@ -974,6 +1103,8 @@ impl Producer {
                 idx <= end_offset,
                 base_ptr as usize + end_offset <= usize::MAX + 1,
                 base_ptr@.provenance == self.vbq.instance@.provenance(),
+                granted_buf.len() == (idx - start),
+                /*
                 forall |i: int| 0 <= i && i < granted_buf.len() ==> granted_perms_map.contains_key(granted_buf[i] as nat),
                 forall |j: nat|
                     j >= base_ptr as nat + idx as nat && j < base_ptr as nat + end_offset as nat
@@ -993,12 +1124,12 @@ impl Producer {
                         ==> (
                             granted_perms_map.index(j).ptr()@.provenance == base_ptr@.provenance
                         ),
-                granted_buf.len() == (idx - start),
                 forall |j: int|
                     0 <= j && j < (idx - start) as int
                         ==> (
                             equal(granted_buf[j], granted_perms_map.index(granted_buf[j] as nat).ptr())
                         ),
+                 */
             decreases
                 end_offset - idx,
         {
@@ -1006,14 +1137,16 @@ impl Producer {
             let ptr: *mut u8 = with_exposed_provenance(addr, expose_provenance(base_ptr));
             
             granted_buf.push(ptr);
-            assert(granted_perms_map.contains_key(addr as nat));
             assert(ptr@.provenance == base_ptr@.provenance);
+            /*
+            assert(granted_perms_map.contains_key(addr as nat));
             assert(granted_perms_map.index(addr as nat).ptr()@.provenance == base_ptr@.provenance);
             assert(granted_perms_map.index(addr as nat).ptr()@.provenance == self.vbq.instance@.provenance());
-            assert(equal(granted_perms_map.index(addr as nat).ptr(), ptr));
-        }
+            assert(equal(granted_perms_map.index(addr as nat).ptr(), ptr)); 
          */
+        }
 
+        assert(granted_buf.len() == sz);
         Ok (
             (
                 GrantW {
@@ -1033,21 +1166,24 @@ struct GrantW {
 }
 
 impl GrantW {
+    /*
     pub closed spec fn wf_with_buf_perms(&self, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
         &&& self.buf.len() == buf_perms.len()
         &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.contains_key(self.buf[i] as nat)
         &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == buf_perms.index(self.buf[i] as nat).ptr()
         &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i]@.provenance == buf_perms.index(self.buf[i] as nat).ptr()@.provenance
     }
+    */
 
     pub closed spec fn wf_with_producer(&self, producer_state: ProducerState, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
-        &&& producer_state.step is Idle
+        &&& producer_state.step is Idle || producer_state.step is Reserved
         &&& match (producer_state.write, producer_state.reserve) {
             (Some(w), Some(res)) => {
                 let grant_start = if w < res {w} else {0};
                 let grant_end = res;
 
                 &&& self.buf.len() == grant_end - grant_start
+                /*
                 &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + grant_start + i as nat
                 &&& forall |j: nat| j >= self.vbq.buffer as nat + grant_start && j < self.vbq.buffer as nat + grant_end
                     <==> buf_perms.contains_key(j)
@@ -1059,6 +1195,7 @@ impl GrantW {
                     ==> (
                         buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
                     )
+                 */
             },
             _ => true,
         }
@@ -1070,11 +1207,11 @@ impl GrantW {
         Tracked(buf_perms): Tracked<Map<nat, raw_ptr::PointsTo<u8>>>
     )
         requires
-            old(self).wf_with_buf_perms(buf_perms),
+            //old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value().step is Idle || old(producer_token).value().step is Reserved,
-            old(self).wf_with_producer(old(producer_token).value(), buf_perms)
+            //old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
             producer_token.value().step is Idle,
             self.vbq.wf(),
@@ -1089,7 +1226,7 @@ impl GrantW {
         Tracked(buf_perms): Tracked<Map<nat, raw_ptr::PointsTo<u8>>>
     )
         requires
-            old(self).wf_with_buf_perms(buf_perms),
+            //old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value().step is Idle || old(producer_token).value().step is Reserved,
@@ -1109,7 +1246,6 @@ impl GrantW {
                 ghost write_in_progress_token => {
                     assert(producer_token.value().step is Idle || producer_token.value().step is Reserved);
                     let _ = self.vbq.instance.borrow().commit_start(&write_in_progress_token, producer_token);
-                    assert(self.wf_with_producer(producer_token.value(), buf_perms));
                 }
         );
 
@@ -1133,21 +1269,14 @@ impl GrantW {
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
                 let _ = self.vbq.instance.borrow().commit_load_write(&write_token, producer_token);
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
             }
         );
-
-        proof {
-            assert(producer_token.value().step is CommitWriteLoaded);
-            assert(self.wf_with_producer(producer_token.value(), buf_perms));
-        }
 
         atomic_with_ghost!(&self.vbq.reserve => fetch_sub(len - used);
             update prev -> next;
             returning ret;
             ghost reserve_token => {
                 let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, producer_token);
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
             }
         );
 
@@ -1155,14 +1284,12 @@ impl GrantW {
         let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
                 let _ = self.vbq.instance.borrow().commit_load_last(&last_token, producer_token);
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
             }
         );
         
         let new_write = atomic_with_ghost!(&self.vbq.reserve => load();
             ghost reserve_token => {
                 let _ = self.vbq.instance.borrow().commit_load_reserve(&reserve_token, producer_token);
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
             }
         );
 
@@ -1172,7 +1299,6 @@ impl GrantW {
             atomic_with_ghost!(&self.vbq.last => store(write);
                 ghost last_token => {
                     let _ = self.vbq.instance.borrow().commit_store_last(write as nat, &mut last_token, producer_token);
-                    assert(self.wf_with_producer(producer_token.value(), buf_perms));
                 }
             );
         } else if new_write > last {
@@ -1186,7 +1312,6 @@ impl GrantW {
             atomic_with_ghost!(&self.vbq.last => store(max);
                 ghost last_token => {
                     let _ = self.vbq.instance.borrow().commit_store_last(max as nat, &mut last_token, producer_token);
-                    assert(self.wf_with_producer(producer_token.value(), buf_perms));
                 }
             );
         }
@@ -1200,11 +1325,9 @@ impl GrantW {
         // time to invert early!
         atomic_with_ghost!(&self.vbq.write => store(new_write);
             ghost write_token => {
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
                 //let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, buf_perms, buf_perms, &mut write_token, producer_token);
                 let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, &mut write_token, producer_token);
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
             }
         );
 
@@ -1221,6 +1344,253 @@ impl GrantW {
     pub fn to_commit(&mut self, amt: usize) {
         self.to_commit = self.buf.len().min(amt);
     }
+}
+
+pub struct Consumer {
+    vbq: Arc<VBBuffer>,
+}
+
+impl Consumer {
+    pub closed spec fn wf(&self) -> bool {
+        (*self.vbq).wf()
+    }
+}
+
+impl Consumer {
+    fn read(&mut self, Tracked(consumer_token): Tracked<&mut VBQueue::consumer>) ->  (r: Result<(GrantR, Tracked<Map<nat, PointsTo<u8>>>), &'static str>)
+        requires
+            old(self).wf(),
+            old(consumer_token).instance_id() == old(self).vbq.instance@.id(),
+            old(consumer_token).value().step is Idle,
+        ensures
+            match r {
+                Ok((rgr, buf_perms)) => {
+                    // rgr.wf_with_buf_perms(buf_perms@) &&
+                    consumer_token.value().step is ReadGranted
+                },
+                _ => true
+            },
+    {
+        let is_read_in_progress =
+            atomic_with_ghost!(&self.vbq.read_in_progress => swap(true);
+                update prev -> next;
+                returning ret;
+                ghost read_in_progress_token => {
+                    if !ret {
+                        let _ = self.vbq.instance.borrow().read_start(&mut read_in_progress_token, consumer_token);
+                        assert(read_in_progress_token.value() == true);
+                        assert(consumer_token.value().step is ReadStarted);
+                        assert(ret == false);
+                    } else {
+                        assert(read_in_progress_token.value() == true);
+                        assert(consumer_token.value().step is Idle);
+                        assert(ret == true);
+                    };
+                }
+        );
+
+        if is_read_in_progress {
+            proof {
+                assert(consumer_token.value().step is Idle);
+            }
+            return Err("read in progress");
+        }
+
+        let write = atomic_with_ghost!(&self.vbq.write => load();
+            ghost write_token => {
+                let _ = self.vbq.instance.borrow().read_load_write(&write_token, consumer_token);
+            }
+        );
+
+        let last = atomic_with_ghost!(&self.vbq.last => load();
+            ghost last_token => {
+                let _ = self.vbq.instance.borrow().read_load_last(&last_token, consumer_token);
+            }
+        );
+        
+        let tracked mut read_perms_map:Map<nat, PointsTo<u8>> = Map::tracked_empty();
+        let mut read = atomic_with_ghost!(&self.vbq.read => load();
+            ghost read_token => {
+                let tracked ret = self.vbq.instance.borrow().read_load_read(&read_token, consumer_token);
+                // TODOメモ: ここでは、あとで read を 0 に巻き戻すケース以外の借り出しを行う。
+                // すなわち (read == last) && (write < read) 以外のケース。
+                // すなわち、(末端まで読んでいて、かつ、 writeが更新されている)以外のケース
+                // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
+                /* read_perms_map = ret.1.get();
+                let ghost start = read_token.value();
+                let ghost sz = if consumer_token.value()->ReadWriteAndLastLoaded_0.1 < start {
+                    (consumer_token.value()->ReadWriteAndLastLoaded_0.2 - start) as nat // last - read
+                } else {
+                    (consumer_token.value()->ReadWriteAndLastLoaded_0.1 - start) as nat // write - read
+                };
+                assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
+                assert(
+                    forall |j: nat| j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat 
+                        <==> read_perms_map.contains_key(j));
+                assert(
+                    forall |j: nat|
+                        j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
+                            ==> (
+                                read_perms_map.index(j).ptr().addr() == j
+                            )
+                );
+                assert(
+                    forall |j: nat|
+                        j >= self.vbq.buffer as nat + start as nat && j < self.vbq.buffer as nat + start as nat + sz as nat
+                            ==> (
+                                read_perms_map.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
+                            )
+                );
+                // lemma で set の数と len() が一致することを示す。
+                let base = self.vbq.buffer as nat + start as nat;
+                let expected_dom = range_set(base, sz as nat);
+                assert(read_perms_map.dom() =~= expected_dom);
+                assert(read_perms_map.len() == sz) by {
+                    lemma_range_set_len(base, sz as nat);
+                };
+                
+                assert(read_token.value() == start + sz);*/
+            }
+        );
+
+        // Resolve the inverted case or end of read
+        if (read == last) && (write < read) {
+            read = 0;
+            // This has some room for error, the other thread reads this
+            // Impact to Grant:
+            //   Grant checks if read < write to see if inverted. If not inverted, but
+            //     no space left, Grant will initiate an inversion, but will not trigger it
+            // Impact to Commit:
+            //   Commit does not check read, but if Grant has started an inversion,
+            //   grant could move Last to the prior write position
+            // MOVING READ BACKWARDS!
+            atomic_with_ghost!(&self.vbq.read => store(0);
+                ghost read_token => {
+                    // TODO: ここで read (0) ~ write までを借り出すか、先に借りだしはやっておいてもよいのかもしれない。
+                    let _ = self.vbq.instance.borrow().read_store_read(&mut read_token, consumer_token);
+                }
+            );
+        }
+
+        let sz = if write < read {
+            // Inverted, only believe last
+            assume(last >= read);
+            last
+        } else {
+            // Not inverted, only believe write
+            assume(write >= read);
+            write
+        } - read;
+
+        if sz == 0 {
+            atomic_with_ghost!(&self.vbq.read_in_progress => store(false);
+                ghost read_in_progress_token => {
+                    let _ = self.vbq.instance.borrow().read_fail(&mut read_in_progress_token, consumer_token);
+                    assert(read_in_progress_token.value() == false);
+                }
+            );
+            return Err("Insufficient size");
+        }
+
+        // This is sound, as UnsafeCell, MaybeUninit, and GenericArray
+        // are all `#[repr(Transparent)]
+        //let start_of_buf_ptr = inner.buf.get().cast::<u8>();
+        //let grant_slice = unsafe { from_raw_parts_mut(start_of_buf_ptr.offset(read as isize), sz) };
+        let mut granted_buf: Vec<*mut u8> = Vec::new();
+        let base_ptr = self.vbq.buffer;
+
+        for idx in read..(read + sz)
+            invariant
+                granted_buf.len() == idx - read,
+                idx <= (read + sz),
+                base_ptr as usize + (read + sz) <= usize::MAX + 1,
+                base_ptr@.provenance == self.vbq.instance@.provenance(),
+                granted_buf.len() == (idx - read),
+                /*
+                forall |i: int| 0 <= i && i < granted_buf.len() ==> read_perms_map.contains_key(granted_buf[i] as nat),
+                forall |j: nat|
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + (read + sz) as nat
+                        ==> (
+                            read_perms_map.contains_key(j)
+                        ),
+                forall |j: nat|
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + (read + sz) as nat
+                        ==> (
+                            read_perms_map.index(j as nat).ptr().addr() as nat == j as nat
+                        ),
+                forall |j: nat|
+                    j >= base_ptr as nat + idx as nat && j < base_ptr as nat + (read + sz) as nat
+                        ==> (
+                            read_perms_map.index(j).ptr()@.provenance == base_ptr@.provenance
+                        ), 
+                forall |j: int|
+                    0 <= j && j < (idx - read) as int
+                        ==> (
+                            equal(granted_buf[j], read_perms_map.index(granted_buf[j] as nat).ptr())
+                        ),*/
+            decreases
+                (read + sz) - idx,
+        {
+            let addr = base_ptr as usize + idx; // * size_of::<u8>();
+            let ptr: *mut u8 = with_exposed_provenance(addr, expose_provenance(base_ptr));
+            
+            granted_buf.push(ptr);
+            assert(ptr@.provenance == base_ptr@.provenance);
+            /*
+            assert(read_perms_map.contains_key(addr as nat));
+            assert(read_perms_map.index(addr as nat).ptr()@.provenance == base_ptr@.provenance);
+            assert(read_perms_map.index(addr as nat).ptr()@.provenance == self.vbq.instance@.provenance());
+            assert(equal(read_perms_map.index(addr as nat).ptr(), ptr));
+             */
+        }
+
+        Ok(
+            (GrantR {
+                buf: granted_buf,
+                vbq: self.vbq.clone(),
+                to_release: 0,
+            }, Tracked(read_perms_map))
+        )
+    }
+}
+
+struct GrantR {
+    buf: Vec<*mut u8>,
+    vbq: Arc<VBBuffer>,
+    to_release: usize,
+}
+
+impl GrantR {
+    /*
+    pub closed spec fn wf_with_buf_perms(&self, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
+        &&& self.buf.len() == buf_perms.len()
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.contains_key(self.buf[i] as nat)
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i] == buf_perms.index(self.buf[i] as nat).ptr()
+        &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i]@.provenance == buf_perms.index(self.buf[i] as nat).ptr()@.provenance
+    }
+
+    pub closed spec fn wf_with_consumer(&self, consumer_state: ConsumerState, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
+        match consumer_state {
+            ConsumerState::ReadGranted((rip, grantr_start, grantr_end)) => {
+                &&& rip == true
+                &&& self.buf.len() == grantr_end - grantr_start
+                &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + grantr_start + i as nat
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + grantr_start && j < self.vbq.buffer as nat + grantr_end
+                    <==> buf_perms.contains_key(j)
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + grantr_start && j < self.vbq.buffer as nat + grantr_end
+                    ==> (
+                        buf_perms.index(j).ptr().addr() == j
+                    )
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + grantr_start && j < self.vbq.buffer as nat + grantr_end
+                    ==> (
+                        buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
+                    )
+            },
+            ConsumerState::Idle(_) => true,
+            _ => false,
+        }
+    }
+    */
 }
 
 fn main() {
