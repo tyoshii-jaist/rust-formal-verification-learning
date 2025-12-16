@@ -405,7 +405,7 @@ pub enum ConsumerState {
     #[inductive(do_reserve)]
     fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
         assert(pre.producer->GrantWriteAndReadLoaded_0.1 == pre.write);
-        let write = pre.write;
+        /*let write = pre.write;
         let read = pre.producer->GrantWriteAndReadLoaded_0.2;
         let max = pre.length;
         
@@ -413,7 +413,7 @@ pub enum ConsumerState {
             (start == write && write < read && write + sz < read) ||
             (start == write && !(write < read) && write + sz <= max) ||
             (start == 0 && !(write < read) && (write + sz > max && sz < read))
-        );
+        ); */
 
         //assert(write <= post.producer->Reserved_0.1 || (post.producer->Reserved_0.2 < read && read <= write));
         assert(post.producer is Reserved);
