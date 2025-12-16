@@ -35,20 +35,33 @@ proof fn lemma_range_set_len(base: nat, sz: nat)
     }
 }
 
-pub enum ProducerState {
-    Idle((bool, nat)), // (write_in_progress, write)
-    GrantStarted((bool, nat)), // (write_in_progress, write)
-    GrantWriteLoaded((bool, nat)), // (write_in_progress, write)
-    GrantWriteAndReadLoaded((bool, nat, nat)), // (write_in_progress, write, read)
-    Reserved((bool, nat, nat)), // (write_in_progress, grant_start, grant_start + grant_sz)
-    CommitWriteLoaded((bool, nat, nat, nat)),  // (write_in_progress, grant_start, grant_start + grant_sz, write)
-    CommitReserveSubbed((bool, nat, nat, nat)), // (write_in_progress, grant_start, grant_start + grant_sz, write)
-    CommitLastLoaded((bool, nat, nat, nat, nat)), // (write_in_progress, grant_start, grant_start + grant_sz, write, last)
-    CommitReserveLoaded((bool, nat, nat, nat, nat, nat)), // (write_in_progress, grant_start, grant_start + grant_sz, write, last, reserve)
+pub enum ProducerStep {
+    Idle,
+    GrantStarted,
+    GrantWriteLoaded,
+    GrantWriteAndReadLoaded,
+    Reserved,
+    CommitWriteLoaded,
+    CommitReserveSubbed,
+    CommitLastLoaded,
+    CommitReserveLoaded,
 }
 
-pub enum ConsumerState {
-    Idle(nat),
+pub struct ProducerState {
+    pub step: ProducerStep,
+    pub write_in_progress: bool,
+    pub write: nat,
+    pub reserve: nat,
+    pub last: nat,
+    pub read_obs: nat,
+}
+
+pub enum ConsumerStep {
+    Idle,
+}
+
+pub struct ProducerState {
+    pub step: ConsumerStep,
 }
 
  tokenized_state_machine!{VBQueue {
@@ -100,8 +113,7 @@ pub enum ConsumerState {
 
     #[invariant]
     pub fn no_write_in_progress(&self) -> bool {
-        !self.write_in_progress ==> self.producer is Idle &&
-        self.producer is Idle ==> !self.write_in_progress
+        !self.write_in_progress <==> self.producer.step is Idle
     }
 
     #[invariant]
