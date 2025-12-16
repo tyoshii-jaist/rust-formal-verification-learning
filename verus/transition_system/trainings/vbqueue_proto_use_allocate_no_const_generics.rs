@@ -45,22 +45,23 @@ pub enum ProducerStep {
     CommitReserveSubbed,
     CommitLastLoaded,
     CommitReserveLoaded,
+    CommitWriteStored,
 }
 
 pub struct ProducerState {
     pub step: ProducerStep,
     pub write_in_progress: bool,
-    pub write: nat,
-    pub reserve: nat,
-    pub last: nat,
-    pub read_obs: nat,
+    pub write: Option<nat>,
+    pub reserve: Option<nat>,
+    pub last: Option<nat>,
+    pub read_obs: Option<nat>,
 }
 
 pub enum ConsumerStep {
     Idle,
 }
 
-pub struct ProducerState {
+pub struct ConsumerState {
     pub step: ConsumerStep,
 }
 
@@ -118,60 +119,43 @@ pub struct ProducerState {
 
     #[invariant]
     pub fn valid_storage_all(&self) -> bool {
-        match self.producer {
-            ProducerState::Reserved((_, grant_start, grant_end)) |
-            ProducerState::CommitWriteLoaded((_, grant_start, grant_end, _)) |
-            ProducerState::CommitReserveSubbed((_, grant_start, grant_end, _)) |
-            ProducerState::CommitLastLoaded((_, grant_start, grant_end, _, _)) |
-            ProducerState::CommitReserveLoaded((_, grant_start, grant_end, _, _, _)) => {
-                &&& grant_start as nat <= self.length
-                &&& grant_end as nat <= self.length
-                &&& forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
-                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
-                        <==> (
-                            self.storage.contains_key(i)
-                        )
-                &&& forall |i: nat|
-                    (i >= self.base_addr + grant_start as nat && i < self.base_addr + grant_end)
-                        ==> (
-                            !self.storage.contains_key(i)
-                        )
-                &&& forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
-                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
-                        ==> (
-                            self.storage.index(i).ptr().addr() == i
-                        )
-                &&& forall |i: nat|
-                    ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
-                    (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
-                        ==> (
-                            self.storage.index(i).ptr()@.provenance == self.provenance
-                        )
-            },
-            _ => {
-                &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length <==> self.storage.contains_key(i)
-                &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.index(i).ptr().addr() == i
-                &&& forall |i: nat| i >= self.base_addr && i < self.base_addr + self.length ==> self.storage.index(i).ptr()@.provenance == self.provenance
-            },
-        }
+        let grant_start = if self.write < self.reserve {self.write} else {0};
+        let grant_end = self.reserve;
+
+        &&& grant_start as nat <= self.length
+        &&& grant_end as nat <= self.length
+        &&& forall |i: nat|
+            ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+            (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                <==> (
+                    self.storage.contains_key(i)
+                )
+        &&& forall |i: nat|
+            (i >= self.base_addr + grant_start as nat && i < self.base_addr + grant_end)
+                ==> (
+                    !self.storage.contains_key(i)
+                )
+        &&& forall |i: nat|
+            ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+            (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                ==> (
+                    self.storage.index(i).ptr().addr() == i
+                )
+        &&& forall |i: nat|
+            ((i >= self.base_addr && i < self.base_addr + grant_start as nat) || 
+            (i >= self.base_addr + grant_end && i < self.base_addr + self.length))
+                ==> (
+                    self.storage.index(i).ptr()@.provenance == self.provenance
+                )
     }
 
     #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
-        match self.producer {
-            ProducerState::Idle((wip, idle)) => self.write_in_progress == false && wip == self.write_in_progress && self.write == idle,
-            ProducerState::GrantStarted((wip, idle)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == idle,
-            ProducerState::GrantWriteLoaded((wip, write)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write,
-            ProducerState::GrantWriteAndReadLoaded((wip, write, _)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write,
-            ProducerState::Reserved((wip, _, reserve_end)) => self.write_in_progress == true && wip == self.write_in_progress && self.reserve == reserve_end,
-            // (reserve_start, reserve_end, write, last, reserve)
-            ProducerState::CommitWriteLoaded((wip, reserve_start, reserve_end, write)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write && self.reserve == reserve_end,
-            ProducerState::CommitReserveSubbed((wip, reserve_start, reserve_end, write)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write,
-            ProducerState::CommitLastLoaded((wip, reserve_start, reserve_end, write, last)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write && self.last == last,
-            ProducerState::CommitReserveLoaded((wip, reserve_start, reserve_end, write, last, reserve)) => self.write_in_progress == true && wip == self.write_in_progress && self.write == write && self.reserve == reserve && self.last == last,
-        }
+        &&& self.producer.step is Idle <==> (self.producer.write_in_progress == false)
+        &&& self.producer.write_in_progress == self.write_in_progress
+        &&& match self.producer.write {Some(w) => w == self.write, None => true}
+        &&& match self.producer.reserve {Some(res) => res == self.reserve, None => true}
+        &&& match self.producer.last {Some(l) => l == self.last, None => true}
     }
 
     init! {
@@ -203,15 +187,24 @@ pub struct ProducerState {
             init write_in_progress = false;
             init already_split = false;
 
-            init producer = ProducerState::Idle((false, 0));
-            init consumer = ConsumerState::Idle(0);
+            init producer = ProducerState {
+                step: ProducerStep::Idle,
+                write_in_progress: false,
+                write: None,
+                reserve: None,
+                last: None,
+                read_obs: None,
+            };
+            init consumer = ConsumerState {
+                step: ConsumerStep::Idle,
+            };
         }
     }
 
     
     #[inductive(initialize)]
     fn initialize_inductive(post: Self, base_addr: nat, provenance: raw_ptr::Provenance, length: nat, storage: Map<nat, raw_ptr::PointsTo<u8>>, buffer_dealloc: raw_ptr::Dealloc) {
-        assert(post.producer is Idle);
+        assert(post.producer.step is Idle);
         assert(post.buffer_dealloc is Some);
     }
 
@@ -225,164 +218,226 @@ pub struct ProducerState {
 
     transition!{
         grant_start() {
-            require(pre.producer is Idle);
+            require(pre.producer.step is Idle);
             require(pre.write_in_progress == false);
 
             update write_in_progress = true;
-            update producer = ProducerState::GrantStarted((true, pre.producer->Idle_0.1));
+            update producer = ProducerState {
+                step: ProducerStep::GrantStarted,
+                write_in_progress: true,
+                write: pre.producer.write,
+                reserve: pre.producer.reserve,
+                last: pre.producer.last,
+                read_obs: pre.producer.read_obs,
+            };
         }
     }
 
     transition!{
         grant_load_write() {
-            require(pre.producer is GrantStarted);
+            require(pre.producer.step is GrantStarted);
 
-            update producer = ProducerState::GrantWriteLoaded((pre.producer->GrantStarted_0.0, pre.write));
+            update producer = ProducerState{
+                step: ProducerStep::GrantWriteLoaded,
+                write: Some(pre.write),
+                write_in_progress: pre.producer.write_in_progress,
+                reserve: pre.producer.reserve,
+                last: pre.producer.last,
+                read_obs: pre.producer.read_obs,
+            };
         }
     }
 
     transition!{
         grant_load_read() {
-            require(pre.producer is GrantWriteLoaded);
+            require(pre.producer.step is GrantWriteLoaded);
 
-            update producer = ProducerState::GrantWriteAndReadLoaded((pre.producer->GrantWriteLoaded_0.0, pre.producer->GrantWriteLoaded_0.1, pre.read));
+            update producer = ProducerState{
+                step: ProducerStep::GrantWriteAndReadLoaded,
+                read_obs: Some(pre.read),
+                write_in_progress: pre.producer.write_in_progress,
+                write: pre.producer.write,
+                reserve: pre.producer.reserve,
+                last: pre.producer.last,
+            };
         }
     }
 
     transition!{
-        do_reserve(start: nat, sz: nat) {
-            require(start + sz <= pre.length);
-            require(pre.producer is GrantWriteAndReadLoaded);
+        do_reserve(reserve: nat) {
+            require(reserve <= pre.length);
+            require(pre.producer.step is GrantWriteAndReadLoaded);
 
-            update reserve = start + sz;
+            update reserve = reserve;
 
-            birds_eye let range_keys = Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + start + sz);
+            let start = pre.producer.write->Some_0;
+            birds_eye let range_keys = Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + reserve);
             // restrict を使わないとうまく pre.storage の情報が引き継がれない?
             birds_eye let withdraw_range_map = pre.storage.restrict(range_keys);
 
             withdraw storage -= (withdraw_range_map) by {
                 assert(withdraw_range_map.submap_of(pre.storage)) by {
-                    assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr)));
+                    assert(withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < reserve + pre.base_addr)));
                     assert(pre.valid_storage_all());
-                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.contains_key(j));
-                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.index(j).ptr().addr() == j);
-                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> pre.storage.index(j).ptr()@.provenance == pre.provenance);
+                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + reserve ==> pre.storage.contains_key(j));
+                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + reserve ==> pre.storage.index(j).ptr().addr() == j);
+                    assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + reserve ==> pre.storage.index(j).ptr()@.provenance == pre.provenance);
                 }
             };
             
-            update producer = ProducerState::Reserved((pre.producer->GrantWriteAndReadLoaded_0.0, start, start + sz));
+            update producer = ProducerState{
+                step: ProducerStep::Reserved,
+                write: None,
+                last: None,
+                reserve: None,
+                read_obs: None,
+                write_in_progress: pre.producer.write_in_progress,
+            };
 
             assert(
-                withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr))
+                withdraw_range_map.dom().subset_of(Set::new(|i: nat| i >= start + pre.base_addr && i < reserve + pre.base_addr))
             );
             assert(
-                Set::new(|i: nat| i >= start + pre.base_addr && i < start + sz + pre.base_addr).subset_of(withdraw_range_map.dom())
+                Set::new(|i: nat| i >= start + pre.base_addr && i < reserve + pre.base_addr).subset_of(withdraw_range_map.dom())
             );
-            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz <==> withdraw_range_map.contains_key(j));
-            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> withdraw_range_map.index(j).ptr().addr() == j);
-            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + start + sz ==> withdraw_range_map.index(j).ptr()@.provenance == pre.provenance);
+            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + reserve <==> withdraw_range_map.contains_key(j));
+            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + reserve ==> withdraw_range_map.index(j).ptr().addr() == j);
+            assert(forall |j: nat| j >= pre.base_addr + start && j < pre.base_addr as nat + reserve ==> withdraw_range_map.index(j).ptr()@.provenance == pre.provenance);
         }
     }
 
     transition!{
         grant_fail() {
-            require(pre.producer is GrantWriteAndReadLoaded);
+            require(pre.producer.step is GrantWriteAndReadLoaded);
 
             update write_in_progress = false;
-            update producer = ProducerState::Idle((false, pre.producer->GrantWriteAndReadLoaded_0.1));
+
+            update producer = ProducerState{
+                step: ProducerStep::Idle,
+                write_in_progress: false,
+                write: None,
+                last: None,
+                reserve: None,
+                read_obs: None,
+            };
         }
     }
 
     transition!{
         commit_start() {
-            require(pre.producer is Idle || pre.producer is Reserved);
-            //assert(!pre.write_in_progress ==> pre.producer is Idle && pre.producer is Idle ==> !pre.write_in_progress);
+            require(pre.producer.step is Idle || pre.producer.step is Reserved);
+            //assert(!pre.write_in_progress ==> pre.producer.step is Idle && pre.producer.step is Idle ==> !pre.write_in_progress);
             if !pre.write_in_progress {
-                assert(pre.producer is Idle);
+                assert(pre.producer.step is Idle);
             } else {
-                assert(pre.producer is Reserved);
+                assert(pre.producer.step is Reserved);
             }
         }
     }
 
     transition!{
         commit_load_write() {
-            require(pre.producer is Reserved);
+            require(pre.producer.step is Reserved);
 
-            update producer = ProducerState::CommitWriteLoaded((pre.producer->Reserved_0.0, pre.producer->Reserved_0.1, pre.producer->Reserved_0.2, pre.write));
+            update producer = ProducerState{
+                step: ProducerStep::CommitWriteLoaded,
+                write: Some(pre.write),
+                write_in_progress: pre.producer.write_in_progress,
+                reserve: pre.producer.reserve,
+                last: pre.producer.last,
+                read_obs: pre.producer.read_obs,
+            };
         }
     }
 
     transition!{
         commit_sub_reserve(commited: nat) {
-            require(pre.producer is CommitWriteLoaded);
-            assert(pre.reserve == pre.producer->CommitWriteLoaded_0.2); // 重要!
+            require(pre.producer.step is CommitWriteLoaded);
+            //assert(pre.reserve == pre.producer->CommitWriteLoaded_0.2); // 重要!
             require(pre.reserve >= commited);
 
             let new_reserve = (pre.reserve - commited) as nat;
 
             update reserve = new_reserve;
-            update producer = ProducerState::CommitReserveSubbed((pre.producer->CommitWriteLoaded_0.0, pre.producer->CommitWriteLoaded_0.1, pre.producer->CommitWriteLoaded_0.2, pre.producer->CommitWriteLoaded_0.3));
+            
+            // TODO: need deposit subbed area.
+            update producer = ProducerState{
+                step: ProducerStep::CommitReserveSubbed,
+                reserve: Some(new_reserve),
+                write_in_progress: pre.producer.write_in_progress,
+                write: pre.producer.write,
+                last: pre.producer.last,
+                read_obs: pre.producer.read_obs,
+            };
         }
     }    
 
     transition!{
         commit_load_last() {
-            require(pre.producer is CommitReserveSubbed);
+            require(pre.producer.step is CommitReserveSubbed);
 
-            update producer = ProducerState::CommitLastLoaded(
-                (pre.producer->CommitReserveSubbed_0.0, pre.producer->CommitReserveSubbed_0.1, pre.producer->CommitReserveSubbed_0.2, pre.producer->CommitReserveSubbed_0.3, pre.last)
-            );
+            update producer = ProducerState{
+                step: ProducerStep::CommitLastLoaded,
+                last: Some(pre.last),
+                write_in_progress: pre.producer.write_in_progress,
+                write: pre.producer.write,
+                reserve: pre.producer.reserve,
+                read_obs: pre.producer.read_obs,
+            };
         }
     }
 
     transition!{
         commit_load_reserve() {
-            require(pre.producer is CommitLastLoaded);
+            require(pre.producer.step is CommitLastLoaded);
 
-            update producer = ProducerState::CommitReserveLoaded(
-                (pre.producer->CommitLastLoaded_0.0, pre.producer->CommitLastLoaded_0.1, pre.producer->CommitLastLoaded_0.2, pre.producer->CommitLastLoaded_0.3, pre.producer->CommitLastLoaded_0.4, pre.reserve)
-            );
+            update producer = ProducerState{
+                step: ProducerStep::CommitReserveLoaded,
+                //reserve: Some(pre.reserve),
+                write_in_progress: pre.producer.write_in_progress,
+                write: pre.producer.write,
+                reserve: Some(pre.reserve),
+                last: pre.producer.last,
+                read_obs: pre.producer.read_obs,
+            };
         }
     }
 
     transition!{
         commit_store_last(new_last: nat) {
-            require(pre.producer is CommitReserveLoaded);
+            require(pre.producer.step is CommitReserveLoaded);
 
             update last = new_last;
 
-            update producer = ProducerState::CommitReserveLoaded(
-                (pre.producer->CommitReserveLoaded_0.0, pre.producer->CommitReserveLoaded_0.1, pre.producer->CommitReserveLoaded_0.2, pre.producer->CommitReserveLoaded_0.3, new_last, pre.producer->CommitReserveLoaded_0.5)
-            );
+            update producer = ProducerState{
+                step: ProducerStep::CommitReserveLoaded,
+                last: Some(new_last),
+                write_in_progress: pre.producer.write_in_progress,
+                write: pre.producer.write,
+                reserve: pre.producer.reserve,
+                read_obs: pre.producer.read_obs,
+            };
         }
     }
 
     transition!{
-        commit_store_write(new_write: nat) {
-            require(pre.producer is CommitReserveLoaded);
-
-            update write = new_write;
-
-            update producer = ProducerState::CommitReserveLoaded(
-                (pre.producer->CommitReserveLoaded_0.0, pre.producer->CommitReserveLoaded_0.1, pre.producer->CommitReserveLoaded_0.2, new_write, pre.producer->CommitReserveLoaded_0.4, pre.producer->CommitReserveLoaded_0.5)
-            );
-        }
-    }
-
-    transition!{
-        commit_end(to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
-            require(pre.producer is CommitReserveLoaded);
+        commit_store_write(new_write: nat, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
+            require(pre.producer.step is CommitReserveLoaded);
+            let write = pre.producer.write->Some_0;
+            let reserve = pre.producer.reserve->Some_0;
+        
+            let grant_start = if write < reserve {write} else {0};
+            let grant_end = reserve;
 
             require(
-                forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
+                forall |j: nat| j >= pre.base_addr + grant_start && j < pre.base_addr + grant_end
                     <==> to_deposit.contains_key(j));
             require(
-                forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
+                forall |j: nat| j >= pre.base_addr + grant_start && j < pre.base_addr + grant_end
                      ==> to_deposit.index(j).ptr().addr() == j
             );
             require(
-                forall |j: nat| j >= pre.base_addr + pre.producer->CommitReserveLoaded_0.1 && j < pre.base_addr + pre.producer->CommitReserveLoaded_0.2
+                forall |j: nat| j >= pre.base_addr + grant_start && j < pre.base_addr + grant_end
                     ==> to_deposit.index(j).ptr()@.provenance == pre.provenance
             );
             deposit storage += (to_deposit) by {
@@ -390,8 +445,32 @@ pub struct ProducerState {
                 assert(forall |i: nat| to_deposit.contains_key(i) ==> !pre.storage.contains_key(i));
             };
 
+            update write = new_write;
+
+            update producer = ProducerState{
+                step: ProducerStep::CommitWriteStored,
+                write: None,
+                reserve: None,
+                read_obs: None,
+                last: None,
+                write_in_progress: pre.producer.write_in_progress,
+            };
+        }
+    }
+
+    transition!{
+        commit_end() {
+            require(pre.producer.step is CommitWriteStored);
+
             update write_in_progress = false;
-            update producer = ProducerState::Idle((false, pre.producer->CommitReserveLoaded_0.3));
+            update producer = ProducerState{
+                step: ProducerStep::Idle,
+                write_in_progress: false,
+                write: pre.producer.write,
+                reserve: pre.producer.reserve,
+                last: pre.producer.last,
+                read_obs: pre.producer.read_obs,
+            };
         }
     }
 
@@ -403,56 +482,29 @@ pub struct ProducerState {
 
     #[inductive(grant_load_write)]
     fn grant_load_write_inductive(pre: Self, post: Self) {
-        assert(post.producer is GrantWriteLoaded);
     }
 
     #[inductive(grant_load_read)]
     fn grant_load_read_inductive(pre: Self, post: Self) {
-        assert(post.producer is GrantWriteAndReadLoaded);
     }
 
     #[inductive(grant_fail)]
     fn grant_fail_inductive(pre: Self, post: Self) { }
 
     #[inductive(do_reserve)]
-    fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
-        assert(pre.producer->GrantWriteAndReadLoaded_0.1 == pre.write);
-        /*let write = pre.write;
-        let read = pre.producer->GrantWriteAndReadLoaded_0.2;
-        let max = pre.length;
-        
-        assert(
-            (start == write && write < read && write + sz < read) ||
-            (start == write && !(write < read) && write + sz <= max) ||
-            (start == 0 && !(write < read) && (write + sz > max && sz < read))
-        ); */
-
-        //assert(write <= post.producer->Reserved_0.1 || (post.producer->Reserved_0.2 < read && read <= write));
-        assert(post.producer is Reserved);
-        assert(post.producer->Reserved_0.2 == post.reserve);
+    fn do_reserve_inductive(pre: Self, post: Self, reserve: nat) {
     }
 
     #[inductive(commit_start)]
     fn commit_start_inductive(pre: Self, post: Self) {
-        if post.producer is Idle {
-            assert(
-                {
-                    &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length <==> post.storage.contains_key(i)
-                    &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i
-                    &&& forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance
-                }
-            );
-        }
     }
 
     #[inductive(commit_load_write)]
     fn commit_load_write_inductive(pre: Self, post: Self) {
-        assert(post.producer->CommitWriteLoaded_0.2 == post.reserve);
     }
 
     #[inductive(commit_sub_reserve)]
     fn commit_sub_reserve_inductive(pre: Self, post: Self, commited: nat) {
-        assert(pre.producer->CommitWriteLoaded_0.2 == pre.reserve);
     }
 
     #[inductive(commit_load_last)]
@@ -465,16 +517,16 @@ pub struct ProducerState {
     fn commit_store_last_inductive(pre: Self, post: Self, new_last: nat) { }
 
     #[inductive(commit_store_write)]
-    fn commit_store_write_inductive(pre: Self, post: Self, new_write: nat) { }
-
-    #[inductive(commit_end)]
-    fn commit_end_inductive(pre: Self, post: Self, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
+    fn commit_store_write_inductive(pre: Self, post: Self, new_write: nat, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
         assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.contains_key(i));
+
+        let write = pre.producer.write->Some_0;
+        let reserve = pre.producer.reserve->Some_0;
 
         let start = post.base_addr;
         let end = post.base_addr + post.length;
-        let dep_start = pre.base_addr + pre.producer->CommitReserveLoaded_0.1;
-        let dep_end = pre.base_addr + pre.producer->CommitReserveLoaded_0.2;
+        let dep_start = pre.base_addr + write;
+        let dep_end = pre.base_addr + reserve;
 
         // post.storage のキーはすべて範囲内であることを示す
         assert(forall |i: nat| post.storage.contains_key(i) ==> start <= i && i < end) 
@@ -494,6 +546,10 @@ pub struct ProducerState {
         };
         assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr().addr() == i);
         assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.index(i).ptr()@.provenance == post.provenance);
+    }
+
+    #[inductive(commit_end)]
+    fn commit_end_inductive(pre: Self, post: Self) {
     }
 }}
 
@@ -588,7 +644,7 @@ impl<T> Consumer<T> {
  */
 impl VBBuffer
 {
-    fn new(length: usize) -> (r:(Self, Tracked<VBQueue::producer>,Tracked<VBQueue::consumer>))
+    fn new(length: usize) -> (r:(Self, Tracked<VBQueue::producer>, Tracked<VBQueue::consumer>))
         requires
             valid_layout(length, 1),
             length > 0, // TODO: 元の BBQueue はこの制約は持っていない。0で使うことはないと思うが。
@@ -606,7 +662,7 @@ impl VBBuffer
         */
             r.0.wf(),
             r.0.instance@.id() == r.1@.instance_id(),
-            r.1@.value() is Idle,
+            r.1@.value().step is Idle,
     {
         // TODO: 元の BBQueue は静的に確保している。
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
@@ -700,7 +756,7 @@ impl VBBuffer
         requires
             self.wf(),
             old(producer_token).instance_id() == self.instance@.id(),
-            old(producer_token).value() is Idle,
+            old(producer_token).value().step is Idle,
         ensures
             self.wf(),
             match res {
@@ -711,7 +767,7 @@ impl VBBuffer
                 Err(_) => true
             },
             producer_token.instance_id() == self.instance@.id(),
-            producer_token.value() is Idle,
+            old(producer_token).value().step is Idle,
     {
         let already_splitted =
             atomic_with_ghost!(&self.already_split => swap(true);
@@ -751,13 +807,13 @@ impl Producer {
         requires
             old(self).wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
-            old(producer_token).value() is Idle,
+            old(producer_token).value().step is Idle,
         ensures
             match r {
                 Ok((wgr, buf_perms)) => {
                     wgr.wf_with_buf_perms(buf_perms@) &&
                     wgr.buf.len() == sz &&
-                    producer_token.value() is Reserved
+                    producer_token.value().step is Reserved
                 },
                 _ => true
             },
@@ -773,11 +829,11 @@ impl Producer {
                         assert(write_in_progress_token.value() == false);
                         let _ = self.vbq.instance.borrow().grant_start(&mut write_in_progress_token, producer_token);
                         assert(write_in_progress_token.value() == true);
-                        assert(producer_token.value() is GrantStarted);
+                        assert(producer_token.value().step is GrantStarted);
                         assert(ret == false);
                     } else {
                         assert(write_in_progress_token.value() == true);
-                        assert(producer_token.value() is Idle);
+                        assert(producer_token.value().step is Idle);
                         assert(ret == true);
                     };
                 }
@@ -785,13 +841,13 @@ impl Producer {
 
         if is_write_in_progress {
             proof {
-                assert(producer_token.value() is Idle);
+                assert(producer_token.value().step is Idle);
             }
             return Err("write in progress");
         }
 
         proof {
-            assert(producer_token.value() is GrantStarted);
+            assert(producer_token.value().step is GrantStarted);
         }
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
@@ -802,7 +858,6 @@ impl Producer {
         let read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
                 let _ = self.vbq.instance.borrow().grant_load_read(&read_token, producer_token);
-                assert(producer_token.value()->GrantWriteAndReadLoaded_0.2 == read_token.value());
             }
         );
         let max = self.vbq.length as usize;
@@ -848,7 +903,6 @@ impl Producer {
             }
         };
         // 上記のエラーケース以外の条件を集約
-        assert(producer_token.value()->GrantWriteAndReadLoaded_0.2 == read);
         assert(
             (start == write && write < read && write + sz < read) ||
             (start == write && !(write < read) && write + sz <= max) ||
@@ -862,7 +916,7 @@ impl Producer {
         atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
             ghost reserve_token => {
                 // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
-                let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, producer_token);
+                let tracked ret = self.vbq.instance.borrow().do_reserve((start + sz) as nat, &mut reserve_token, producer_token);
                 granted_perms_map = ret.1.get();
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
                 assert(
@@ -971,7 +1025,6 @@ impl Producer {
     }
 }
 
-
 struct GrantW {
     buf: Vec<*mut u8>,
     vbq: Arc<VBBuffer>,
@@ -986,29 +1039,27 @@ impl GrantW {
         &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i]@.provenance == buf_perms.index(self.buf[i] as nat).ptr()@.provenance
     }
 
-    pub closed spec fn wf_with_producer(&self, producer_token: ProducerState, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
-        match producer_token {
-            ProducerState::Reserved((wip, reserve_start, reserve_end)) |
-            ProducerState::CommitWriteLoaded((wip, reserve_start, reserve_end, _)) |
-            ProducerState::CommitReserveSubbed((wip, reserve_start, reserve_end, _)) |
-            ProducerState::CommitLastLoaded((wip, reserve_start, reserve_end, _, _)) |
-            ProducerState::CommitReserveLoaded((wip, reserve_start, reserve_end, _, _, _)) => {
-                &&& wip == true
-                &&& self.buf.len() == reserve_end - reserve_start
-                &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + reserve_start + i as nat
-                &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
+    pub closed spec fn wf_with_producer(&self, producer_state: ProducerState, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
+        &&& producer_state.step is Idle
+        &&& match (producer_state.write, producer_state.reserve) {
+            (Some(w), Some(res)) => {
+                let grant_start = if w < res {w} else {0};
+                let grant_end = res;
+
+                &&& self.buf.len() == grant_end - grant_start
+                &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.index(self.buf[i] as nat).ptr().addr() == self.vbq.instance@.base_addr() as nat + grant_start + i as nat
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + grant_start && j < self.vbq.buffer as nat + grant_end
                     <==> buf_perms.contains_key(j)
-                &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + grant_start && j < self.vbq.buffer as nat + grant_end
                     ==> (
                         buf_perms.index(j).ptr().addr() == j
                     )
-                &&& forall |j: nat| j >= self.vbq.buffer as nat + reserve_start && j < self.vbq.buffer as nat + reserve_end
+                &&& forall |j: nat| j >= self.vbq.buffer as nat + grant_start && j < self.vbq.buffer as nat + grant_end
                     ==> (
                         buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
                     )
             },
-            ProducerState::Idle(_) => true,
-            _ => false,
+            _ => true,
         }
     }
 
@@ -1021,10 +1072,10 @@ impl GrantW {
             old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
-            old(producer_token).value() is Idle || old(producer_token).value() is Reserved,
+            old(producer_token).value().step is Idle || old(producer_token).value().step is Reserved,
             old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
-            producer_token.value() is Idle,
+            producer_token.value().step is Idle,
             self.vbq.wf(),
     {
         self.commit_inner(used, Tracked(producer_token), Tracked(buf_perms));
@@ -1040,10 +1091,10 @@ impl GrantW {
             old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
-            old(producer_token).value() is Idle || old(producer_token).value() is Reserved,
+            old(producer_token).value().step is Idle || old(producer_token).value().step is Reserved,
             old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
-            producer_token.value() is Idle,
+            producer_token.value().step is Idle,
             self.vbq.wf(),
     {
         // If there is no grant in progress, return early. This
@@ -1055,15 +1106,14 @@ impl GrantW {
                 update prev -> next;
                 returning ret;
                 ghost write_in_progress_token => {
-                    assert(producer_token.value() is Idle || producer_token.value() is Reserved);
-                    assert(!(producer_token.value() is Idle) ==> producer_token.value() is Reserved);
+                    assert(producer_token.value().step is Idle || producer_token.value().step is Reserved);
                     let _ = self.vbq.instance.borrow().commit_start(&write_in_progress_token, producer_token);
                     assert(self.wf_with_producer(producer_token.value(), buf_perms));
                 }
         );
 
         if !is_write_in_progress {
-            assert(producer_token.value() is Idle);
+            assert(producer_token.value().step is Idle);
             return;
         }
 
@@ -1076,21 +1126,18 @@ impl GrantW {
 
         proof {
             assert(used <= len);
-            assert(producer_token.value() is Reserved);
+            assert(producer_token.value().step is Reserved);
         }
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
                 let _ = self.vbq.instance.borrow().commit_load_write(&write_token, producer_token);
-                assert(producer_token.value()->CommitWriteLoaded_0.2 - producer_token.value()->CommitWriteLoaded_0.1 == len);
-                assert(producer_token.value()->CommitWriteLoaded_0.2 >= producer_token.value()->CommitWriteLoaded_0.1);
-                assert(producer_token.value()->CommitWriteLoaded_0.2 >= len);
                 assert(self.wf_with_producer(producer_token.value(), buf_perms));
             }
         );
 
         proof {
-            assert(producer_token.value() is CommitWriteLoaded);
+            assert(producer_token.value().step is CommitWriteLoaded);
             assert(self.wf_with_producer(producer_token.value(), buf_perms));
         }
 
@@ -1152,7 +1199,9 @@ impl GrantW {
         // time to invert early!
         atomic_with_ghost!(&self.vbq.write => store(new_write);
             ghost write_token => {
-                let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, &mut write_token, producer_token);
+                assert(self.wf_with_producer(producer_token.value(), buf_perms));
+                assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
+                let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, buf_perms, buf_perms, &mut write_token, producer_token);
                 assert(self.wf_with_producer(producer_token.value(), buf_perms));
             }
         );
@@ -1160,24 +1209,7 @@ impl GrantW {
         // Allow subsequent grants
         atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
             ghost write_in_progress_token => {
-                assert(self.wf_with_producer(producer_token.value(), buf_perms));
-                assert(
-                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
-                        <==> buf_perms.contains_key(j));
-                assert(
-                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
-                        ==> (
-                            buf_perms.index(j).ptr().addr() == j
-                        )
-                );
-                assert(
-                    forall |j: nat| j >= self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.1 && j < self.vbq.buffer as nat + producer_token.value()->CommitReserveLoaded_0.2
-                        ==> (
-                            buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
-                        )
-                );
-                assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
-                let _ = self.vbq.instance.borrow().commit_end(buf_perms, buf_perms, &mut write_in_progress_token, producer_token);
+                let _ = self.vbq.instance.borrow().commit_end(&mut write_in_progress_token, producer_token);
                 assert(write_in_progress_token.value() == false);
             }
         );
