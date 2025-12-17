@@ -209,6 +209,18 @@ impl ConsumerState {
     }
 
     #[invariant]
+    pub fn valid_order(&self) -> bool {
+        if self.read <= self.write {
+            // not inverted
+            ||| self.write <= self.reserve && self.reserve <= self.last
+            ||| 0 <= self.reserve < self.read
+        } else {
+            // inverted
+            self.write <= self.reserve && self.reserve < self.read
+        }
+    }
+
+    #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
         &&& self.producer.write_in_progress == self.write_in_progress
         &&& self.producer.write == self.write
@@ -217,9 +229,42 @@ impl ConsumerState {
     }
 
     #[invariant]
+    pub fn valid_producer_local_state_order(&self) -> bool {
+        match self.producer.read_obs {
+            Some(read_obs) => {
+                if read_obs <= self.producer.write {
+                    // not inverted
+                    ||| self.producer.write <= self.producer.reserve && self.producer.reserve <= self.producer.last
+                    ||| 0 <= self.producer.reserve < read_obs
+                } else {
+                    // inverted
+                    self.producer.write <= self.producer.reserve && self.producer.reserve < read_obs
+                }
+            },
+            None => self.producer.write == self.producer.reserve
+        }
+    }
+
+    #[invariant]
     pub fn valid_consumer_local_state(&self) -> bool {
         &&& self.consumer.read_in_progress == self.read_in_progress
         &&& self.consumer.read == self.read
+    }
+
+    #[invariant]
+    pub fn valid_consumer_local_state_order(&self) -> bool {
+        match (self.consumer.write_obs, self.consumer.last_obs) {
+            (Some(write_obs), Some(last_obs) ) => {
+                if self.consumer.read <= write_obs {
+                    // not inverted
+                    write_obs <= last_obs
+                } else {
+                    // inverted
+                    self.consumer.read <= last_obs
+                }
+            },
+            _ => true,
+        }
     }
 
     init! {
@@ -322,7 +367,7 @@ impl ConsumerState {
     transition!{
         do_reserve(reserve: nat) {
             require(pre.producer.write_in_progress == true);
-            require(reserve <= pre.length);
+            require(reserve <= pre.producer.last);
 
             update reserve = reserve;
 
@@ -447,12 +492,27 @@ impl ConsumerState {
  */
 
     transition!{
-        commit_store_last(new_last: nat) {
+        commit_update_last_by_write() {
             require(pre.producer.write_in_progress == true);
-            update last = new_last;
+            update last = pre.producer.write; // write で last を更新する
 
             update producer = ProducerState{
-                last: new_last,
+                last: pre.producer.write,
+                write_in_progress: pre.producer.write_in_progress,
+                write: pre.producer.write,
+                reserve: pre.producer.reserve,
+                read_obs: pre.producer.read_obs,
+            };
+        }
+    }
+
+    transition!{
+        commit_update_last_by_max() {
+            require(pre.producer.write_in_progress == true);
+            update last = pre.length; // max で last を更新する
+
+            update producer = ProducerState{
+                last: pre.length,
                 write_in_progress: pre.producer.write_in_progress,
                 write: pre.producer.write,
                 reserve: pre.producer.reserve,
@@ -640,8 +700,11 @@ impl ConsumerState {
     #[inductive(commit_load_reserve)]
     fn commit_load_reserve_inductive(pre: Self, post: Self) { }
  */
-    #[inductive(commit_store_last)]
-    fn commit_store_last_inductive(pre: Self, post: Self, new_last: nat) { }
+    #[inductive(commit_update_last_by_write)]
+    fn commit_update_last_by_write_inductive(pre: Self, post: Self) { }
+
+    #[inductive(commit_update_last_by_max)]
+    fn commit_update_last_by_max_inductive(pre: Self, post: Self) { }
 
     #[inductive(commit_store_write)]
     fn commit_store_write_inductive(pre: Self, post: Self, new_write: nat) {//, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
@@ -1058,6 +1121,7 @@ impl Producer {
         atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
             ghost reserve_token => {
                 // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
+                assert(start + sz <= producer_token.value().last);
                 let tracked ret = self.vbq.instance.borrow().do_reserve((start + sz) as nat, &mut reserve_token, producer_token);
                 /*
                 granted_perms_map = ret.1.get();
@@ -1284,7 +1348,7 @@ impl GrantW {
             // Mark `last` where the write pointer used to be to hold the line here
             atomic_with_ghost!(&self.vbq.last => store(write);
                 ghost last_token => {
-                    let _ = self.vbq.instance.borrow().commit_store_last(write as nat, &mut last_token, producer_token);
+                    let _ = self.vbq.instance.borrow().commit_update_last_by_write(&mut last_token, producer_token);
                 }
             );
         } else if new_write > last {
@@ -1297,7 +1361,7 @@ impl GrantW {
             // value
             atomic_with_ghost!(&self.vbq.last => store(max);
                 ghost last_token => {
-                    let _ = self.vbq.instance.borrow().commit_store_last(max as nat, &mut last_token, producer_token);
+                    let _ = self.vbq.instance.borrow().commit_update_last_by_max(&mut last_token, producer_token);
                 }
             );
         }
