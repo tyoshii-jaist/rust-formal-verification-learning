@@ -208,17 +208,18 @@ impl ConsumerState {
                 )
     }
 
+    /*
     #[invariant]
     pub fn valid_order(&self) -> bool {
         if self.read <= self.write {
             // not inverted
-            ||| self.write <= self.reserve && self.reserve <= self.last
-            ||| 0 <= self.reserve < self.read
+            (self.write <= self.reserve && self.reserve <= self.last)
+            || self.reserve < self.read
         } else {
             // inverted
             self.write <= self.reserve && self.reserve < self.read
         }
-    }
+    } */
 
     #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
@@ -234,11 +235,19 @@ impl ConsumerState {
             Some(read_obs) => {
                 if read_obs <= self.producer.write {
                     // not inverted
-                    ||| self.producer.write <= self.producer.reserve && self.producer.reserve <= self.producer.last
-                    ||| 0 <= self.producer.reserve < read_obs
+                    &&& read_obs <= self.read // read は単調増加
+                    &&& self.read <= self.producer.write // read は write を追い越さない
+                    &&& (
+                        (self.producer.write <= self.producer.reserve && self.producer.reserve <= self.producer.last)
+                        || (self.producer.reserve < read_obs)
+                    )
                 } else {
                     // inverted
-                    self.producer.write <= self.producer.reserve && self.producer.reserve < read_obs
+                    &&& (
+                        (read_obs <= self.read && self.read <= self.producer.last) // ラップしてないときは read_obs は read を追い越さない
+                        || (self.read <= self.producer.write)
+                    )
+                    &&& self.producer.write <= self.producer.reserve && self.producer.reserve < read_obs
                 }
             },
             None => self.producer.write == self.producer.reserve
@@ -368,6 +377,19 @@ impl ConsumerState {
         do_reserve(reserve: nat) {
             require(pre.producer.write_in_progress == true);
             require(reserve <= pre.producer.last);
+            require(pre.producer.read_obs is Some);
+            require(
+                // not inverted
+                (
+                    (pre.producer.read_obs->Some_0 <= pre.producer.write) &&
+                        ((pre.producer.write <= reserve && reserve <= pre.producer.last) || reserve < pre.producer.read_obs->Some_0)
+                ) ||
+                // inverted
+                (
+                    (pre.producer.write < pre.producer.read_obs->Some_0) &&
+                        (pre.producer.write <= reserve && reserve < pre.producer.read_obs->Some_0)
+                )
+            );
 
             update reserve = reserve;
 
