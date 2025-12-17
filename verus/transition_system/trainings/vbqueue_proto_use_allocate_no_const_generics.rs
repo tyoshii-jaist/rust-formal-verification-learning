@@ -37,10 +37,14 @@ proof fn lemma_range_set_len(base: nat, sz: nat)
 
 pub struct ProducerState {
     pub write_in_progress: bool,
+
+    // 自身で管理するのは nat で持つ
     pub write: nat,
     pub reserve: nat,
     pub last: nat,
-    pub read_obs: nat,
+
+    // 観測して持つものは Option で持つ
+    pub read_obs: Option<nat>,
 }
 
 impl ProducerState {
@@ -55,10 +59,30 @@ impl ProducerState {
 
 pub struct ConsumerState {
     pub read_in_progress: bool,
+    // 自分で管理するものは nat で持つ
     pub read: nat,
-    pub write_obs: nat,
-    pub reserve_obs: nat,
-    pub last_obs: nat,
+    // 観測して持つものは Option で持つ
+    pub write_obs: Option<nat>,
+    pub last_obs: Option<nat>,
+}
+
+impl ConsumerState {
+    pub closed spec fn grant_start(&self) -> nat {
+        self.read
+    }
+
+    pub closed spec fn grant_end(&self) -> nat {
+        match (self.write_obs, self.last_obs) {
+            (Some(w), Some(l)) => {
+                if self.read <= w {
+                    w // not inverted
+                } else {
+                    l // inverted
+                }
+            },
+            _ => self.read // no area
+        }
+    }
 }
 
  tokenized_state_machine!{VBQueue {
@@ -117,18 +141,39 @@ pub struct ConsumerState {
     }
  */
     #[invariant]
+    pub fn last_equals_max(&self) -> bool {
+        // not inverted だと last == max がいえる
+        &&& self.last <= self.length
+        &&& self.read <= self.write ==> self.last == self.length
+        &&& self.last < self.length ==> self.read > self.write
+    }
+    
+    #[invariant]
+    pub fn order_of_max_last(&self) -> bool {
+        &&& self.last <= self.length
+        &&& self.read <= self.last
+        &&& self.write <= self.last
+        &&& self.reserve <= self.last
+    }
+
+    #[invariant]
     pub fn valid_prod_grant_range(&self) -> bool {
         self.producer.grant_start() <= self.producer.grant_end()
     }
 
     #[invariant]
+    pub fn valid_cons_grant_range(&self) -> bool {
+        self.consumer.grant_start() <= self.consumer.grant_end()
+    }
+
+    #[invariant]
     pub fn no_write_in_progress(&self) -> bool {
-        !self.write_in_progress ==> self.producer.write == self.producer.reserve
+        !self.write_in_progress ==> self.producer.grant_start() == self.producer.grant_end()
     }
 
     #[invariant]
     pub fn no_read_in_progress(&self) -> bool {
-        !self.read_in_progress ==> self.consumer.read == self.consumer.write_obs
+        !self.read_in_progress ==> self.consumer.grant_start() == self.consumer.grant_end()
     }
 
     #[invariant]
@@ -171,6 +216,12 @@ pub struct ConsumerState {
         &&& self.producer.last == self.last
     }
 
+    #[invariant]
+    pub fn valid_consumer_local_state(&self) -> bool {
+        &&& self.consumer.read_in_progress == self.read_in_progress
+        &&& self.consumer.read == self.read
+    }
+
     init! {
         initialize(
             base_addr: nat,
@@ -205,14 +256,13 @@ pub struct ConsumerState {
                 write: 0,
                 reserve: 0,
                 last: length,
-                read_obs: 0,
+                read_obs: None,
             };
             init consumer = ConsumerState {
                 read_in_progress: false,
                 read: 0,
-                write_obs: 0,
-                reserve_obs: 0,
-                last_obs: length,
+                write_obs: None,
+                last_obs: None,
             };
         }
     }
@@ -260,7 +310,7 @@ pub struct ConsumerState {
     transition!{
         grant_load_read() {
             update producer = ProducerState{
-                read_obs: pre.read,
+                read_obs: Some(pre.read),
                 write_in_progress: pre.producer.write_in_progress,
                 write: pre.producer.write,
                 reserve: pre.producer.reserve,
@@ -326,7 +376,7 @@ pub struct ConsumerState {
                 write: pre.producer.write,
                 reserve: pre.producer.reserve,
                 last: pre.producer.last,
-                read_obs: pre.producer.read_obs,
+                read_obs: None,
             };
         }
     }
@@ -463,13 +513,14 @@ pub struct ConsumerState {
     transition!{
         read_start() {
             require(pre.read_in_progress == false);
+            require(pre.consumer.write_obs is None);
+            require(pre.consumer.last_obs is None);
 
             update read_in_progress = true;
             update consumer = ConsumerState {
                 read_in_progress: true,
                 read: pre.consumer.read,
                 write_obs: pre.consumer.write_obs,
-                reserve_obs: pre.consumer.reserve_obs,
                 last_obs: pre.consumer.last_obs,
             };
         }
@@ -478,12 +529,13 @@ pub struct ConsumerState {
     transition!{
         read_load_write() {
             require(pre.consumer.read_in_progress == true);
+            require(pre.consumer.write_obs is None);
+            require(pre.consumer.last_obs is None);
 
             update consumer = ConsumerState {
                 read_in_progress: pre.consumer.read_in_progress,
-                write_obs: pre.write,
+                write_obs: Some(pre.write),
                 read: pre.consumer.read,
-                reserve_obs: pre.consumer.reserve_obs,
                 last_obs: pre.consumer.last_obs,
             };
         }
@@ -491,16 +543,19 @@ pub struct ConsumerState {
 
     transition!{
         read_load_last() {
+            require(pre.consumer.read_in_progress == true);
+            require(pre.consumer.write_obs is Some);
+            require(pre.consumer.last_obs is None);
+
             update consumer = ConsumerState {
-                last_obs: pre.last,
+                last_obs: Some(pre.last),
                 read_in_progress: pre.consumer.read_in_progress,
                 read: pre.consumer.read,
                 write_obs: pre.consumer.write_obs,
-                reserve_obs: pre.consumer.reserve_obs,
             };
         }
     }
-
+/*
     transition!{
         read_load_read() {
             update consumer = ConsumerState {
@@ -512,16 +567,17 @@ pub struct ConsumerState {
             };
         }
     }
-
+ */
     transition!{
         read_store_read() {
+            require(pre.consumer.read_in_progress == true);
+
             update read = 0;
 
             update consumer = ConsumerState {
                 read_in_progress: pre.consumer.read_in_progress,
                 read: 0,
                 write_obs: pre.consumer.write_obs,
-                reserve_obs: pre.consumer.reserve_obs,
                 last_obs: pre.consumer.last_obs,
             };
         }
@@ -529,13 +585,14 @@ pub struct ConsumerState {
 
     transition!{
         read_fail() {
+            require(pre.consumer.read_in_progress == true);
+
             update read_in_progress = false;
             update consumer = ConsumerState {
                 read_in_progress: false,
                 read: pre.consumer.read,
-                write_obs: pre.consumer.write_obs,
-                reserve_obs: pre.consumer.reserve_obs,
-                last_obs: pre.consumer.last_obs,
+                write_obs: None,
+                last_obs: None,
             };
         }
     }
@@ -633,11 +690,11 @@ pub struct ConsumerState {
     #[inductive(read_load_last)]
     fn read_load_last_inductive(pre: Self, post: Self) {
     }
-
+/*
     #[inductive(read_load_read)]
     fn read_load_read_inductive(pre: Self, post: Self) {
     }
-
+ */
     #[inductive(read_store_read)]
     fn read_store_read_inductive(pre: Self, post: Self) {        
     }
@@ -909,8 +966,6 @@ impl Producer {
                         assert(write_in_progress_token.value() == false);
                         let _ = self.vbq.instance.borrow().grant_start(&mut write_in_progress_token, producer_token);
                         assert(write_in_progress_token.value() == true);
-                        
-                        assert(producer_token.value().write == producer_token.value().reserve);
                         assert(ret == false);
                     } else {
                         assert(write_in_progress_token.value() == true);
@@ -1306,6 +1361,7 @@ impl Consumer {
                 returning ret;
                 ghost read_in_progress_token => {
                     if !ret {
+                        assert(read_in_progress_token.value() == false);
                         let _ = self.vbq.instance.borrow().read_start(&mut read_in_progress_token, consumer_token);
                         assert(read_in_progress_token.value() == true);
                         assert(ret == false);
@@ -1335,10 +1391,10 @@ impl Consumer {
         let tracked mut read_perms_map:Map<nat, PointsTo<u8>> = Map::tracked_empty();
         let mut read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
-                let tracked ret = self.vbq.instance.borrow().read_load_read(&read_token, consumer_token);
-                // TODOメモ: ここでは、あとで read を 0 に巻き戻すケース以外の借り出しを行う。
-                // すなわち (read == last) && (write < read) 以外のケース。
-                // すなわち、(末端まで読んでいて、かつ、 writeが更新されている)以外のケース
+                assert(read_token.value() == consumer_token.value().read);
+                //let tracked ret = self.vbq.instance.borrow().read_load_read(&read_token, consumer_token);
+                
+                // TODO: 以下は last 確定時に移す必要がある！
                 // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
                 /* read_perms_map = ret.1.get();
                 let ghost start = read_token.value();
