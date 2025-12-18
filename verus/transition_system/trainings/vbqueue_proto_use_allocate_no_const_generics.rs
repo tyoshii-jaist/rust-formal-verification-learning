@@ -140,8 +140,7 @@ impl ConsumerState {
     pub fn last_equals_max(&self) -> bool {
         // not inverted だと last == max がいえる
         &&& self.last <= self.length
-        &&& self.read <= self.write ==> self.last == self.length
-        &&& self.last < self.length ==> self.read > self.write
+        &&& self.read < self.write ==> (self.last == self.length || self.last >= self.write) // self.last >= self.write は折り返し直前の過渡期と read が 0 に戻ってきたケースをカバーしている
     }
     
     #[invariant]
@@ -152,8 +151,62 @@ impl ConsumerState {
         &&& self.reserve <= self.last
     }
 
+
     #[invariant]
-    pub fn write_
+    pub fn valid_producer_local_state(&self) -> bool {
+        &&& self.producer.write_in_progress == self.write_in_progress
+        &&& self.producer.write == self.write
+        &&& self.producer.reserve == self.reserve
+        &&& self.producer.last == self.last
+    }
+
+    #[invariant]
+    pub fn valid_producer_local_state_order(&self) -> bool {
+        match self.producer.read_obs {
+            Some(read_obs) => {
+                if read_obs <= self.producer.write {
+                    // not inverted
+                    &&& read_obs <= self.read // read は単調増加
+                    &&& self.read <= self.producer.write // read は write を追い越さない
+                    &&& (
+                        (self.producer.write <= self.producer.reserve <= self.producer.last)
+                        || (self.producer.reserve < read_obs)
+                    )
+                } else {
+                    // inverted
+                    &&& (
+                        (read_obs <= self.read <= self.producer.last) // ラップしてないときは read_obs は read を追い越さない
+                        || (self.read <= self.producer.write <= self.producer.last)
+                    )
+                    &&& self.producer.write <= self.producer.reserve && self.producer.reserve < read_obs
+                }
+            },
+            None => self.producer.write == self.producer.reserve
+        }
+    }
+
+    #[invariant]
+    pub fn valid_consumer_local_state(&self) -> bool {
+        &&& self.consumer.read_in_progress == self.read_in_progress
+        &&& self.consumer.read == self.read
+    }
+
+    #[invariant]
+    pub fn valid_consumer_local_state_order(&self) -> bool {
+        match (self.consumer.write_obs, self.consumer.last_obs) {
+            (Some(write_obs), Some(last_obs) ) => {
+                if self.consumer.read <= write_obs {
+                    // not inverted
+                    write_obs <= last_obs
+                } else {
+                    // inverted
+                    self.consumer.read <= last_obs
+                }
+            },
+            _ => true,
+        }
+    }
+
 
     #[invariant]
     pub fn valid_prod_grant_range(&self) -> bool {
@@ -205,74 +258,6 @@ impl ConsumerState {
                 ==> (
                     self.storage.index(i).ptr()@.provenance == self.provenance
                 )
-    }
-
-    /*
-    #[invariant]
-    pub fn valid_order(&self) -> bool {
-        if self.read <= self.write {
-            // not inverted
-            (self.write <= self.reserve && self.reserve <= self.last)
-            || self.reserve < self.read
-        } else {
-            // inverted
-            self.write <= self.reserve && self.reserve < self.read
-        }
-    } */
-
-    #[invariant]
-    pub fn valid_producer_local_state(&self) -> bool {
-        &&& self.producer.write_in_progress == self.write_in_progress
-        &&& self.producer.write == self.write
-        &&& self.producer.reserve == self.reserve
-        &&& self.producer.last == self.last
-    }
-
-    #[invariant]
-    pub fn valid_producer_local_state_order(&self) -> bool {
-        match self.producer.read_obs {
-            Some(read_obs) => {
-                if read_obs <= self.producer.write {
-                    // not inverted
-                    &&& read_obs <= self.read // read は単調増加
-                    &&& self.read <= self.producer.write // read は write を追い越さない
-                    &&& (
-                        (self.producer.write <= self.producer.reserve && self.producer.reserve <= self.producer.last)
-                        || (self.producer.reserve < read_obs)
-                    )
-                } else {
-                    // inverted
-                    &&& (
-                        (read_obs <= self.read && self.read <= self.producer.last) // ラップしてないときは read_obs は read を追い越さない
-                        || (self.read <= self.producer.write)
-                    )
-                    &&& self.producer.write <= self.producer.reserve && self.producer.reserve < read_obs
-                }
-            },
-            None => self.producer.write == self.producer.reserve
-        }
-    }
-
-    #[invariant]
-    pub fn valid_consumer_local_state(&self) -> bool {
-        &&& self.consumer.read_in_progress == self.read_in_progress
-        &&& self.consumer.read == self.read
-    }
-
-    #[invariant]
-    pub fn valid_consumer_local_state_order(&self) -> bool {
-        match (self.consumer.write_obs, self.consumer.last_obs) {
-            (Some(write_obs), Some(last_obs) ) => {
-                if self.consumer.read <= write_obs {
-                    // not inverted
-                    write_obs <= last_obs
-                } else {
-                    // inverted
-                    self.consumer.read <= last_obs
-                }
-            },
-            _ => true,
-        }
     }
 
     init! {
@@ -516,7 +501,8 @@ impl ConsumerState {
     transition!{
         commit_update_last_by_write() {
             require(pre.producer.write_in_progress == true);
-            require(pre.producer.read_obs->Some_0 <= pre.producer.write);
+            require(pre.producer.reserve < pre.producer.write && pre.producer.write != pre.length);
+
             update last = pre.producer.write; // write で last を更新する
 
             update producer = ProducerState{
@@ -680,6 +666,35 @@ impl ConsumerState {
         }
     }
 
+    transition!{
+        release_add_read(used: nat) {
+            require(pre.consumer.read_in_progress == true);
+
+            update read = pre.consumer.read + used;
+            update consumer = ConsumerState {
+                read_in_progress: false,
+                read: pre.consumer.read + used,
+                write_obs: pre.consumer.write_obs,
+                last_obs: pre.consumer.last_obs,
+            };
+        }
+    }
+
+    
+    transition!{
+        release_end() {
+            require(pre.consumer.read_in_progress == true);
+
+            update read_in_progress = false;
+            update consumer = ConsumerState {
+                read_in_progress: false,
+                read: pre.consumer.read,
+                write_obs: None,
+                last_obs: None,
+            };
+        }
+    }
+
     #[inductive(try_split)]
     fn try_split_inductive(pre: Self, post: Self) { }
 
@@ -724,7 +739,9 @@ impl ConsumerState {
     fn commit_load_reserve_inductive(pre: Self, post: Self) { }
  */
     #[inductive(commit_update_last_by_write)]
-    fn commit_update_last_by_write_inductive(pre: Self, post: Self) { }
+    fn commit_update_last_by_write_inductive(pre: Self, post: Self) {
+        assert(post.producer.last != post.length);
+    }
 
     #[inductive(commit_update_last_by_max)]
     fn commit_update_last_by_max_inductive(pre: Self, post: Self) { }
@@ -787,6 +804,12 @@ impl ConsumerState {
 
     #[inductive(read_fail)]
     fn read_fail_inductive(pre: Self, post: Self) { }
+
+    #[inductive(release_add_read)]
+    fn release_add_read_inductive(pre: Self, post: Self, used: nat) { }
+       
+    #[inductive(release_end)]
+    fn release_end_inductive(pre: Self, post: Self) { }
 }}
 
 struct_with_invariants!{
@@ -1628,6 +1651,76 @@ struct GrantR {
 }
 
 impl GrantR {
+    fn release(&mut self,
+        used: usize,
+        Tracked(consumer_token): Tracked<&mut VBQueue::consumer>, 
+        Tracked(buf_perms): Tracked<Map<nat, raw_ptr::PointsTo<u8>>>
+    )
+        requires
+            //old(self).wf_with_buf_perms(buf_perms),
+            old(self).vbq.wf(),
+            old(consumer_token).instance_id() == old(self).vbq.instance@.id(),
+            //old(self).wf_with_producer(old(producer_token).value(), buf_perms)
+        ensures
+            self.vbq.wf(),
+    {
+        self.release_inner(used, Tracked(consumer_token), Tracked(buf_perms));
+        // forget(self); // FIXME
+    }
+
+    pub(crate) fn release_inner(&mut self,
+        used: usize,
+        Tracked(consumer_token): Tracked<&mut VBQueue::consumer>, 
+        Tracked(buf_perms): Tracked<Map<nat, raw_ptr::PointsTo<u8>>>
+    )
+        requires
+            //old(self).wf_with_buf_perms(buf_perms),
+            old(self).vbq.wf(),
+            old(consumer_token).instance_id() == old(self).vbq.instance@.id(),
+            //old(self).wf_with_producer(old(consumer_token).value(), buf_perms)
+        ensures
+            self.vbq.wf(),
+    {
+        // If there is no grant in progress, return early. This
+        // generally means we are dropping the grant within a
+        // wrapper structure
+        let is_read_in_progress =
+            atomic_with_ghost!(&self.vbq.read_in_progress => load();
+                update prev -> next;
+                returning ret;
+                ghost read_in_progress_token => {
+                    assert(consumer_token.value().read_in_progress == read_in_progress_token.value());
+                }
+        );
+
+        if !is_read_in_progress {
+            return;
+        }
+
+        // This should always be checked by the public interfaces
+        // debug_assert!(used <= self.buf.len());
+
+        // This should be fine, purely incrementing
+        let _ = atomic_with_ghost!(&self.vbq.read => fetch_add(used);
+            update prev -> next;
+            returning ret;
+            ghost read_token => {
+                let _ = self.vbq.instance.borrow().release_add_read(used as nat, &mut read_token, consumer_token);
+            }
+        );
+
+        atomic_with_ghost!(&self.vbq.read_in_progress => store(false);
+            ghost read_in_progress_token => {
+                let _ = self.vbq.instance.borrow().release_end(&mut read_in_progress_token, consumer_token);
+                assert(read_in_progress_token.value() == false);
+            }
+        );
+    }
+
+    /// Configures the amount of bytes to be released on drop.
+    pub fn to_release(&mut self, amt: usize) {
+        self.to_release = self.buf.len().min(amt);
+    }
     /*
     pub closed spec fn wf_with_buf_perms(&self, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
         &&& self.buf.len() == buf_perms.len()
