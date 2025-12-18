@@ -55,6 +55,10 @@ impl ProducerState {
     pub closed spec fn grant_end(&self) -> nat {
         self.reserve
     }
+
+    pub closed spec fn grant_sz(&self) -> nat {
+        (self.grant_end() - self.grant_start()) as nat
+    }
 }
 
 pub struct ConsumerState {
@@ -131,15 +135,7 @@ impl ConsumerState {
         #[sharding(variable)]
         pub consumer: ConsumerState,
     }
-/*
-    pub open spec fn prod_grant_start(&self) -> nat {
-        if self.producer.write <= self.producer.reserve {self.producer.write} else {0}
-    }
 
-    pub open spec fn prod_grant_end(&self) -> nat {
-        self.producer.reserve
-    }
- */
     #[invariant]
     pub fn last_equals_max(&self) -> bool {
         // not inverted だと last == max がいえる
@@ -155,6 +151,9 @@ impl ConsumerState {
         &&& self.write <= self.last
         &&& self.reserve <= self.last
     }
+
+    #[invariant]
+    pub fn write_
 
     #[invariant]
     pub fn valid_prod_grant_range(&self) -> bool {
@@ -471,6 +470,7 @@ impl ConsumerState {
         commit_sub_reserve(commited: nat) {
             require(pre.producer.write_in_progress == true);
             require(pre.reserve >= commited);
+            require(pre.producer.grant_sz() >= commited);
 
             let new_reserve = (pre.reserve - commited) as nat;
 
@@ -516,6 +516,7 @@ impl ConsumerState {
     transition!{
         commit_update_last_by_write() {
             require(pre.producer.write_in_progress == true);
+            require(pre.producer.read_obs->Some_0 <= pre.producer.write);
             update last = pre.producer.write; // write で last を更新する
 
             update producer = ProducerState{
