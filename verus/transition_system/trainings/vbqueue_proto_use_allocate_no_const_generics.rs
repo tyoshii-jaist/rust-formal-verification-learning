@@ -166,8 +166,7 @@ impl ConsumerState {
             Some(read_obs) => {
                 if read_obs <= self.producer.write {
                     // not inverted
-                    &&& read_obs <= self.read // read は単調増加
-                    &&& self.read <= self.producer.write // read は write を追い越さない
+                    &&& read_obs <= self.read <= self.producer.write // read は単調増加で write を起こさない
                     &&& (
                         (self.producer.write <= self.producer.reserve <= self.producer.last)
                         || (self.producer.reserve < read_obs)
@@ -200,7 +199,7 @@ impl ConsumerState {
                     write_obs <= self.write <= self.last || self.write < self.consumer.read
                 } else {
                     // inverted
-                    self.consumer.read <= self.last
+                    write_obs <= self.write < self.consumer.read <= self.last
                 }
             },
             (Some(write_obs), Some(last_obs) ) => {
@@ -209,7 +208,7 @@ impl ConsumerState {
                     write_obs <= self.write <= self.last || self.write < self.consumer.read
                 } else {
                     // inverted
-                    self.consumer.read <= last_obs
+                    write_obs <= self.write < self.consumer.read <= last_obs
                 }
             },
             (None, Some(_) ) => false, // last だけを知っていることはあり得ない
@@ -280,6 +279,7 @@ impl ConsumerState {
         {
             require(
                 {
+                    &&& length > 0 // 元の BBQueue はこの制約は持っていない
                     &&& forall |i: nat| i >= base_addr && i < base_addr + length <==> storage.contains_key(i)
                     &&& forall |i: nat| i >= base_addr && i < base_addr + length ==> storage.index(i).ptr().addr() == i
                     &&& forall |i: nat| i >= base_addr && i < base_addr + length ==> storage.index(i).ptr()@.provenance == provenance
@@ -648,8 +648,9 @@ impl ConsumerState {
     }
  */
     transition!{
-        read_store_read() {
+        read_wrap() {
             require(pre.consumer.read_in_progress == true);
+            require((pre.consumer.read == pre.consumer.last_obs->Some_0) && (pre.consumer.write_obs->Some_0 < pre.consumer.read));
 
             update read = 0;
 
@@ -808,8 +809,8 @@ impl ConsumerState {
     fn read_load_read_inductive(pre: Self, post: Self) {
     }
  */
-    #[inductive(read_store_read)]
-    fn read_store_read_inductive(pre: Self, post: Self) {        
+    #[inductive(read_wrap)]
+    fn read_wrap_inductive(pre: Self, post: Self) {        
     }
 
     #[inductive(read_fail)]
@@ -1113,9 +1114,10 @@ impl Producer {
         );
         // ここで Prod は write と read_obs を得ている。
         // inverted かどうかがわかる。
-        // Not inverted (write が先) の場合、一周した先の read_obs までは使用できることがわかる。
+        // Not inverted (write が先または同じ) の場合、一周した先の read_obs までは使用できることがわかる。
         // すなわち write <= reserve <= max || reserve < read_obs
         // また、read_obs <= read <= write は守られることが期待される。
+        // write と read が同じ場合も Not inverted 扱いになる。
         //
         // inverted (read が先) の場合、先の read_obs までは使用できることがわかる。
         // すなわち write <= reserve < read_obs
@@ -1566,8 +1568,13 @@ impl Consumer {
             // MOVING READ BACKWARDS!
             atomic_with_ghost!(&self.vbq.read => store(0);
                 ghost read_token => {
-                    // TODO: ここで read (0) ~ write までを借り出すか、先に借りだしはやっておいてもよいのかもしれない。
-                    let _ = self.vbq.instance.borrow().read_store_read(&mut read_token, consumer_token);
+                    // ここで read が wrap する。
+                    // read == last の状態で、かつ、write < read なので、inverted 状態になる。
+                    let _ = self.vbq.instance.borrow().read_wrap(&mut read_token, consumer_token);
+                    // ↑をまたぐと
+                    // read == 0 になるので not inverted に切り替わる
+                    // この瞬間に producer はまだ inverted
+                    // read == 0 read_obs == 9 write == 9 で last は 10 のとき、not inverted 判断になる。
                 }
             );
         }
