@@ -87,6 +87,10 @@ impl ConsumerState {
             _ => self.read // no area
         }
     }
+
+    pub closed spec fn grant_sz(&self) -> nat {
+        (self.grant_end() - self.grant_start()) as nat
+    }
 }
 
  tokenized_state_machine!{VBQueue {
@@ -1101,14 +1105,12 @@ impl Producer {
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
                 assert(write_token.value() == producer_token.value().write);
-                assert(producer_token.value().write == producer_token.value().reserve);
                 // let _ = self.vbq.instance.borrow().grant_load_write(&write_token, producer_token);
             }
         );
 
         let read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
-                assert(producer_token.value().write == producer_token.value().reserve);
                 let _ = self.vbq.instance.borrow().grant_load_read(&read_token, producer_token);
             }
         );
@@ -1133,9 +1135,7 @@ impl Producer {
                 // Inverted, no room is available
                 atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                     ghost write_in_progress_token => {
-                        assert(producer_token.value().write == producer_token.value().reserve);
                         let _ = self.vbq.instance.borrow().grant_fail(&mut write_in_progress_token, producer_token);
-                        assert(write_in_progress_token.value() == false);
                     }
                 );
                 return Err("Inverted, no room is available");
@@ -1472,25 +1472,15 @@ impl Consumer {
         ensures
             match r {
                 Ok((rgr, buf_perms)) => {
-                    true// rgr.wf_with_buf_perms(buf_perms@) &&
+                    &&& rgr.buf.len() == consumer_token.value().grant_sz()
                 },
                 _ => true
             },
     {
         let is_read_in_progress =
-            atomic_with_ghost!(&self.vbq.read_in_progress => swap(true);
-                update prev -> next;
-                returning ret;
+            atomic_with_ghost!(&self.vbq.read_in_progress => load();
                 ghost read_in_progress_token => {
-                    if !ret {
-                        assert(read_in_progress_token.value() == false);
-                        let _ = self.vbq.instance.borrow().read_start(&mut read_in_progress_token, consumer_token);
-                        assert(read_in_progress_token.value() == true);
-                        assert(ret == false);
-                    } else {
-                        assert(read_in_progress_token.value() == true);
-                        assert(ret == true);
-                    };
+                    assert(read_in_progress_token.value() == consumer_token.value().read_in_progress);
                 }
         );
 
@@ -1650,6 +1640,7 @@ impl Consumer {
             assert(equal(read_perms_map.index(addr as nat).ptr(), ptr));
              */
         }
+        assert(granted_buf.len() == sz);
 
         Ok(
             (GrantR {
@@ -1674,10 +1665,11 @@ impl GrantR {
         Tracked(buf_perms): Tracked<Map<nat, raw_ptr::PointsTo<u8>>>
     )
         requires
+            used <= old(self).buf.len(),
             //old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(consumer_token).instance_id() == old(self).vbq.instance@.id(),
-            //old(self).wf_with_producer(old(producer_token).value(), buf_perms)
+            old(self).wf_with_consumer(old(consumer_token).value(), buf_perms)
         ensures
             self.vbq.wf(),
     {
@@ -1691,10 +1683,11 @@ impl GrantR {
         Tracked(buf_perms): Tracked<Map<nat, raw_ptr::PointsTo<u8>>>
     )
         requires
+            used <= old(self).buf.len(),
             //old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(consumer_token).instance_id() == old(self).vbq.instance@.id(),
-            //old(self).wf_with_producer(old(consumer_token).value(), buf_perms)
+            old(self).wf_with_consumer(old(consumer_token).value(), buf_perms)
         ensures
             self.vbq.wf(),
     {
@@ -1702,7 +1695,7 @@ impl GrantR {
         // generally means we are dropping the grant within a
         // wrapper structure
         let is_read_in_progress =
-            atomic_with_ghost!(&self.vbq.read_in_progress => load();
+            atomic_with_ghost!(&self.vbq.read_in_progress => swap(true);
                 update prev -> next;
                 returning ret;
                 ghost read_in_progress_token => {
@@ -1737,6 +1730,10 @@ impl GrantR {
     /// Configures the amount of bytes to be released on drop.
     pub fn to_release(&mut self, amt: usize) {
         self.to_release = self.buf.len().min(amt);
+    }
+
+    pub closed spec fn wf_with_consumer(&self, consumer_state: ConsumerState, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
+        &&& self.buf.len() == consumer_state.grant_sz()
     }
     /*
     pub closed spec fn wf_with_buf_perms(&self, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
