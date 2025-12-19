@@ -194,15 +194,25 @@ impl ConsumerState {
     #[invariant]
     pub fn valid_consumer_local_state_order(&self) -> bool {
         match (self.consumer.write_obs, self.consumer.last_obs) {
+            (Some(write_obs), None) => {
+                if self.consumer.read <= write_obs {
+                    // not inverted
+                    write_obs <= self.write <= self.last || self.write < self.consumer.read
+                } else {
+                    // inverted
+                    self.consumer.read <= self.last
+                }
+            },
             (Some(write_obs), Some(last_obs) ) => {
                 if self.consumer.read <= write_obs {
                     // not inverted
-                    write_obs <= last_obs
+                    write_obs <= self.write <= self.last || self.write < self.consumer.read
                 } else {
                     // inverted
                     self.consumer.read <= last_obs
                 }
             },
+            (None, Some(_) ) => false, // last だけを知っていることはあり得ない
             _ => true,
         }
     }
