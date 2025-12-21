@@ -1295,7 +1295,7 @@ impl GrantW {
         &&& forall |i: int| 0 <= i && i < self.buf.len() ==> self.buf[i]@.provenance == buf_perms.index(self.buf[i] as nat).ptr()@.provenance
     }
     */
-
+    /*
     pub closed spec fn wf_with_producer(&self, producer_state: ProducerState, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
         &&& self.buf.len() == producer_state.grant_end() - producer_state.grant_start()
         /*
@@ -1311,7 +1311,7 @@ impl GrantW {
                 buf_perms.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
             )
             */
-    }
+    } */
 
     fn commit(&mut self,
         used: usize,
@@ -1322,6 +1322,7 @@ impl GrantW {
             //old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
+            old(producer_token).value().grant_sz() == old(self).buf.len(),
             //old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
             self.vbq.wf(),
@@ -1339,7 +1340,7 @@ impl GrantW {
             //old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
-            old(self).wf_with_producer(old(producer_token).value(), buf_perms)
+            old(producer_token).value().grant_sz() == old(self).buf.len(),
         ensures
             self.vbq.wf(),
     {
@@ -1669,7 +1670,7 @@ impl GrantR {
             //old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(consumer_token).instance_id() == old(self).vbq.instance@.id(),
-            old(self).wf_with_consumer(old(consumer_token).value(), buf_perms)
+            old(consumer_token).value().grant_sz() == old(self).buf.len(),
         ensures
             self.vbq.wf(),
     {
@@ -1687,7 +1688,7 @@ impl GrantR {
             //old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(consumer_token).instance_id() == old(self).vbq.instance@.id(),
-            old(self).wf_with_consumer(old(consumer_token).value(), buf_perms)
+            old(consumer_token).value().grant_sz() == old(self).buf.len(),
         ensures
             self.vbq.wf(),
     {
@@ -1732,10 +1733,11 @@ impl GrantR {
         self.to_release = self.buf.len().min(amt);
     }
 
+        /*
     pub closed spec fn wf_with_consumer(&self, consumer_state: ConsumerState, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
         &&& self.buf.len() == consumer_state.grant_sz()
     }
-    /*
+
     pub closed spec fn wf_with_buf_perms(&self, buf_perms: Map<nat, raw_ptr::PointsTo<u8>>) -> bool {
         &&& self.buf.len() == buf_perms.len()
         &&& forall |i: int| 0 <= i && i < self.buf.len() ==> buf_perms.contains_key(self.buf[i] as nat)
