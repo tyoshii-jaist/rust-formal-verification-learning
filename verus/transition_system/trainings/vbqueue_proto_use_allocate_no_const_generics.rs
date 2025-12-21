@@ -361,6 +361,8 @@ impl ConsumerState {
  */
     transition!{
         grant_load_read() {
+            require(pre.producer.write_in_progress == true);
+
             update producer = ProducerState{
                 read_obs: Some(pre.read),
                 write_in_progress: pre.producer.write_in_progress,
@@ -433,6 +435,7 @@ impl ConsumerState {
 
     transition!{
         grant_fail() {
+            require(pre.producer.write_in_progress == true);
             require(pre.producer.write == pre.producer.reserve);
 
             update write_in_progress = false;
@@ -1065,6 +1068,8 @@ impl Producer {
             old(self).wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
         ensures
+            self.wf(),
+            producer_token.instance_id() == self.vbq.instance@.id(),
             match r {
                 Ok((wgr, buf_perms)) => {
                     let write = producer_token.value().write;
@@ -1326,6 +1331,7 @@ impl GrantW {
             //old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
             self.vbq.wf(),
+            producer_token.instance_id() == self.vbq.instance@.id(),
     {
         self.commit_inner(used, Tracked(producer_token), Tracked(buf_perms));
         // forget(self); // FIXME
@@ -1343,6 +1349,7 @@ impl GrantW {
             old(producer_token).value().grant_sz() == old(self).buf.len(),
         ensures
             self.vbq.wf(),
+            producer_token.instance_id() == self.vbq.instance@.id(),
     {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
@@ -1477,6 +1484,7 @@ impl Consumer {
                 },
                 _ => true
             },
+            consumer_token.instance_id() == self.vbq.instance@.id(),
     {
         let is_read_in_progress =
             atomic_with_ghost!(&self.vbq.read_in_progress => load();
@@ -1673,6 +1681,7 @@ impl GrantR {
             old(consumer_token).value().grant_sz() == old(self).buf.len(),
         ensures
             self.vbq.wf(),
+            consumer_token.instance_id() == self.vbq.instance@.id(),
     {
         self.release_inner(used, Tracked(consumer_token), Tracked(buf_perms));
         // forget(self); // FIXME
@@ -1691,6 +1700,7 @@ impl GrantR {
             old(consumer_token).value().grant_sz() == old(self).buf.len(),
         ensures
             self.vbq.wf(),
+            consumer_token.instance_id() == self.vbq.instance@.id(),
     {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
