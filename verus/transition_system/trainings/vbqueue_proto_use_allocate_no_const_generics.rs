@@ -529,6 +529,7 @@ impl ConsumerState {
     transition!{
         commit_update_last_by_max() {
             require(pre.producer.write_in_progress == true);
+            require(pre.producer.reserve > pre.last);
             update last = pre.length; // max で last を更新する
 
             update producer = ProducerState{
