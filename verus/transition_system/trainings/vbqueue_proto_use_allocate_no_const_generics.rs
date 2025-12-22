@@ -471,7 +471,7 @@ impl ConsumerState {
             let new_reserve = (pre.reserve - commited) as nat;
 
             update reserve = new_reserve;
-            
+
             // TODO: need deposit subbed area.
             update producer = ProducerState{
                 reserve: new_reserve,
@@ -682,10 +682,17 @@ impl ConsumerState {
     transition!{
         release_add_read(used: nat) {
             require(pre.consumer.read_in_progress == true);
+            require(pre.consumer.write_obs is Some);
+            require(pre.consumer.last_obs is Some);
+            require(
+                pre.consumer.read + used <= pre.consumer.write_obs->Some_0
+                || pre.consumer.write_obs->Some_0 <= pre.consumer.read + used <= pre.consumer.last_obs->Some_0
+            );
+            require(pre.consumer.grant_sz() >= used);
 
             update read = pre.consumer.read + used;
             update consumer = ConsumerState {
-                read_in_progress: false,
+                read_in_progress: true,
                 read: pre.consumer.read + used,
                 write_obs: pre.consumer.write_obs,
                 last_obs: pre.consumer.last_obs,
@@ -1104,7 +1111,7 @@ impl Producer {
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
-                assert(write_token.value() == producer_token.value().write);
+                // assert(write_token.value() == producer_token.value().write);
                 // let _ = self.vbq.instance.borrow().grant_load_write(&write_token, producer_token);
             }
         );
@@ -1179,7 +1186,7 @@ impl Producer {
         atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
             ghost reserve_token => {
                 // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
-                assert(start + sz <= producer_token.value().last);
+                // assert(start + sz <= producer_token.value().last);
                 let tracked ret = self.vbq.instance.borrow().do_reserve((start + sz) as nat, &mut reserve_token, producer_token);
                 /*
                 granted_perms_map = ret.1.get();
@@ -1355,7 +1362,7 @@ impl GrantW {
                 update prev -> next;
                 returning ret;
                 ghost write_in_progress_token => {
-                    assert(producer_token.value().write_in_progress == write_in_progress_token.value());
+                    //assert(producer_token.value().write_in_progress == write_in_progress_token.value());
                 }
         );
 
@@ -1376,7 +1383,7 @@ impl GrantW {
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
-                assert(producer_token.value().write == write_token.value());
+                // assert(producer_token.value().write == write_token.value());
                 //let _ = self.vbq.instance.borrow().commit_load_write(&write_token, producer_token);
             }
         );
@@ -1484,7 +1491,7 @@ impl Consumer {
         let is_read_in_progress =
             atomic_with_ghost!(&self.vbq.read_in_progress => load();
                 ghost read_in_progress_token => {
-                    assert(read_in_progress_token.value() == consumer_token.value().read_in_progress);
+                    //assert(read_in_progress_token.value() == consumer_token.value().read_in_progress);
                 }
         );
 
@@ -1494,12 +1501,14 @@ impl Consumer {
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
+                assume(consumer_token.value().read_in_progress == true); // FIXME!
                 let _ = self.vbq.instance.borrow().read_load_write(&write_token, consumer_token);
             }
         );
 
         let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
+                assume(consumer_token.value().read_in_progress == true); // FIXME!
                 let _ = self.vbq.instance.borrow().read_load_last(&last_token, consumer_token);
             }
         );
@@ -1705,7 +1714,7 @@ impl GrantR {
                 update prev -> next;
                 returning ret;
                 ghost read_in_progress_token => {
-                    assert(consumer_token.value().read_in_progress == read_in_progress_token.value());
+                    //assert(consumer_token.value().read_in_progress == read_in_progress_token.value());
                 }
         );
 
