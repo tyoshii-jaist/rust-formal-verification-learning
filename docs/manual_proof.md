@@ -31,16 +31,16 @@ read と write の区間 (Consumer占有区間) と write と reserve の間 (Pr
 
 ## Producer invariants
 // not inverted & reserve not wrap
-||| read_obs <= read <= write <= reserve <= last
+||| read_obs <= read <= write <= reserve <= last <= max
 
 // not inverted & reserve wrap
-||| reserve < read_obs <= read <= write <= last
+||| reserve < read_obs <= read <= write <= last <= max
 
 // inverted (write < read_obs) & read not wrap
-||| write <= reserve < read_obs <= read <= last
+||| write <= reserve < read_obs <= read <= last <= max
 
 // converted to not inverted by wrapping read 
-||| read <= write <= reserve < read_obs <= last
+||| read <= write <= reserve < read_obs <= last <= max
 
 
 ## Consumer invariants
@@ -67,16 +67,16 @@ Prod がいくら動いても、last は動かせない。write & reserve が追
 これも本質的に2,3,5と同じで、Prod 側に主導権がある。
 
 // not inverted (read <= write_obs) & reserve not wrap
-||| read <= write_obs <= write <= reserve <= last(last_obs については何も言えない)
+||| read <= write_obs <= write <= reserve <= last <= max (last_obs については何も言えない)
 
 // not inverted & reserve wrap
-||| reserve < read <= write_obs <= write <= last
+||| reserve < read <= write_obs <= write <= last <= max
 
 // converted to inverted by wrapping reserve and write
-||| write <= reserve < read <= write_obs <= last
+||| write <= reserve < read <= write_obs <= last <= max
 
 // inverted (write_obs < read) & read not wrap
-||| write_obs <= write <= reserve < read <= last_obs == last
+||| write_obs <= write <= reserve < read <= last_obs == last <= max
 
 ただ、Global の方は上記 Prod/Cons の条件に含まれるので、上記があればよい。
 

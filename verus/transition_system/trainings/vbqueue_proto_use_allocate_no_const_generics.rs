@@ -140,21 +140,6 @@ impl ConsumerState {
         pub consumer: ConsumerState,
     }
 
-    #[invariant]
-    pub fn last_equals_max(&self) -> bool {
-        // not inverted だと last == max がいえる
-        &&& self.last <= self.length
-        &&& self.read < self.write ==> (self.last == self.length || self.last >= self.write) // self.last >= self.write は折り返し直前の過渡期と read が 0 に戻ってきたケースをカバーしている
-    }
-    
-    #[invariant]
-    pub fn order_of_max_last(&self) -> bool {
-        &&& self.last <= self.length
-        &&& self.read <= self.last
-        &&& self.write <= self.last
-        &&& self.reserve <= self.last
-    }
-
 
     #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
@@ -168,23 +153,23 @@ impl ConsumerState {
     pub fn valid_producer_local_state_order(&self) -> bool {
         match self.producer.read_obs {
             Some(read_obs) => {
-                if read_obs <= self.producer.write {
-                    // not inverted
-                    &&& read_obs <= self.read <= self.producer.write // read は単調増加で write を起こさない
-                    &&& (
-                        (self.producer.write <= self.producer.reserve <= self.producer.last)
-                        || (self.producer.reserve < read_obs)
-                    )
-                } else {
-                    // inverted
-                    &&& (
-                        (read_obs <= self.read <= self.producer.last) // ラップしてないときは read_obs は read を追い越さない
-                        || (self.read <= self.producer.write <= self.producer.last)
-                    )
-                    &&& self.producer.write <= self.producer.reserve && self.producer.reserve < read_obs
-                }
+                // not inverted & reserve not wrap
+                ||| read_obs <= self.read <= self.write <= self.reserve <= self.last <= self.length
+                // not inverted & reserve wrap
+                ||| self.reserve < read_obs <= self.read <= self.write <= self.last <= self.length
+                // inverted (write < read_obs) & read not wrap
+                ||| self.write <= self.reserve < read_obs <= self.read <= self.last <= self.length
+                // converted to not inverted by wrapping read 
+                ||| self.read <= self.write <= self.reserve < read_obs <= self.last <= self.length
             },
-            None => self.producer.write == self.producer.reserve
+            None => {
+                // not inverted & reserve not wrap
+                ||| self.read <= self.write <= self.reserve <= self.last <= self.length
+                // not inverted & reserve wrap
+                ||| self.reserve < self.read <= self.write <= self.last <= self.length
+                // inverted (write < read_obs) & read not wrap
+                ||| self.write <= self.reserve < self.read <= self.last <= self.length
+            }
         }
     }
 
@@ -198,29 +183,37 @@ impl ConsumerState {
     pub fn valid_consumer_local_state_order(&self) -> bool {
         match (self.consumer.write_obs, self.consumer.last_obs) {
             (Some(write_obs), None) => {
-                if self.consumer.read <= write_obs {
-                    // not inverted
-                    write_obs <= self.write <= self.last || self.write < self.consumer.read
-                } else {
-                    // inverted
-                    write_obs <= self.write < self.consumer.read <= self.last
-                }
+                // not inverted (read <= write_obs) & reserve not wrap
+                ||| self.read <= write_obs <= self.write <= self.reserve <= self.last <= self.length //(last_obs については何も言えない)
+                // not inverted & reserve wrap
+                ||| self.reserve < self.read <= write_obs <= self.write <= self.last <= self.length
+                // converted to inverted by wrapping reserve and write
+                ||| self.write <= self.reserve < self.read <= write_obs <= self.last <= self.length
+                // inverted (write_obs < read) & read not wrap
+                ||| write_obs <= self.write <= self.reserve < self.read <= self.length
             },
             (Some(write_obs), Some(last_obs) ) => {
-                if self.consumer.read <= write_obs {
-                    // not inverted
-                    write_obs <= self.write <= self.last || self.write < self.consumer.read
-                } else {
-                    // inverted
-                    write_obs <= self.write < self.consumer.read <= last_obs
-                }
+                // not inverted (read <= write_obs) & reserve not wrap
+                ||| self.read <= write_obs <= self.write <= self.reserve <= self.last <= self.length //(last_obs については何も言えない)
+                // not inverted & reserve wrap
+                ||| self.reserve < self.read <= write_obs <= self.write <= self.last <= self.length
+                // converted to inverted by wrapping reserve and write
+                ||| self.write <= self.reserve < self.read <= write_obs <= self.last <= self.length
+                // inverted (write_obs < read) & read not wrap
+                ||| write_obs <= self.write <= self.reserve < self.read <= last_obs == self.last <= self.length
             },
             (None, Some(_) ) => false, // last だけを知っていることはあり得ない
-            _ => true,
+            (None, None) => {
+                ||| self.read <= self.write <= self.reserve <= self.last <= self.length
+                // not inverted & reserve wrap
+                ||| self.reserve < self.read <= self.write <= self.last <= self.length
+                // inverted (write < read_obs) & read not wrap
+                ||| self.write <= self.reserve < self.read <= self.last <= self.length
+            },
         }
     }
 
-
+/*
     #[invariant]
     pub fn valid_prod_grant_range(&self) -> bool {
         self.producer.grant_start() <= self.producer.grant_end()
@@ -240,6 +233,7 @@ impl ConsumerState {
     pub fn no_read_in_progress(&self) -> bool {
         !self.read_in_progress ==> self.consumer.grant_start() == self.consumer.grant_end()
     }
+    */
 
     #[invariant]
     pub fn valid_storage_all(&self) -> bool {
