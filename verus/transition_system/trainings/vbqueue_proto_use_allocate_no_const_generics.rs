@@ -48,16 +48,30 @@ pub struct ProducerState {
 }
 
 impl ProducerState {
-    pub closed spec fn grant_start(&self) -> nat {
-        if self.write <= self.reserve {self.write} else {0}
+    pub open spec fn grant_start(&self) -> nat {
+        self.write
     }
 
-    pub closed spec fn grant_end(&self) -> nat {
+    pub open spec fn grant_end(&self) -> nat {
         self.reserve
     }
 
-    pub closed spec fn grant_sz(&self) -> nat {
+    pub open spec fn grant_sz(&self) -> nat {
         (self.grant_end() - self.grant_start()) as nat
+    }
+
+    pub open spec fn is_grant_possible(&self, sz: nat) -> bool {
+        match self.read_obs {
+            None => false,
+            Some(read_obs) => {
+                let already_inverted = self.write < read_obs;
+                if already_inverted {
+                    self.write + sz < read_obs
+                } else {
+                    sz < read_obs
+                }
+            }
+        }
     }
 }
 
@@ -71,11 +85,11 @@ pub struct ConsumerState {
 }
 
 impl ConsumerState {
-    pub closed spec fn grant_start(&self) -> nat {
+    pub open spec fn grant_start(&self) -> nat {
         self.read
     }
 
-    pub closed spec fn grant_end(&self) -> nat {
+    pub open spec fn grant_end(&self) -> nat {
         match (self.write_obs, self.last_obs) {
             (Some(w), Some(l)) => {
                 if self.read <= w {
@@ -88,7 +102,7 @@ impl ConsumerState {
         }
     }
 
-    pub closed spec fn grant_sz(&self) -> nat {
+    pub open spec fn grant_sz(&self) -> nat {
         (self.grant_end() - self.grant_start()) as nat
     }
 }
@@ -147,6 +161,7 @@ impl ConsumerState {
         &&& self.producer.write == self.write
         &&& self.producer.reserve == self.reserve
         &&& self.producer.last == self.last
+        &&& self.producer.read_obs is None ==> self.producer.write == self.producer.reserve
     }
 
     #[invariant]
@@ -329,6 +344,8 @@ impl ConsumerState {
     transition!{
         grant_start() {
             require(pre.write_in_progress == false);
+            require(pre.producer.read_obs is None);
+            require(pre.producer.write == pre.producer.reserve);
 
             update write_in_progress = true;
             update producer = ProducerState {
@@ -356,6 +373,8 @@ impl ConsumerState {
     transition!{
         grant_load_read() {
             require(pre.producer.write_in_progress == true);
+            require(pre.producer.read_obs is None);
+            require(pre.producer.write == pre.producer.reserve);
 
             update producer = ProducerState{
                 read_obs: Some(pre.read),
@@ -428,8 +447,9 @@ impl ConsumerState {
     }
 
     transition!{
-        grant_fail() {
+        grant_fail(sz: nat) {
             require(pre.producer.write_in_progress == true);
+            require(pre.producer.is_grant_possible(sz) == false);
             require(pre.producer.write == pre.producer.reserve);
 
             update write_in_progress = false;
@@ -731,7 +751,7 @@ impl ConsumerState {
     }
 
     #[inductive(grant_fail)]
-    fn grant_fail_inductive(pre: Self, post: Self) { }
+    fn grant_fail_inductive(pre: Self, post: Self, sz: nat) { }
 
     #[inductive(do_reserve)]
     fn do_reserve_inductive(pre: Self, post: Self, reserve: nat) {
@@ -1069,6 +1089,7 @@ impl Producer {
         requires
             old(self).wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
+            // old(producer_token).value().write_in_progress == false ==> old(producer_token).value().read_obs is None && old(producer_token).value().write == old(producer_token).value().reserve,
         ensures
             self.wf(),
             producer_token.instance_id() == self.vbq.instance@.id(),
@@ -1142,7 +1163,7 @@ impl Producer {
                 // Inverted, no room is available
                 atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                     ghost write_in_progress_token => {
-                        let _ = self.vbq.instance.borrow().grant_fail(&mut write_in_progress_token, producer_token);
+                        let _ = self.vbq.instance.borrow().grant_fail(sz as nat, &mut write_in_progress_token, producer_token);
                     }
                 );
                 return Err("Inverted, no room is available");
@@ -1164,7 +1185,7 @@ impl Producer {
                     // Not invertible, no space
                     atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                         ghost write_in_progress_token => {
-                            let _ = self.vbq.instance.borrow().grant_fail(&mut write_in_progress_token, producer_token);
+                            let _ = self.vbq.instance.borrow().grant_fail(sz as nat, &mut write_in_progress_token, producer_token);
                             assert(write_in_progress_token.value() == false);
                         }
                     );
