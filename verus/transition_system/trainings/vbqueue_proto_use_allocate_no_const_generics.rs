@@ -73,6 +73,10 @@ impl ProducerState {
             }
         }
     }
+
+    pub open spec fn is_idle(&self) -> bool {
+        self.read_obs is None && self.write == self.reserve
+    }
 }
 
 pub struct ConsumerState {
@@ -1030,12 +1034,15 @@ impl VBBuffer
         requires
             self.wf(),
             old(producer_token).instance_id() == self.instance@.id(),
+            old(producer_token).value().is_idle(),
         ensures
             self.wf(),
             match res {
                 Ok((prod, cons)) => {
-                    prod.wf() &&/* //cons.wf(), */
-                    producer_token.instance_id() == prod.vbq.instance@.id()
+                    &&& prod.wf()
+                    &&& cons.wf()
+                    &&& producer_token.instance_id() == prod.vbq.instance@.id()
+                    &&& producer_token.value().is_idle()
                 }, 
                 Err(_) => true
             },
@@ -1089,6 +1096,7 @@ impl Producer {
         requires
             old(self).wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
+            old(producer_token).value().is_idle(),
             // old(producer_token).value().write_in_progress == false ==> old(producer_token).value().read_obs is None && old(producer_token).value().write == old(producer_token).value().reserve,
         ensures
             self.wf(),
@@ -1115,6 +1123,7 @@ impl Producer {
                     if !ret {
                         assert(prev == false);
                         assert(next == true);
+                        assert(write_in_progress_token.instance_id() == producer_token.instance_id());
                         assert(write_in_progress_token.value() == false);
                         let _ = self.vbq.instance.borrow().grant_start(&mut write_in_progress_token, producer_token);
                         assert(write_in_progress_token.value() == true);
@@ -1130,6 +1139,9 @@ impl Producer {
             return Err("write in progress");
         }
 
+        proof {
+            assert(producer_token.value().write_in_progress == true);
+        }
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
                 // assert(write_token.value() == producer_token.value().write);
