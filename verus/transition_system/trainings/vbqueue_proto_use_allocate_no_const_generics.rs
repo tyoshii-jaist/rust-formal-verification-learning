@@ -60,7 +60,7 @@ impl ProducerState {
         (self.grant_end() - self.grant_start()) as nat
     }
 
-    pub open spec fn is_grant_possible(&self, sz: nat) -> bool {
+    pub open spec fn is_grant_possible(&self, sz: nat, max: nat) -> bool {
         match self.read_obs {
             None => false,
             Some(read_obs) => {
@@ -68,7 +68,7 @@ impl ProducerState {
                 if already_inverted {
                     self.write + sz < read_obs
                 } else {
-                    sz < read_obs
+                    self.write + sz <= max || sz < read_obs
                 }
             }
         }
@@ -453,7 +453,7 @@ impl ConsumerState {
     transition!{
         grant_fail(sz: nat) {
             require(pre.producer.write_in_progress == true);
-            require(pre.producer.is_grant_possible(sz) == false);
+            //require(pre.producer.is_grant_possible(sz, pre.length) == false);
             require(pre.producer.write == pre.producer.reserve);
 
             update write_in_progress = false;
@@ -1175,6 +1175,7 @@ impl Producer {
                 // Inverted, no room is available
                 atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                     ghost write_in_progress_token => {
+                        //assert(producer_token.value().is_grant_possible(sz as nat, max as nat) == false);
                         let _ = self.vbq.instance.borrow().grant_fail(sz as nat, &mut write_in_progress_token, producer_token);
                     }
                 );
@@ -1197,6 +1198,7 @@ impl Producer {
                     // Not invertible, no space
                     atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                         ghost write_in_progress_token => {
+                            //assert(producer_token.value().is_grant_possible(sz as nat, max as nat) == false);
                             let _ = self.vbq.instance.borrow().grant_fail(sz as nat, &mut write_in_progress_token, producer_token);
                             assert(write_in_progress_token.value() == false);
                         }
