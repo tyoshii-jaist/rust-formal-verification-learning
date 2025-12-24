@@ -31,16 +31,16 @@ read と write の区間 (Consumer占有区間) と write と reserve の間 (Pr
 
 ## Producer invariants
 // not inverted & reserve not wrap
-||| read_obs <= read <= write <= reserve <= max
+||| read_obs <= read <= write <= reserve <= max //(not inverted では last は意味をなさない)
 
 // not inverted & reserve wrap
-||| reserve < read_obs <= read <= write <= max
+||| reserve < read_obs <= read <= write <= max //(not inverted では last は意味をなさない)
 
 // inverted (write < read_obs) & read not wrap
 ||| write <= reserve < read_obs <= read <= last <= max
 
 // converted to not inverted by wrapping read 
-||| read <= write <= reserve < read_obs <= max
+||| read <= write <= reserve < read_obs <= max //(not inverted では last は意味をなさないが、read_obs がふたをしているので守る必要がある)
 
 
 ## Consumer invariants
