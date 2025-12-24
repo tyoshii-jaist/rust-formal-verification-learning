@@ -173,9 +173,9 @@ impl ConsumerState {
         match self.producer.read_obs {
             Some(read_obs) => {
                 // not inverted & reserve not wrap
-                ||| read_obs <= self.read <= self.write <= self.reserve <= self.last <= self.length
+                ||| read_obs <= self.read <= self.write <= self.reserve <= self.length
                 // not inverted & reserve wrap
-                ||| self.reserve < read_obs <= self.read <= self.write <= self.last <= self.length
+                ||| self.reserve < read_obs <= self.read <= self.write <= self.length
                 // inverted (write < read_obs) & read not wrap
                 ||| self.write <= self.reserve < read_obs <= self.read <= self.last <= self.length
                 // converted to not inverted by wrapping read 
@@ -183,9 +183,9 @@ impl ConsumerState {
             },
             None => {
                 // not inverted & reserve not wrap
-                ||| self.read <= self.write <= self.reserve <= self.last <= self.length
+                ||| self.read <= self.write <= self.reserve <= self.length
                 // not inverted & reserve wrap
-                ||| self.reserve < self.read <= self.write <= self.last <= self.length
+                ||| self.reserve < self.read <= self.write <= self.length
                 // inverted (write < read_obs) & read not wrap
                 ||| self.write <= self.reserve < self.read <= self.last <= self.length
             }
@@ -203,9 +203,9 @@ impl ConsumerState {
         match (self.consumer.write_obs, self.consumer.last_obs) {
             (Some(write_obs), None) => {
                 // not inverted (read <= write_obs) & reserve not wrap
-                ||| self.read <= write_obs <= self.write <= self.reserve <= self.last <= self.length //(last_obs については何も言えない)
+                ||| self.read <= write_obs <= self.write <= self.reserve <= self.length //(last_obs については何も言えない)
                 // not inverted & reserve wrap
-                ||| self.reserve < self.read <= write_obs <= self.write <= self.last <= self.length
+                ||| self.reserve < self.read <= write_obs <= self.write <= self.length
                 // converted to inverted by wrapping reserve and write
                 ||| self.write <= self.reserve < self.read <= write_obs <= self.last <= self.length
                 // inverted (write_obs < read) & read not wrap
@@ -213,9 +213,9 @@ impl ConsumerState {
             },
             (Some(write_obs), Some(last_obs) ) => {
                 // not inverted (read <= write_obs) & reserve not wrap
-                ||| self.read <= write_obs <= self.write <= self.reserve <= self.last <= self.length //(last_obs については何も言えない)
+                ||| self.read <= write_obs <= self.write <= self.reserve <= self.length //(last_obs については何も言えない)
                 // not inverted & reserve wrap
-                ||| self.reserve < self.read <= write_obs <= self.write <= self.last <= self.length
+                ||| self.reserve < self.read <= write_obs <= self.write <= self.length
                 // converted to inverted by wrapping reserve and write
                 ||| self.write <= self.reserve < self.read <= write_obs <= self.last <= self.length
                 // inverted (write_obs < read) & read not wrap
@@ -394,7 +394,20 @@ impl ConsumerState {
         do_reserve(start: nat, sz: nat) {
             require(pre.producer.write_in_progress == true);
             require(pre.producer.read_obs is Some);
-            require(pre.producer.is_grant_possible(sz, pre.length));
+            let new_reserve = start + sz;
+            let read_obs = pre.producer.read_obs->Some_0;
+            require(
+                {
+                    // not inverted & reserve not wrap
+                    ||| read_obs <= pre.producer.write <= new_reserve <= pre.length
+                    // not inverted & reserve wrap
+                    ||| new_reserve < read_obs <= pre.producer.write <= pre.length
+                    // inverted (write < read_obs) & read not wrap
+                    ||| pre.producer.write <= new_reserve < read_obs <= pre.producer.last <= pre.length
+                    // converted to not inverted by wrapping read 
+                    ||| pre.producer.write <= new_reserve < read_obs <= pre.producer.last <= pre.length
+                }
+            );
             require(pre.producer.grant_start() == start);
 
             update reserve = start + sz;
