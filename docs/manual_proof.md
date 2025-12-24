@@ -31,16 +31,16 @@ read と write の区間 (Consumer占有区間) と write と reserve の間 (Pr
 
 ## Producer invariants
 // not inverted & reserve not wrap
-||| read_obs <= read <= write <= reserve <= last <= max
+||| read_obs <= read <= write <= reserve <= max
 
 // not inverted & reserve wrap
-||| reserve < read_obs <= read <= write <= last <= max
+||| reserve < read_obs <= read <= write <= max
 
 // inverted (write < read_obs) & read not wrap
 ||| write <= reserve < read_obs <= read <= last <= max
 
 // converted to not inverted by wrapping read 
-||| read <= write <= reserve < read_obs <= last <= max
+||| read <= write <= reserve < read_obs <= max
 
 
 ## Consumer invariants
@@ -67,10 +67,10 @@ Prod がいくら動いても、last は動かせない。write & reserve が追
 これも本質的に2,3,5と同じで、Prod 側に主導権がある。
 
 // not inverted (read <= write_obs) & reserve not wrap
-||| read <= write_obs <= write <= reserve <= last <= max (last_obs については何も言えない)
+||| read <= write_obs <= write <= reserve <= max
 
 // not inverted & reserve wrap
-||| reserve < read <= write_obs <= write <= last <= max
+||| reserve < read <= write_obs <= write <= max
 
 // converted to inverted by wrapping reserve and write
 ||| write <= reserve < read <= write_obs <= last <= max
@@ -81,4 +81,24 @@ Prod がいくら動いても、last は動かせない。write & reserve が追
 ただ、Global の方は上記 Prod/Cons の条件に含まれるので、上記があればよい。
 
 _obs が None のときはどう扱えばよいのか？
-読めている時だけ足せばよいのか。
+ 読めている時だけ足せばよさそう。これはすなわち grant や read を行っているときは制約が足されているということを意味しそう。
+
+
+# Transitions
+## Producer
+### do_reserve 
+reserve := new_reserve
+
+### sub_reserve
+reserve := reserve - (len - used)
+
+### update_last_by_write
+last := new_last
+
+### update_last_by_max
+last := max
+
+### store_write
+write := new_write
+
+## Consumer
