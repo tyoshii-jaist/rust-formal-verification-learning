@@ -391,24 +391,13 @@ impl ConsumerState {
     }
 
     transition!{
-        do_reserve(reserve: nat) {
+        do_reserve(start: nat, sz: nat) {
             require(pre.producer.write_in_progress == true);
-            require(reserve <= pre.producer.last);
             require(pre.producer.read_obs is Some);
-            require(
-                // not inverted
-                (
-                    (pre.producer.read_obs->Some_0 <= pre.producer.write) &&
-                        ((pre.producer.write <= reserve && reserve <= pre.producer.last) || reserve < pre.producer.read_obs->Some_0)
-                ) ||
-                // inverted
-                (
-                    (pre.producer.write < pre.producer.read_obs->Some_0) &&
-                        (pre.producer.write <= reserve && reserve < pre.producer.read_obs->Some_0)
-                )
-            );
+            require(pre.producer.is_grant_possible(sz, pre.length));
+            require(pre.producer.grant_start() == start);
 
-            update reserve = reserve;
+            update reserve = start + sz;
 
             /*
             let grant_start = pre.prod_grant_start();
@@ -432,7 +421,7 @@ impl ConsumerState {
             update producer = ProducerState{
                 write_in_progress: pre.producer.write_in_progress,
                 write: pre.producer.write,
-                reserve: reserve,
+                reserve: start + sz,
                 last: pre.producer.last,
                 read_obs: pre.producer.read_obs,
             };
@@ -758,7 +747,7 @@ impl ConsumerState {
     fn grant_fail_inductive(pre: Self, post: Self, sz: nat) { }
 
     #[inductive(do_reserve)]
-    fn do_reserve_inductive(pre: Self, post: Self, reserve: nat) {
+    fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
     }
 
     /*
@@ -1103,14 +1092,9 @@ impl Producer {
             producer_token.instance_id() == self.vbq.instance@.id(),
             match r {
                 Ok((wgr, buf_perms)) => {
-                    let write = producer_token.value().write;
-                    let reserve = producer_token.value().reserve;
-                    let grant_start = if write <= reserve {write} else {0};
-                    let grant_end = reserve;
-
                     // wgr.wf_with_buf_perms(buf_perms@) &&
                     &&& wgr.buf.len() == sz
-                    &&& wgr.buf.len() == grant_end - grant_start
+                    &&& wgr.buf.len() == producer_token.value().grant_sz()
                 },
                 _ => true
             },
@@ -1222,7 +1206,7 @@ impl Producer {
             ghost reserve_token => {
                 // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
                 // assert(start + sz <= producer_token.value().last);
-                let tracked ret = self.vbq.instance.borrow().do_reserve((start + sz) as nat, &mut reserve_token, producer_token);
+                let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, producer_token);
                 /*
                 granted_perms_map = ret.1.get();
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
