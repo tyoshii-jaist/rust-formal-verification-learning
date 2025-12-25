@@ -203,7 +203,7 @@ impl ConsumerState {
         match (self.consumer.write_obs, self.consumer.last_obs) {
             (Some(write_obs), None) => {
                 // not inverted (read <= write_obs) & reserve not wrap
-                ||| self.read <= write_obs <= self.write <= self.reserve <= self.length //(last_obs については何も言えない)
+                ||| self.read <= write_obs <= self.write <= self.reserve <= self.length
                 // not inverted & reserve wrap
                 ||| self.reserve < self.read <= write_obs <= self.write <= self.length
                 // converted to inverted by wrapping reserve and write
@@ -213,7 +213,7 @@ impl ConsumerState {
             },
             (Some(write_obs), Some(last_obs) ) => {
                 // not inverted (read <= write_obs) & reserve not wrap
-                ||| self.read <= write_obs <= self.write <= self.reserve <= self.length //(last_obs については何も言えない)
+                ||| self.read <= write_obs <= self.write <= self.reserve <= self.length
                 // not inverted & reserve wrap
                 ||| self.reserve < self.read <= write_obs <= self.write <= self.length
                 // converted to inverted by wrapping reserve and write
@@ -223,9 +223,9 @@ impl ConsumerState {
             },
             (None, Some(_) ) => false, // last だけを知っていることはあり得ない
             (None, None) => {
-                ||| self.read <= self.write <= self.reserve <= self.last <= self.length
+                ||| self.read <= self.write <= self.reserve <= self.length
                 // not inverted & reserve wrap
-                ||| self.reserve < self.read <= self.write <= self.last <= self.length
+                ||| self.reserve < self.read <= self.write <= self.length
                 // inverted (write < read_obs) & read not wrap
                 ||| self.write <= self.reserve < self.read <= self.last <= self.length
             },
