@@ -89,6 +89,19 @@ _obs が None のときはどう扱えばよいのか？
 ### do_reserve 
 reserve := new_reserve
 
+require(
+    {
+        // not inverted & reserve not wrap
+        ||| read_obs <= pre.producer.write <= new_reserve <= pre.length
+        // not inverted & reserve wrap
+        ||| new_reserve < read_obs <= pre.producer.write <= pre.length
+        // inverted (write < read_obs) & read not wrap
+        ||| pre.producer.write <= new_reserve < read_obs <= pre.producer.last <= pre.length
+        // converted to not inverted by wrapping read 
+        ||| pre.producer.write <= new_reserve < read_obs <= pre.producer.last <= pre.length
+    }
+);
+
 ### sub_reserve
 reserve := reserve - (len - used)
 

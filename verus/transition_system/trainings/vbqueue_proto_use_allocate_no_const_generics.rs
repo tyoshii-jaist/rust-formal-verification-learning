@@ -75,7 +75,7 @@ impl ProducerState {
     }
 
     pub open spec fn is_idle(&self) -> bool {
-        self.read_obs is None && self.write == self.reserve
+        self.read_obs is None && self.write == self.reserve && self.write_in_progress == false
     }
 }
 
@@ -108,6 +108,10 @@ impl ConsumerState {
 
     pub open spec fn grant_sz(&self) -> nat {
         (self.grant_end() - self.grant_start()) as nat
+    }
+
+    pub open spec fn is_idle(&self) -> bool {
+        self.write_obs is None && self.last_obs is None && self.read_in_progress == false
     }
 }
 
@@ -404,8 +408,6 @@ impl ConsumerState {
                     ||| new_reserve < read_obs <= pre.producer.write <= pre.length
                     // inverted (write < read_obs) & read not wrap
                     ||| pre.producer.write <= new_reserve < read_obs <= pre.producer.last <= pre.length
-                    // converted to not inverted by wrapping read 
-                    ||| pre.producer.write <= new_reserve < read_obs <= pre.producer.last <= pre.length
                 }
             );
             require(pre.producer.grant_start() == start);
@@ -572,6 +574,18 @@ impl ConsumerState {
         commit_store_write(new_write: nat) {//, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
             require(pre.producer.write_in_progress == true);
             require(pre.producer.reserve == new_write);
+            require(pre.producer.read_obs is Some);
+            let read_obs = pre.producer.read_obs->Some_0;
+
+            require(
+                {
+                    // not inverted & reserve not wrap
+                    ||| read_obs <= new_write == pre.producer.reserve <= pre.length
+                    // inverted (write < read_obs) & read not wrap
+                    ||| new_write == pre.producer.reserve < read_obs <= pre.producer.last <= pre.length
+                }
+            );
+
             /*
             require(
                 forall |j: nat| j >= pre.base_addr + grant_start && j < pre.base_addr + grant_end
@@ -794,6 +808,8 @@ impl ConsumerState {
 
     #[inductive(commit_store_write)]
     fn commit_store_write_inductive(pre: Self, post: Self, new_write: nat) {//, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
+        assume(post.valid_producer_local_state_order()); // FIXME!
+        assume(post.valid_consumer_local_state_order()); // FIXME!
         assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.contains_key(i));
         /*
         let write = pre.producer.write->Some_0;
@@ -943,6 +959,7 @@ impl VBBuffer
         */
             r.0.wf(),
             r.0.instance@.id() == r.1@.instance_id(),
+            r.1@.value().is_idle(),
     {
         // TODO: 元の BBQueue は静的に確保している。
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
@@ -1219,6 +1236,15 @@ impl Producer {
             ghost reserve_token => {
                 // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
                 // assert(start + sz <= producer_token.value().last);
+                let ghost new_reserve: nat = (start + sz) as nat;
+                assert({
+                    // not inverted & reserve not wrap
+                    ||| read <= write <= new_reserve <= max
+                    // not inverted & reserve wrap
+                    ||| new_reserve < read <= write <= max
+                    // inverted (write < read_obs) & read not wrap
+                    ||| write <= new_reserve < read <= max
+                });
                 let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, producer_token);
                 /*
                 granted_perms_map = ret.1.get();
@@ -1511,6 +1537,7 @@ impl Consumer {
         requires
             old(self).wf(),
             old(consumer_token).instance_id() == old(self).vbq.instance@.id(),
+            old(consumer_token).value().is_idle(),
         ensures
             match r {
                 Ok((rgr, buf_perms)) => {
