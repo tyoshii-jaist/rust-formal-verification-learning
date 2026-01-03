@@ -412,7 +412,6 @@ impl ConsumerState {
                     ||| pre.producer.write <= new_reserve < read_obs /*<= pre.producer.last */ <= pre.length
                 }
             );
-            require(pre.producer.grant_start() == start);
 
             update reserve = start + sz;
 
@@ -573,11 +572,16 @@ impl ConsumerState {
     }
 
     transition!{
-        commit_store_write(new_write: nat) {//, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
+        commit_store_write() {//, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
             require(pre.producer.write_in_progress == true);
-            require(pre.producer.reserve == new_write);
             require(pre.producer.read_obs is Some);
+
+            // 以下の require がないと
+            // ||| self.reserve < read_obs <= self.read <= self.write <= self.length のケースで write が巻き戻ったあとの、
+            // valid_producer_local_state_order の invariant が保たれることを示せない。
+            require(pre.producer.reserve < pre.producer.write ==> pre.producer.write == pre.producer.last);
             let read_obs = pre.producer.read_obs->Some_0;
+            let new_write = pre.producer.reserve;
 
             require(
                 {
@@ -606,7 +610,6 @@ impl ConsumerState {
             };
              */
             update write = new_write;
-
             update producer = ProducerState{
                 write: new_write,
                 reserve: pre.producer.reserve,
@@ -811,9 +814,9 @@ impl ConsumerState {
     fn commit_update_last_by_max_inductive(pre: Self, post: Self) { }
 
     #[inductive(commit_store_write)]
-    fn commit_store_write_inductive(pre: Self, post: Self, new_write: nat) {//, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
-        assume(post.valid_producer_local_state_order()); // FIXME!
-        assume(post.valid_consumer_local_state_order()); // FIXME!
+    fn commit_store_write_inductive(pre: Self, post: Self) {//, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
+        //assume(post.valid_producer_local_state_order()); // FIXME!
+        //assume(post.valid_consumer_local_state_order()); // FIXME!
         assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.contains_key(i));
         /*
         let write = pre.producer.write->Some_0;
@@ -1529,7 +1532,7 @@ impl GrantW {
             ghost write_token => {
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
                 //let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, buf_perms, buf_perms, &mut write_token, producer_token);
-                let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, &mut write_token, producer_token);
+                let _ = self.vbq.instance.borrow().commit_store_write(&mut write_token, producer_token);
             }
         );
 
