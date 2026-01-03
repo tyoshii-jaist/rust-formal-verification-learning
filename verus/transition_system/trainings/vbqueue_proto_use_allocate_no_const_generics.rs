@@ -365,9 +365,12 @@ impl ConsumerState {
             };
         }
     }
-/*
+
     transition!{
         grant_load_write() {
+            require(pre.producer.write_in_progress == true);
+            require(pre.producer.write == pre.producer.reserve);
+
             update producer = ProducerState{
                 write: pre.write,
                 write_in_progress: pre.producer.write_in_progress,
@@ -377,12 +380,11 @@ impl ConsumerState {
             };
         }
     }
- */
     transition!{
         grant_load_read() {
             require(pre.producer.write_in_progress == true);
             require(pre.producer.read_obs is None);
-            require(pre.producer.write == pre.producer.reserve);
+            assert(pre.producer.write == pre.producer.reserve);
 
             update producer = ProducerState{
                 read_obs: Some(pre.read),
@@ -761,10 +763,12 @@ impl ConsumerState {
     #[inductive(start_grant)]
     fn start_grant_inductive(pre: Self, post: Self) { }
 
-    /*
     #[inductive(grant_load_write)]
     fn grant_load_write_inductive(pre: Self, post: Self) {
-    } */
+        assert(pre.producer.write == pre.producer.reserve);
+        assert(post.valid_producer_local_state());
+        assert(post.producer.write == post.producer.reserve);
+    }
 
     #[inductive(grant_load_read)]
     fn grant_load_read_inductive(pre: Self, post: Self) {
@@ -1147,6 +1151,7 @@ impl Producer {
                         assert(next == true);
                         assert(write_in_progress_token.instance_id() == producer_token.instance_id());
                         assert(write_in_progress_token.value() == false);
+                        assert(producer_token.value().write_in_progress == write_in_progress_token.value());
                         let _ = self.vbq.instance.borrow().start_grant(&mut write_in_progress_token, producer_token);
                         assert(write_in_progress_token.value() == true);
                         assert(ret == false);
@@ -1165,14 +1170,20 @@ impl Producer {
             assert(producer_token.value().write_in_progress == true);
         }
         let write = atomic_with_ghost!(&self.vbq.write => load();
+            returning ret;
             ghost write_token => {
-                // assert(write_token.value() == producer_token.value().write);
-                // let _ = self.vbq.instance.borrow().grant_load_write(&write_token, producer_token);
+                assert(write_token.value() == ret);
+                assert(write_token.instance_id() == producer_token.instance_id());
+                //assert(producer_token.value().write == ret);
+                let _ = self.vbq.instance.borrow().grant_load_write(&write_token, producer_token);
+                assert(write_token.value() == producer_token.value().write);
             }
         );
 
         let read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
+                assert(read_token.instance_id() == producer_token.instance_id());
+                assume(producer_token.value().reserve == producer_token.value().write);
                 let _ = self.vbq.instance.borrow().grant_load_read(&read_token, producer_token);
             }
         );
@@ -1198,6 +1209,7 @@ impl Producer {
                 atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                     ghost write_in_progress_token => {
                         //assert(producer_token.value().is_grant_possible(sz as nat, max as nat) == false);
+                        assume(producer_token.value().reserve == producer_token.value().write);
                         let _ = self.vbq.instance.borrow().grant_fail(sz as nat, &mut write_in_progress_token, producer_token);
                     }
                 );
@@ -1253,6 +1265,7 @@ impl Producer {
                     // inverted (write < read_obs) & read not wrap
                     ||| write <= new_reserve < read <= max
                 });
+                assert(producer_token.value().write == write);
                 let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, producer_token);
                 /*
                 granted_perms_map = ret.1.get();
