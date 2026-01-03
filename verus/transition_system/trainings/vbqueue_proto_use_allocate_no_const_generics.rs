@@ -350,7 +350,7 @@ impl ConsumerState {
     }
 
     transition!{
-        grant_start() {
+        start_grant() {
             require(pre.write_in_progress == false);
             require(pre.producer.read_obs is None);
             require(pre.producer.write == pre.producer.reserve);
@@ -407,7 +407,7 @@ impl ConsumerState {
                     // not inverted & reserve wrap
                     ||| new_reserve < read_obs <= pre.producer.write <= pre.length
                     // inverted (write < read_obs) & read not wrap
-                    ||| pre.producer.write <= new_reserve < read_obs <= pre.producer.last <= pre.length
+                    ||| pre.producer.write <= new_reserve < read_obs /*<= pre.producer.last */ <= pre.length
                 }
             );
             require(pre.producer.grant_start() == start);
@@ -632,7 +632,7 @@ impl ConsumerState {
     }
 
     transition!{
-        read_start() {
+        start_read() {
             require(pre.read_in_progress == false);
             require(pre.consumer.write_obs is None);
             require(pre.consumer.last_obs is None);
@@ -758,8 +758,8 @@ impl ConsumerState {
     #[inductive(try_split)]
     fn try_split_inductive(pre: Self, post: Self) { }
 
-    #[inductive(grant_start)]
-    fn grant_start_inductive(pre: Self, post: Self) { }
+    #[inductive(start_grant)]
+    fn start_grant_inductive(pre: Self, post: Self) { }
 
     /*
     #[inductive(grant_load_write)]
@@ -845,8 +845,8 @@ impl ConsumerState {
     fn commit_end_inductive(pre: Self, post: Self) {
     }
 
-    #[inductive(read_start)]
-    fn read_start_inductive(pre: Self, post: Self) { }
+    #[inductive(start_read)]
+    fn start_read_inductive(pre: Self, post: Self) { }
 
     #[inductive(read_load_write)]
     fn read_load_write_inductive(pre: Self, post: Self) {
@@ -959,7 +959,9 @@ impl VBBuffer
         */
             r.0.wf(),
             r.0.instance@.id() == r.1@.instance_id(),
+            r.0.instance@.id() == r.2@.instance_id(),
             r.1@.value().is_idle(),
+            r.2@.value().is_idle(),
     {
         // TODO: 元の BBQueue は静的に確保している。
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
@@ -1049,11 +1051,13 @@ impl VBBuffer
         }, Tracked(producer_token), Tracked(consumer_token))
     }
 
-    fn try_split(self, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(consumer_token): Tracked<VBQueue::consumer>) -> (res: Result<(Producer, Consumer),  &'static str>)
+    fn try_split(self, Tracked(producer_token): Tracked<&mut VBQueue::producer>, Tracked(consumer_token): Tracked<&mut VBQueue::consumer>) -> (res: Result<(Producer, Consumer),  &'static str>)
         requires
             self.wf(),
             old(producer_token).instance_id() == self.instance@.id(),
+            old(consumer_token).instance_id() == self.instance@.id(),
             old(producer_token).value().is_idle(),
+            old(consumer_token).value().is_idle(),
         ensures
             self.wf(),
             match res {
@@ -1062,10 +1066,13 @@ impl VBBuffer
                     &&& cons.wf()
                     &&& producer_token.instance_id() == prod.vbq.instance@.id()
                     &&& producer_token.value().is_idle()
+                    &&& consumer_token.instance_id() == cons.vbq.instance@.id()
+                    &&& consumer_token.value().is_idle()
                 }, 
                 Err(_) => true
             },
             producer_token.instance_id() == self.instance@.id(),
+            consumer_token.instance_id() == self.instance@.id(),
     {
         let already_splitted =
             atomic_with_ghost!(&self.already_split => swap(true);
@@ -1124,7 +1131,8 @@ impl Producer {
                 Ok((wgr, buf_perms)) => {
                     // wgr.wf_with_buf_perms(buf_perms@) &&
                     &&& wgr.buf.len() == sz
-                    &&& wgr.buf.len() == producer_token.value().grant_sz()
+                    //&&& wgr.buf.len() == producer_token.value().grant_sz()
+                    &&& producer_token.value().write_in_progress == true
                 },
                 _ => true
             },
@@ -1139,7 +1147,7 @@ impl Producer {
                         assert(next == true);
                         assert(write_in_progress_token.instance_id() == producer_token.instance_id());
                         assert(write_in_progress_token.value() == false);
-                        let _ = self.vbq.instance.borrow().grant_start(&mut write_in_progress_token, producer_token);
+                        let _ = self.vbq.instance.borrow().start_grant(&mut write_in_progress_token, producer_token);
                         assert(write_in_progress_token.value() == true);
                         assert(ret == false);
                     } else {
@@ -1332,7 +1340,10 @@ impl Producer {
          */
         }
 
-        assert(granted_buf.len() == sz);
+        proof {
+            assert(granted_buf.len() == sz);
+
+        }
         Ok (
             (
                 GrantW {
@@ -1388,6 +1399,7 @@ impl GrantW {
             old(self).vbq.wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value().grant_sz() == old(self).buf.len(),
+            old(producer_token).value().write_in_progress == true,
             //old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
             self.vbq.wf(),
@@ -1407,6 +1419,7 @@ impl GrantW {
             old(self).vbq.wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value().grant_sz() == old(self).buf.len(),
+            old(producer_token).value().write_in_progress == true,
         ensures
             self.vbq.wf(),
             producer_token.instance_id() == self.vbq.instance@.id(),
@@ -1548,9 +1561,18 @@ impl Consumer {
             consumer_token.instance_id() == self.vbq.instance@.id(),
     {
         let is_read_in_progress =
-            atomic_with_ghost!(&self.vbq.read_in_progress => load();
+            atomic_with_ghost!(&self.vbq.read_in_progress => swap(true);
+                update prev -> next;
+                returning ret;
                 ghost read_in_progress_token => {
-                    //assert(read_in_progress_token.value() == consumer_token.value().read_in_progress);
+                    if !ret {
+                        assert(read_in_progress_token.instance_id() == consumer_token.instance_id());
+                        let _ = self.vbq.instance.borrow().start_read(&mut read_in_progress_token, consumer_token);
+                        assert(read_in_progress_token.value() == true);
+                    } else {
+                        assert(read_in_progress_token.value() == true);
+                        assert(ret == true);
+                    };
                 }
         );
 
@@ -1560,14 +1582,12 @@ impl Consumer {
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
-                assume(consumer_token.value().read_in_progress == true); // FIXME!
                 let _ = self.vbq.instance.borrow().read_load_write(&write_token, consumer_token);
             }
         );
 
         let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
-                assume(consumer_token.value().read_in_progress == true); // FIXME!
                 let _ = self.vbq.instance.borrow().read_load_last(&last_token, consumer_token);
             }
         );
@@ -1575,7 +1595,7 @@ impl Consumer {
         let tracked mut read_perms_map:Map<nat, PointsTo<u8>> = Map::tracked_empty();
         let mut read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
-                assert(read_token.value() == consumer_token.value().read);
+                //assert(read_token.value() == consumer_token.value().read);
                 //let tracked ret = self.vbq.instance.borrow().read_load_read(&read_token, consumer_token);
                 
                 // TODO: 以下は last 確定時に移す必要がある！
@@ -1769,9 +1789,7 @@ impl GrantR {
         // generally means we are dropping the grant within a
         // wrapper structure
         let is_read_in_progress =
-            atomic_with_ghost!(&self.vbq.read_in_progress => swap(true);
-                update prev -> next;
-                returning ret;
+            atomic_with_ghost!(&self.vbq.read_in_progress => load();
                 ghost read_in_progress_token => {
                     //assert(consumer_token.value().read_in_progress == read_in_progress_token.value());
                 }
@@ -1844,7 +1862,7 @@ impl GrantR {
 
 fn main() {
     let (vbuf, Tracked(producer_token), Tracked(consumer_token)) = VBBuffer::new(6);
-    let (mut prod, mut cons) = match vbuf.try_split(Tracked(&mut producer_token), Tracked(consumer_token)) {
+    let (mut prod, mut cons) = match vbuf.try_split(Tracked(&mut producer_token), Tracked(&mut consumer_token)) {
         Ok((prod, cons)) => (prod, cons),
         Err(_) => {
             return;
