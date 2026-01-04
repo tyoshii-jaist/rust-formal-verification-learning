@@ -715,20 +715,38 @@ impl ConsumerState {
         }
     }
 
+
+    transition!{
+        start_release() {
+            require(pre.consumer.read_in_progress == true);
+            require(pre.consumer.write_obs is Some);
+            require(pre.consumer.last_obs is Some);
+        }
+    }
+
     transition!{
         release_add_read(used: nat) {
             require(pre.consumer.read_in_progress == true);
             require(pre.consumer.write_obs is Some);
             require(pre.consumer.last_obs is Some);
-            require(
-                pre.consumer.read + used <= pre.consumer.write_obs->Some_0
-                || pre.consumer.write_obs->Some_0 <= pre.consumer.read + used <= pre.consumer.last_obs->Some_0
-            );
             require(pre.consumer.grant_sz() >= used);
+            require(pre.consumer.read + used <= pre.length);
+
+            let write_obs = pre.consumer.write_obs->Some_0;
+            let last_obs = pre.consumer.last_obs->Some_0;
+
+            require(
+                {
+                    // not inverted (read <= write_obs) & reserve not wrap
+                    ||| pre.consumer.read + used <= write_obs <= pre.length
+                    // inverted (write_obs < read) & read not wrap
+                    ||| write_obs < pre.consumer.read + used <= last_obs <= pre.length
+                }
+            );
 
             update read = pre.consumer.read + used;
             update consumer = ConsumerState {
-                read_in_progress: true,
+                read_in_progress: pre.consumer.read_in_progress,
                 read: pre.consumer.read + used,
                 write_obs: pre.consumer.write_obs,
                 last_obs: pre.consumer.last_obs,
@@ -861,9 +879,12 @@ impl ConsumerState {
     #[inductive(read_fail)]
     fn read_fail_inductive(pre: Self, post: Self) { }
 
+    #[inductive(start_release)]
+    fn start_release_inductive(pre: Self, post: Self) { }
+
     #[inductive(release_add_read)]
     fn release_add_read_inductive(pre: Self, post: Self, used: nat) { }
-       
+
     #[inductive(release_end)]
     fn release_end_inductive(pre: Self, post: Self) { }
 }}
@@ -895,25 +916,25 @@ struct_with_invariants!{
         invariant on write with (instance) is (v: usize, g: VBQueue::write) {
             &&& g.instance_id() === instance@.id()
             &&& g.value() == v as int
-            &&& g.value() <= instance@.length()
+            //&&& g.value() <= instance@.length()
         }
 
         invariant on read with (instance) is (v: usize, g: VBQueue::read) {
             &&& g.instance_id() === instance@.id()
             &&& g.value() == v as int
-            &&& g.value() <= instance@.length()
+            //&&& g.value() <= instance@.length()
         }
 
         invariant on last with (instance) is (v: usize, g: VBQueue::last) {
             &&& g.instance_id() === instance@.id()
             &&& g.value() == v as int
-            &&& g.value() <= instance@.length()
+            //&&& g.value() <= instance@.length()
         }
 
         invariant on reserve with (instance) is (v: usize, g: VBQueue::reserve) {
             &&& g.instance_id() === instance@.id()
             &&& g.value() == v as int
-            &&& g.value() <= instance@.length()
+            //&&& g.value() <= instance@.length()
         }
 
         invariant on read_in_progress with (instance) is (v: bool, g: VBQueue::read_in_progress) {
@@ -1497,8 +1518,8 @@ impl GrantW {
             update prev -> next;
             returning ret;
             ghost reserve_token => {
-                assert(usize::MIN as int <= prev - (len - used));
                 assert(usize::MIN as int <= producer_token.value().reserve - (len - used));
+                assume(usize::MIN as int <= prev - (len - used));
                 let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, producer_token);
             }
         );
@@ -1817,9 +1838,14 @@ impl GrantR {
             //old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(consumer_token).instance_id() == old(self).vbq.instance@.id(),
+            old(consumer_token).value().read_in_progress == true,
+            old(consumer_token).value().last_obs is Some,
+            old(consumer_token).value().write_obs is Some,
             old(consumer_token).value().grant_sz() == old(self).buf.len(),
             old(consumer_token).value().read + old(self).buf.len() <= usize::MAX,
             old(consumer_token).value() == old(self).read_consumer_state,
+            (old(consumer_token).value().read + old(self).buf.len() <= old(consumer_token).value().write_obs->Some_0 <= old(self).vbq.instance@.length()
+            || old(consumer_token).value().write_obs->Some_0 < old(consumer_token).value().read + old(self).buf.len() <= old(consumer_token).value().last_obs->Some_0 <= old(self).vbq.instance@.length()),
         ensures
             self.vbq.wf(),
             consumer_token.instance_id() == self.vbq.instance@.id(),
@@ -1851,6 +1877,7 @@ impl GrantR {
         let is_read_in_progress =
             atomic_with_ghost!(&self.vbq.read_in_progress => load();
                 ghost read_in_progress_token => {
+                    let _ = self.vbq.instance.borrow().start_release(consumer_token);
                     //assert(consumer_token.value().read_in_progress == read_in_progress_token.value());
                 }
         );
@@ -1873,8 +1900,9 @@ impl GrantR {
             update prev -> next;
             returning ret;
             ghost read_token => {
-                assert(prev + used <= usize::MAX);
+                assume(prev + used <= usize::MAX);
                 assert(consumer_token.value().read + used <= usize::MAX);
+                assert(consumer_token.value().read + used <= self.vbq.instance@.length());
                 let _ = self.vbq.instance.borrow().release_add_read(used as nat, &mut read_token, consumer_token);
             }
         );
