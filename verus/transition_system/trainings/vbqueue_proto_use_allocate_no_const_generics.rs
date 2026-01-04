@@ -1127,6 +1127,7 @@ impl Producer {
                     &&& wgr.buf.len() == sz
                     //&&& wgr.buf.len() == producer_token.value().grant_sz()
                     &&& producer_token.value().write_in_progress == true
+                    &&& producer_token.value().read_obs is Some
                     &&& producer_token.value() == wgr.granted_producer_state
                     &&& producer_token.value().grant_sz() >= sz
                 },
@@ -1407,7 +1408,8 @@ impl GrantW {
             old(producer_token).value().grant_sz() == old(self).buf.len(),
             old(producer_token).value().write_in_progress == true,
             old(producer_token).value() == old(self).granted_producer_state,
-            old(producer_token).value().grant_sz() >= old(self).buf.len()
+            old(producer_token).value().grant_sz() >= old(self).buf.len(),
+            old(producer_token).value().read_obs is Some,
             //old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
             self.vbq.wf(),
@@ -1431,6 +1433,7 @@ impl GrantW {
             old(producer_token).value() == old(self).granted_producer_state,
             old(producer_token).value().write_in_progress == true,
             old(producer_token).value().grant_sz() >= old(self).buf.len(),
+            old(producer_token).value().read_obs is Some,
         ensures
             self.vbq.wf(),
             producer_token.instance_id() == self.vbq.instance@.id(),
@@ -1463,9 +1466,11 @@ impl GrantW {
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
                 assert(producer_token.value().grant_sz() >= used);
+                assert(producer_token.value().read_obs is Some);
                 // assert(producer_token.value().write == write_token.value());
                 let _ = self.vbq.instance.borrow().commit_load_write(&write_token, producer_token);//(&write_token, producer_token);
                 assert(producer_token.value().grant_sz() >= used);
+                assert(producer_token.value().read_obs is Some);
             }
         );
 
@@ -1538,6 +1543,8 @@ impl GrantW {
         // time to invert early!
         atomic_with_ghost!(&self.vbq.write => store(new_write);
             ghost write_token => {
+                assert(producer_token.value().read_obs is Some);
+                assert(producer_token.value().reserve < producer_token.value().write && producer_token.value().write != max ==> producer_token.value().write == producer_token.value().last);
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
                 //let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, buf_perms, buf_perms, &mut write_token, producer_token);
                 let _ = self.vbq.instance.borrow().commit_store_write(&mut write_token, producer_token);
