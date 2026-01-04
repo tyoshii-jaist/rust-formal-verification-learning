@@ -35,6 +35,7 @@ proof fn lemma_range_set_len(base: nat, sz: nat)
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub struct ProducerState {
     pub write_in_progress: bool,
 
@@ -79,6 +80,10 @@ impl ProducerState {
     }
 
     pub open spec fn is_idle(&self) -> bool {
+        self.read_obs is None && self.write == self.reserve && self.write_in_progress == false
+    }
+
+    pub open spec fn is_reserved(&self) -> bool {
         self.read_obs is None && self.write == self.reserve && self.write_in_progress == false
     }
 }
@@ -1132,6 +1137,7 @@ impl Producer {
                     &&& wgr.buf.len() == sz
                     //&&& wgr.buf.len() == producer_token.value().grant_sz()
                     &&& producer_token.value().write_in_progress == true
+                    &&& producer_token.value() == wgr.granted_producer_state
                 },
                 _ => true
             },
@@ -1349,7 +1355,6 @@ impl Producer {
 
         proof {
             assert(granted_buf.len() == sz);
-
         }
         Ok (
             (
@@ -1357,6 +1362,7 @@ impl Producer {
                     buf: granted_buf,
                     vbq: self.vbq.clone(),
                     to_commit: sz,
+                    granted_producer_state: Ghost(producer_token.value()),
                 }, Tracked(granted_perms_map)
             )
         )
@@ -1367,6 +1373,7 @@ struct GrantW {
     buf: Vec<*mut u8>,
     vbq: Arc<VBBuffer>,
     to_commit: usize,
+    granted_producer_state: Ghost<ProducerState>,
 }
 
 impl GrantW {
@@ -1408,6 +1415,7 @@ impl GrantW {
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value().grant_sz() == old(self).buf.len(),
             old(producer_token).value().write_in_progress == true,
+            old(producer_token).value() == old(self).granted_producer_state
             //old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
             self.vbq.wf(),
@@ -1428,6 +1436,7 @@ impl GrantW {
             used <= old(self).buf.len(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value().grant_sz() == old(self).buf.len(),
+            old(producer_token).value() == old(self).granted_producer_state,
             old(producer_token).value().write_in_progress == true,
         ensures
             self.vbq.wf(),
