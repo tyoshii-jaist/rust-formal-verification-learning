@@ -804,8 +804,6 @@ impl ConsumerState {
 
     #[inductive(commit_store_write)]
     fn commit_store_write_inductive(pre: Self, post: Self) {//, to_deposit: Map::<nat, vstd::raw_ptr::PointsTo<u8>>) {
-        //assume(post.valid_producer_local_state_order()); // FIXME!
-        //assume(post.valid_consumer_local_state_order()); // FIXME!
         assert(forall |i: nat| i >= post.base_addr && i < post.base_addr + post.length ==> post.storage.contains_key(i));
         /*
         let write = pre.producer.write->Some_0;
@@ -1209,7 +1207,7 @@ impl Producer {
                 atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                     ghost write_in_progress_token => {
                         //assert(producer_token.value().is_grant_possible(sz as nat, max as nat) == false);
-                        assume(producer_token.value().reserve == producer_token.value().write);
+                        assert(producer_token.value().reserve == producer_token.value().write);
                         let _ = self.vbq.instance.borrow().grant_fail(sz as nat, &mut write_in_progress_token, producer_token);
                     }
                 );
@@ -1416,7 +1414,6 @@ impl GrantW {
             old(producer_token).value().grant_sz() == old(self).buf.len(),
             old(producer_token).value().write_in_progress == true,
             old(producer_token).value() == old(self).granted_producer_state,
-            old(producer_token).value().grant_sz() >= old(self).buf.len(),
             old(producer_token).value().read_obs is Some,
             old(producer_token).value().read_obs->Some_0 <= old(self).vbq.instance@.length(),
             old(producer_token).value().write == old(self).vbq.instance@.length() ==> old(producer_token).value().last == old(self).vbq.instance@.length(),
@@ -1500,7 +1497,7 @@ impl GrantW {
             update prev -> next;
             returning ret;
             ghost reserve_token => {
-                assume(usize::MIN as int <= prev - (len - used));
+                assert(usize::MIN as int <= prev - (len - used));
                 assert(usize::MIN as int <= producer_token.value().reserve - (len - used));
                 let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, producer_token);
             }
@@ -1605,6 +1602,7 @@ impl Consumer {
                     &&& consumer_token.value().write_obs is Some
                     &&& consumer_token.value().last_obs is Some
                     &&& consumer_token.value().read + rgr.buf.len() <= usize::MAX
+                    &&& consumer_token.value() == rgr.read_consumer_state
                 },
                 _ => true
             },
@@ -1795,6 +1793,7 @@ impl Consumer {
                 buf: granted_buf,
                 vbq: self.vbq.clone(),
                 to_release: 0,
+                read_consumer_state: Ghost(consumer_token.value()),
             }, Tracked(read_perms_map))
         )
     }
@@ -1804,6 +1803,7 @@ struct GrantR {
     buf: Vec<*mut u8>,
     vbq: Arc<VBBuffer>,
     to_release: usize,
+    read_consumer_state: Ghost<ConsumerState>,
 }
 
 impl GrantR {
@@ -1818,7 +1818,8 @@ impl GrantR {
             old(self).vbq.wf(),
             old(consumer_token).instance_id() == old(self).vbq.instance@.id(),
             old(consumer_token).value().grant_sz() == old(self).buf.len(),
-            old(consumer_token).value().read + old(self).buf.len() <= usize::MAX
+            old(consumer_token).value().read + old(self).buf.len() <= usize::MAX,
+            old(consumer_token).value() == old(self).read_consumer_state,
         ensures
             self.vbq.wf(),
             consumer_token.instance_id() == self.vbq.instance@.id(),
@@ -1872,6 +1873,7 @@ impl GrantR {
             update prev -> next;
             returning ret;
             ghost read_token => {
+                assert(prev + used <= usize::MAX);
                 assert(consumer_token.value().read + used <= usize::MAX);
                 let _ = self.vbq.instance.borrow().release_add_read(used as nat, &mut read_token, consumer_token);
             }
