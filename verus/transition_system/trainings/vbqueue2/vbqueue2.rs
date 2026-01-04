@@ -287,7 +287,7 @@ tokenized_state_machine!{VBQueue {
                     // not inverted & reserve not wrap
                     ||| read_obs <= new_write == pre.reserve <= pre.length
                     // inverted (write < read_obs) & read not wrap
-                    ||| new_write == pre.reserve < read_obs /*<= pre.producer.last */ <= pre.length
+                    ||| new_write == pre.reserve < read_obs <= pre.last <= pre.length
                 }
             );
             update write = new_write;
@@ -300,6 +300,7 @@ tokenized_state_machine!{VBQueue {
             require(pre.reserve == pre.write);
 
             update write_in_progress = false;
+            update producer_read_obs = None;
         }
     }
 
