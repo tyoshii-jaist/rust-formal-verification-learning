@@ -516,11 +516,13 @@ impl ConsumerState {
 
     transition!{
         commit_load_last() {
+            assert(pre.last == pre.producer.last);
         }
     }
 
     transition!{
         commit_load_reserve() {
+            assert(pre.reserve == pre.producer.reserve);
         }
     }
 
@@ -544,7 +546,8 @@ impl ConsumerState {
     transition!{
         commit_update_last_by_max() {
             require(pre.producer.write_in_progress == true);
-            require(pre.producer.reserve > pre.last);
+            //require(!(pre.producer.reserve < pre.producer.write && pre.producer.write != pre.length));
+            require(pre.producer.reserve > pre.producer.last);
             update last = pre.length; // max で last を更新する
 
             update producer = ProducerState{
@@ -1489,13 +1492,13 @@ impl GrantW {
         let max = self.vbq.length as usize;
         let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
-                let _ = self.vbq.instance.borrow().commit_load_last();//(&last_token, producer_token);
+                let _ = self.vbq.instance.borrow().commit_load_last(&last_token, producer_token);
             }
         );
         
         let new_write = atomic_with_ghost!(&self.vbq.reserve => load();
             ghost reserve_token => {
-                let _ = self.vbq.instance.borrow().commit_load_reserve();//(&reserve_token, producer_token);
+                let _ = self.vbq.instance.borrow().commit_load_reserve(&reserve_token, producer_token);
             }
         );
 
@@ -1505,6 +1508,7 @@ impl GrantW {
             atomic_with_ghost!(&self.vbq.last => store(write);
                 ghost last_token => {
                     assert(producer_token.value().write == write);
+                    assert(producer_token.value().reserve == new_write);
                     let _ = self.vbq.instance.borrow().commit_update_last_by_write(&mut last_token, producer_token);
                 }
             );
@@ -1518,6 +1522,8 @@ impl GrantW {
             // value
             atomic_with_ghost!(&self.vbq.last => store(max);
                 ghost last_token => {
+                    assert(producer_token.value().last == last);
+                    assert(producer_token.value().reserve == new_write);
                     let _ = self.vbq.instance.borrow().commit_update_last_by_max(&mut last_token, producer_token);
                 }
             );
