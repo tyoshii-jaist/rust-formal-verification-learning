@@ -114,6 +114,18 @@ tokenized_state_machine!{VBQueue {
         }
     }
 
+    pub open spec fn producer_grant_start(&self) -> nat {
+        if self.write <= self.reserve {
+            self.write
+        } else {
+            0
+        }
+    }
+
+    pub open spec fn producer_grant_end(&self) -> nat {
+        self.reserve
+    }
+
     init! {
         initialize(
             length: nat,
@@ -218,14 +230,18 @@ tokenized_state_machine!{VBQueue {
     transition!{
         load_write_at_commit() {
             require(pre.write_in_progress == true);
+            require(pre.producer_read_obs is Some);
         }
     }
  
     transition!{
         sub_reserve_at_commit(commited: nat) {
             require(pre.write_in_progress == true);
+            require(pre.producer_read_obs is Some);
             require(pre.reserve >= commited);
-            // TODO: require(pre.producer.grant_sz() >= commited);
+
+            let grant_start = if pre.write <= pre.reserve {pre.write} else {0};
+            require(pre.reserve - grant_start >= commited);
 
             let new_reserve = (pre.reserve - commited) as nat;
 
@@ -370,11 +386,16 @@ tokenized_state_machine!{VBQueue {
             require(pre.read_in_progress == true);
             require(pre.consumer_write_obs is Some);
             require(pre.consumer_last_obs is Some);
-            //require(pre.consumer.grant_sz() >= used);
-            require(pre.read + used <= pre.length);
 
             let write_obs = pre.consumer_write_obs->Some_0;
             let last_obs = pre.consumer_last_obs->Some_0;
+            let grant_end = if pre.read <= write_obs {
+                    write_obs // not inverted
+                } else {
+                    last_obs // inverted
+                };
+            require(grant_end - pre.read >= used);
+            require(pre.read + used <= pre.length);
 
             require(
                 {
@@ -388,7 +409,6 @@ tokenized_state_machine!{VBQueue {
             update read = pre.read + used;
         }
     }
-
     
     transition!{
         release_end() {
