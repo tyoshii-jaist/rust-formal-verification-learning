@@ -130,3 +130,11 @@ read_obs
 read
 write_obs
 last_obs
+
+
+# last の遷移について
+lenght で初期化される。
+write を reserve 位置に移すタイミングで 
+- write が wrap する場合で、かつ、write 位置が length でない場合、今の write 位置が last になる。
+- reserve (write を持っていく位置) が last 位置を追い抜いていると length に戻す。
+
