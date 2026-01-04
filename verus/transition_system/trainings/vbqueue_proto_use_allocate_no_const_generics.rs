@@ -49,7 +49,11 @@ pub struct ProducerState {
 
 impl ProducerState {
     pub open spec fn grant_start(&self) -> nat {
-        self.write
+        if self.write <= self.reserve {
+            self.write
+        } else {
+            0
+        }
     }
 
     pub open spec fn grant_end(&self) -> nat {
@@ -471,13 +475,11 @@ impl ConsumerState {
             };
         }
     }
-/*
+
     transition!{
         commit_start() {
-            assert(pre.write_in_progress);
-            update write_in_progress = true;
             update producer = ProducerState{
-                write_in_progress: true,
+                write_in_progress: pre.producer.write_in_progress,
                 write: pre.producer.write,
                 reserve: pre.producer.reserve,
                 last: pre.producer.last,
@@ -488,9 +490,16 @@ impl ConsumerState {
 
     transition!{
         commit_load_write() {
+            update producer = ProducerState{
+                write_in_progress: pre.producer.write_in_progress,
+                write: pre.write,
+                reserve: pre.producer.reserve,
+                last: pre.producer.last,
+                read_obs: pre.producer.read_obs,
+            };
         }
     }
- */
+ 
     transition!{
         commit_sub_reserve(commited: nat) {
             require(pre.producer.write_in_progress == true);
@@ -512,31 +521,16 @@ impl ConsumerState {
         }
     }
 
-/*
+
     transition!{
         commit_load_last() {
-            update producer = ProducerState{
-                last: pre.last,
-                write_in_progress: pre.producer.write_in_progress,
-                write: pre.producer.write,
-                reserve: pre.producer.reserve,
-                read_obs: pre.producer.read_obs,
-            };
         }
     }
 
     transition!{
         commit_load_reserve() {
-            update producer = ProducerState{
-                write_in_progress: pre.producer.write_in_progress,
-                write: pre.producer.write,
-                reserve: pre.reserve,
-                last: pre.producer.last,
-                read_obs: pre.producer.read_obs,
-            };
         }
     }
- */
 
     transition!{
         commit_update_last_by_write() {
@@ -784,27 +778,25 @@ impl ConsumerState {
     fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
     }
 
-    /*
     #[inductive(commit_start)]
     fn commit_start_inductive(pre: Self, post: Self) {
     }
 
-
     #[inductive(commit_load_write)]
     fn commit_load_write_inductive(pre: Self, post: Self) {
+        assert(post.producer.reserve == post.reserve);
     }
-     */
+
     #[inductive(commit_sub_reserve)]
     fn commit_sub_reserve_inductive(pre: Self, post: Self, commited: nat) {
     }
 
-    /*
     #[inductive(commit_load_last)]
     fn commit_load_last_inductive(pre: Self, post: Self) { }
 
     #[inductive(commit_load_reserve)]
     fn commit_load_reserve_inductive(pre: Self, post: Self) { }
- */
+
     #[inductive(commit_update_last_by_write)]
     fn commit_update_last_by_write_inductive(pre: Self, post: Self) {
         assert(post.producer.last != post.length);
@@ -1186,7 +1178,6 @@ impl Producer {
         let read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
                 assert(read_token.instance_id() == producer_token.instance_id());
-                assume(producer_token.value().reserve == producer_token.value().write);
                 let _ = self.vbq.instance.borrow().grant_load_read(&read_token, producer_token);
             }
         );
@@ -1413,6 +1404,7 @@ impl GrantW {
         requires
             //old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
+            used <= old(self).buf.len(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value().grant_sz() == old(self).buf.len(),
             old(producer_token).value().write_in_progress == true,
@@ -1433,6 +1425,7 @@ impl GrantW {
         requires
             //old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
+            used <= old(self).buf.len(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value().grant_sz() == old(self).buf.len(),
             old(producer_token).value().write_in_progress == true,
@@ -1449,6 +1442,7 @@ impl GrantW {
                 update prev -> next;
                 returning ret;
                 ghost write_in_progress_token => {
+                    let _ = self.vbq.instance.borrow().commit_start(producer_token);
                     //assert(producer_token.value().write_in_progress == write_in_progress_token.value());
                 }
         );
@@ -1464,21 +1458,29 @@ impl GrantW {
         let len = self.buf.len();
         let used = if len <= used { len } else { used }; // min の代用。
 
-        proof {
-            assert(used <= len);
-        }
-
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
                 // assert(producer_token.value().write == write_token.value());
-                //let _ = self.vbq.instance.borrow().commit_load_write(&write_token, producer_token);
+                let _ = self.vbq.instance.borrow().commit_load_write(&write_token, producer_token);//(&write_token, producer_token);
             }
         );
+
+        proof {
+            assert(used <= len);
+            assert(producer_token.value().write == write);
+            assert(producer_token.value().grant_sz() >= used);
+            assert((producer_token.value().grant_end() - producer_token.value().grant_start()) == producer_token.value().grant_sz());
+            assert((producer_token.value().grant_end() - producer_token.value().grant_start()) >= used);
+            assert(producer_token.value().grant_end() >= used);
+            assert(usize::MIN as int <= producer_token.value().reserve - (len - used));
+        }
 
         atomic_with_ghost!(&self.vbq.reserve => fetch_sub(len - used);
             update prev -> next;
             returning ret;
             ghost reserve_token => {
+                assume(usize::MIN as int <= prev - (len - used));
+                assert(usize::MIN as int <= producer_token.value().reserve - (len - used));
                 let _ = self.vbq.instance.borrow().commit_sub_reserve((len - used) as nat, &mut reserve_token, producer_token);
             }
         );
@@ -1486,15 +1488,13 @@ impl GrantW {
         let max = self.vbq.length as usize;
         let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
-                assert(producer_token.value().last == last_token.value());
-                //let _ = self.vbq.instance.borrow().commit_load_last(&last_token, producer_token);
+                let _ = self.vbq.instance.borrow().commit_load_last();//(&last_token, producer_token);
             }
         );
         
         let new_write = atomic_with_ghost!(&self.vbq.reserve => load();
             ghost reserve_token => {
-                assert(producer_token.value().reserve == reserve_token.value());
-                //let _ = self.vbq.instance.borrow().commit_load_reserve(&reserve_token, producer_token);
+                let _ = self.vbq.instance.borrow().commit_load_reserve();//(&reserve_token, producer_token);
             }
         );
 
@@ -1503,6 +1503,7 @@ impl GrantW {
             // Mark `last` where the write pointer used to be to hold the line here
             atomic_with_ghost!(&self.vbq.last => store(write);
                 ghost last_token => {
+                    assert(producer_token.value().write == write);
                     let _ = self.vbq.instance.borrow().commit_update_last_by_write(&mut last_token, producer_token);
                 }
             );

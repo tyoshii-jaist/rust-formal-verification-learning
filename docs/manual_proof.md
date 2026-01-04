@@ -115,3 +115,18 @@ last := max
 write := new_write
 
 ## Consumer
+
+
+
+# Grant/Commit での producer の状態の引き継ぎ
+以下を保存して require/ensure で渡す必要がある。
+write
+reserve
+last
+read_obs
+
+
+# Read/Release での consumer の状態の引き継ぎ
+read
+write_obs
+last_obs
