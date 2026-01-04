@@ -114,18 +114,6 @@ tokenized_state_machine!{VBQueue {
         }
     }
 
-    pub open spec fn producer_grant_start(&self) -> nat {
-        if self.write <= self.reserve {
-            self.write
-        } else {
-            0
-        }
-    }
-
-    pub open spec fn producer_grant_end(&self) -> nat {
-        self.reserve
-    }
-
     init! {
         initialize(
             length: nat,
