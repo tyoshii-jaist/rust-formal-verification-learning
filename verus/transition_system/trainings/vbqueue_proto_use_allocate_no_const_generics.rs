@@ -182,6 +182,12 @@ impl ConsumerState {
     }
 
     #[invariant]
+    pub fn valid_write_max_implies_last_max(&self) -> bool {
+        // write が終端(length)にいるなら、last も終端でなければならない
+        self.producer.write == self.length ==> self.producer.last == self.length
+    }
+
+    #[invariant]
     pub fn valid_producer_local_state_order(&self) -> bool {
         match self.producer.read_obs {
             Some(read_obs) => {
@@ -571,6 +577,8 @@ impl ConsumerState {
             require(pre.producer.reserve < pre.producer.write ==> pre.producer.write == pre.producer.last);
             let read_obs = pre.producer.read_obs->Some_0;
             let new_write = pre.producer.reserve;
+
+            require(new_write == pre.length ==> pre.producer.last == pre.length);
 
             require(
                 {
@@ -1410,6 +1418,7 @@ impl GrantW {
             old(producer_token).value() == old(self).granted_producer_state,
             old(producer_token).value().grant_sz() >= old(self).buf.len(),
             old(producer_token).value().read_obs is Some,
+            old(producer_token).value().write == old(self).vbq.instance@.length() ==> old(producer_token).value().last == old(self).vbq.instance@.length(),
             //old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
             self.vbq.wf(),
@@ -1434,6 +1443,7 @@ impl GrantW {
             old(producer_token).value().write_in_progress == true,
             old(producer_token).value().grant_sz() >= old(self).buf.len(),
             old(producer_token).value().read_obs is Some,
+            old(producer_token).value().write == old(self).vbq.instance@.length() ==> old(producer_token).value().last == old(self).vbq.instance@.length(),
         ensures
             self.vbq.wf(),
             producer_token.instance_id() == self.vbq.instance@.id(),
@@ -1515,6 +1525,7 @@ impl GrantW {
                     assert(producer_token.value().write == write);
                     assert(producer_token.value().reserve == new_write);
                     let _ = self.vbq.instance.borrow().commit_update_last_by_write(&mut last_token, producer_token);
+                    assert(producer_token.value().write == max ==> producer_token.value().last == max);
                 }
             );
         } else if new_write > last {
@@ -1530,6 +1541,7 @@ impl GrantW {
                     assert(producer_token.value().last == last);
                     assert(producer_token.value().reserve == new_write);
                     let _ = self.vbq.instance.borrow().commit_update_last_by_max(&mut last_token, producer_token);
+                    assert(producer_token.value().write == max ==> producer_token.value().last == max);
                 }
             );
         }
@@ -1546,6 +1558,16 @@ impl GrantW {
                 assert(producer_token.value().read_obs is Some);
                 assert(producer_token.value().reserve < producer_token.value().write && producer_token.value().write != max ==> producer_token.value().write == producer_token.value().last);
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
+
+                // ★ここが重要: Invariant の力を借りる
+                // 「もし write == max なら、Invariant より last == max のはずだ」と主張
+                assert(producer_token.value().write == max ==> producer_token.value().last == max);
+                
+                assert(
+                    producer_token.value().reserve < producer_token.value().write 
+                    ==> 
+                    producer_token.value().write == producer_token.value().last
+                );
                 //let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, buf_perms, buf_perms, &mut write_token, producer_token);
                 let _ = self.vbq.instance.borrow().commit_store_write(&mut write_token, producer_token);
             }
