@@ -1,17 +1,20 @@
 # Variables
-## Shared variables
+
 write
 reserve
 last
 read
 
-## Local variables
+read_in_progress
+write_in_progress
+already_split
+
 read_obs
 write_obs
 last_obs
 
 ## Constants
-max
+length
 
 
 # Invariants
@@ -44,28 +47,6 @@ read と write の区間 (Consumer占有区間) と write と reserve の間 (Pr
 
 
 ## Consumer invariants
-Consumer は write をロードした後に last をロードする。この間に隙があるので、条件が難しい。
-思考実験
-write を読みだしたときに・・・
-1. write < read の場合
-この場合、 read <= last になる。
-Prod がいくら動いても、last は動かせない。write & reserve が追い越したときにしか last は動かない。
-
-2. write == read の場合
-この場合、read は読める領域がない。write は好きに成長できるので、last も今後どうなるかわからない。
-
-3. read < write の場合
-この場合、read は write_obs まで成長できるが、本質的に 2 と同じ。
-
-4. write < read == last の場合
-この場合、本質的に 1 と同じ。Consumer 側が read を動かさない限り Prod は何もできない。
-
-5. write == read == last の場合
-これは本質的に 2, 3 と同じで Prod 側に主導権がある。
-
-6. read < write == last の場合
-これも本質的に2,3,5と同じで、Prod 側に主導権がある。
-
 // not inverted (read <= write_obs) & reserve not wrap
 ||| read <= write_obs <= write <= reserve <= max
 
@@ -78,14 +59,22 @@ Prod がいくら動いても、last は動かせない。write & reserve が追
 // inverted (write_obs < read) & read not wrap
 ||| write_obs <= write <= reserve < read <= last_obs == last <= max
 
-ただ、Global の方は上記 Prod/Cons の条件に含まれるので、上記があればよい。
-
-_obs が None のときはどう扱えばよいのか？
- 読めている時だけ足せばよさそう。これはすなわち grant や read を行っているときは制約が足されているということを意味しそう。
-
 
 # Transitions
+### try_split
+初期化
+
+
 ## Producer
+### start_grant
+write_in_progress を true に。
+
+### load_write_at_grant
+実質的に assert しかしない
+
+### load_read_at_grant
+read_obs を得る
+
 ### do_reserve 
 reserve := new_reserve
 
@@ -102,8 +91,18 @@ require(
     }
 );
 
+### grant_fail
+grant失敗
+
+
+### start_commit
+
+### load_write_at_commit
+
 ### sub_reserve
 reserve := reserve - (len - used)
+
+### load_last_at_commit
 
 ### update_last_by_write
 last := new_last
@@ -138,3 +137,31 @@ write を reserve 位置に移すタイミングで
 - write が wrap する場合で、かつ、write 位置が length でない場合、今の write 位置が last になる。
 - reserve (write を持っていく位置) が last 位置を追い抜いていると length に戻す。
 
+
+# 雑多メモ
+
+
+Consumer は write をロードした後に last をロードする。この間に隙があるので、条件が難しい。
+思考実験
+write を読みだしたときに・・・
+1. write < read の場合
+この場合、 read <= last になる。
+Prod がいくら動いても、last は動かせない。write & reserve が追い越したときにしか last は動かない。
+
+2. write == read の場合
+この場合、read は読める領域がない。write は好きに成長できるので、last も今後どうなるかわからない。
+
+3. read < write の場合
+この場合、read は write_obs まで成長できるが、本質的に 2 と同じ。
+
+4. write < read == last の場合
+この場合、本質的に 1 と同じ。Consumer 側が read を動かさない限り Prod は何もできない。
+
+5. write == read == last の場合
+これは本質的に 2, 3 と同じで Prod 側に主導権がある。
+
+6. read < write == last の場合
+これも本質的に2,3,5と同じで、Prod 側に主導権がある。
+
+_obs が None のときはどう扱えばよいのか？
+ 読めている時だけ足せばよさそう。これはすなわち grant や read を行っているときは制約が足されているということを意味しそう。
