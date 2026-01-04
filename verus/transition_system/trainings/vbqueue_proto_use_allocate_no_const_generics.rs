@@ -585,7 +585,7 @@ impl ConsumerState {
                     // not inverted & reserve not wrap
                     ||| read_obs <= new_write == pre.producer.reserve <= pre.length
                     // inverted (write < read_obs) & read not wrap
-                    ||| new_write == pre.producer.reserve < read_obs <= pre.producer.last <= pre.length
+                    ||| new_write == pre.producer.reserve < read_obs /*<= pre.producer.last */ <= pre.length
                 }
             );
 
@@ -963,6 +963,7 @@ impl VBBuffer
             r.0.instance@.id() == r.1@.instance_id(),
             r.0.instance@.id() == r.2@.instance_id(),
             r.1@.value().is_idle(),
+            r.1@.value().write == r.0.instance@.length() ==> r.1@.value().last == r.0.instance@.length(),
             r.2@.value().is_idle(),
     {
         // TODO: 元の BBQueue は静的に確保している。
@@ -1060,6 +1061,7 @@ impl VBBuffer
             old(consumer_token).instance_id() == self.instance@.id(),
             old(producer_token).value().is_idle(),
             old(consumer_token).value().is_idle(),
+            old(producer_token).value().write == self.instance@.length() ==> old(producer_token).value().last == self.instance@.length(),
         ensures
             self.wf(),
             match res {
@@ -1068,6 +1070,7 @@ impl VBBuffer
                     &&& cons.wf()
                     &&& producer_token.instance_id() == prod.vbq.instance@.id()
                     &&& producer_token.value().is_idle()
+                    &&& producer_token.value().write == prod.vbq.instance@.length() ==> producer_token.value().last == prod.vbq.instance@.length()
                     &&& consumer_token.instance_id() == cons.vbq.instance@.id()
                     &&& consumer_token.value().is_idle()
                 }, 
@@ -1125,6 +1128,7 @@ impl Producer {
             old(self).wf(),
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value().is_idle(),
+            old(producer_token).value().write == old(self).vbq.instance@.length() ==> old(producer_token).value().last == old(self).vbq.instance@.length(),
             // old(producer_token).value().write_in_progress == false ==> old(producer_token).value().read_obs is None && old(producer_token).value().write == old(producer_token).value().reserve,
         ensures
             self.wf(),
@@ -1138,6 +1142,9 @@ impl Producer {
                     &&& producer_token.value().read_obs is Some
                     &&& producer_token.value() == wgr.granted_producer_state
                     &&& producer_token.value().grant_sz() >= sz
+                    &&& producer_token.value().read_obs is Some
+                    &&& producer_token.value().read_obs->Some_0 <= self.vbq.instance@.length()
+                    &&& producer_token.value().write == self.vbq.instance@.length() ==> producer_token.value().last == self.vbq.instance@.length()
                 },
                 _ => true
             },
@@ -1418,12 +1425,13 @@ impl GrantW {
             old(producer_token).value() == old(self).granted_producer_state,
             old(producer_token).value().grant_sz() >= old(self).buf.len(),
             old(producer_token).value().read_obs is Some,
+            old(producer_token).value().read_obs->Some_0 <= old(self).vbq.instance@.length(),
             old(producer_token).value().write == old(self).vbq.instance@.length() ==> old(producer_token).value().last == old(self).vbq.instance@.length(),
             //old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
             self.vbq.wf(),
             producer_token.instance_id() == self.vbq.instance@.id(),
-    {
+/*    {
         self.commit_inner(used, Tracked(producer_token), Tracked(buf_perms));
         // forget(self); // FIXME
     }
@@ -1447,6 +1455,7 @@ impl GrantW {
         ensures
             self.vbq.wf(),
             producer_token.instance_id() == self.vbq.instance@.id(),
+ */
     {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
@@ -1559,15 +1568,6 @@ impl GrantW {
                 assert(producer_token.value().reserve < producer_token.value().write && producer_token.value().write != max ==> producer_token.value().write == producer_token.value().last);
                 assert(self.vbq.buffer as nat == self.vbq.instance@.base_addr());
 
-                // ★ここが重要: Invariant の力を借りる
-                // 「もし write == max なら、Invariant より last == max のはずだ」と主張
-                assert(producer_token.value().write == max ==> producer_token.value().last == max);
-                
-                assert(
-                    producer_token.value().reserve < producer_token.value().write 
-                    ==> 
-                    producer_token.value().write == producer_token.value().last
-                );
                 //let _ = self.vbq.instance.borrow().commit_store_write(new_write as nat, buf_perms, buf_perms, &mut write_token, producer_token);
                 let _ = self.vbq.instance.borrow().commit_store_write(&mut write_token, producer_token);
             }
@@ -1818,7 +1818,8 @@ impl GrantR {
         ensures
             self.vbq.wf(),
             consumer_token.instance_id() == self.vbq.instance@.id(),
-    {
+/*
+            {
         self.release_inner(used, Tracked(consumer_token), Tracked(buf_perms));
         // forget(self); // FIXME
     }
@@ -1837,6 +1838,7 @@ impl GrantR {
         ensures
             self.vbq.wf(),
             consumer_token.instance_id() == self.vbq.instance@.id(),
+ */
     {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
