@@ -678,19 +678,13 @@ impl ConsumerState {
             };
         }
     }
-/*
+
     transition!{
         read_load_read() {
-            update consumer = ConsumerState {
-                read: pre.read,
-                read_in_progress: pre.consumer.read_in_progress,
-                write_obs: pre.consumer.write_obs,
-                reserve_obs: pre.consumer.reserve_obs,
-                last_obs: pre.consumer.last_obs,
-            };
+            assert(pre.consumer.read == pre.read);
         }
     }
- */
+ 
     transition!{
         read_wrap() {
             require(pre.consumer.read_in_progress == true);
@@ -857,11 +851,11 @@ impl ConsumerState {
     #[inductive(read_load_last)]
     fn read_load_last_inductive(pre: Self, post: Self) {
     }
-/*
+
     #[inductive(read_load_read)]
     fn read_load_read_inductive(pre: Self, post: Self) {
     }
- */
+ 
     #[inductive(read_wrap)]
     fn read_wrap_inductive(pre: Self, post: Self) {        
     }
@@ -1139,7 +1133,6 @@ impl Producer {
                     &&& wgr.buf.len() == sz
                     //&&& wgr.buf.len() == producer_token.value().grant_sz()
                     &&& producer_token.value().write_in_progress == true
-                    &&& producer_token.value().read_obs is Some
                     &&& producer_token.value() == wgr.granted_producer_state
                     &&& producer_token.value().grant_sz() >= sz
                     &&& producer_token.value().read_obs is Some
@@ -1608,6 +1601,10 @@ impl Consumer {
             match r {
                 Ok((rgr, buf_perms)) => {
                     &&& rgr.buf.len() == consumer_token.value().grant_sz()
+                    &&& consumer_token.value().read_in_progress == true
+                    &&& consumer_token.value().write_obs is Some
+                    &&& consumer_token.value().last_obs is Some
+                    &&& consumer_token.value().read + rgr.buf.len() <= usize::MAX
                 },
                 _ => true
             },
@@ -1649,7 +1646,7 @@ impl Consumer {
         let mut read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
                 //assert(read_token.value() == consumer_token.value().read);
-                //let tracked ret = self.vbq.instance.borrow().read_load_read(&read_token, consumer_token);
+                let tracked ret = self.vbq.instance.borrow().read_load_read(&read_token, consumer_token);
                 
                 // TODO: 以下は last 確定時に移す必要がある！
                 // (Ghost<Map<nat, PointsTo<u8>>>, Tracked<Map<nat, PointsTo<u8>>>) が返る
@@ -1786,6 +1783,12 @@ impl Consumer {
              */
         }
         assert(granted_buf.len() == sz);
+        /*assert(consumer_token.value().read + sz == consumer_token.value().last_obs->Some_0 ||
+            consumer_token.value().read + sz == consumer_token.value().write_obs->Some_0);
+        assert(consumer_token.value().last_obs->Some_0 <= usize::MAX);
+        assert(consumer_token.value().write_obs->Some_0 <= usize::MAX);
+        */
+        assert(consumer_token.value().read + sz <= usize::MAX);
 
         Ok(
             (GrantR {
@@ -1815,6 +1818,7 @@ impl GrantR {
             old(self).vbq.wf(),
             old(consumer_token).instance_id() == old(self).vbq.instance@.id(),
             old(consumer_token).value().grant_sz() == old(self).buf.len(),
+            old(consumer_token).value().read + old(self).buf.len() <= usize::MAX
         ensures
             self.vbq.wf(),
             consumer_token.instance_id() == self.vbq.instance@.id(),
@@ -1854,6 +1858,12 @@ impl GrantR {
             return;
         }
 
+        proof {
+            assert(used <= self.buf.len());
+            assert(consumer_token.value().grant_sz() == self.buf.len());
+            assert(consumer_token.value().read + used as nat <= usize::MAX);
+        }
+
         // This should always be checked by the public interfaces
         // debug_assert!(used <= self.buf.len());
 
@@ -1862,6 +1872,7 @@ impl GrantR {
             update prev -> next;
             returning ret;
             ghost read_token => {
+                assert(consumer_token.value().read + used <= usize::MAX);
                 let _ = self.vbq.instance.borrow().release_add_read(used as nat, &mut read_token, consumer_token);
             }
         );
