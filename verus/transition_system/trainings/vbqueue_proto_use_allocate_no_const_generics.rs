@@ -483,25 +483,12 @@ impl ConsumerState {
 
     transition!{
         commit_start() {
-            update producer = ProducerState{
-                write_in_progress: pre.producer.write_in_progress,
-                write: pre.producer.write,
-                reserve: pre.producer.reserve,
-                last: pre.producer.last,
-                read_obs: pre.producer.read_obs,
-            };
         }
     }
 
     transition!{
         commit_load_write() {
-            update producer = ProducerState{
-                write_in_progress: pre.producer.write_in_progress,
-                write: pre.write,
-                reserve: pre.producer.reserve,
-                last: pre.producer.last,
-                read_obs: pre.producer.read_obs,
-            };
+            assert(pre.write == pre.producer.write);
         }
     }
  
@@ -1138,6 +1125,7 @@ impl Producer {
                     //&&& wgr.buf.len() == producer_token.value().grant_sz()
                     &&& producer_token.value().write_in_progress == true
                     &&& producer_token.value() == wgr.granted_producer_state
+                    &&& producer_token.value().grant_sz() >= sz
                 },
                 _ => true
             },
@@ -1415,7 +1403,8 @@ impl GrantW {
             old(producer_token).instance_id() == old(self).vbq.instance@.id(),
             old(producer_token).value().grant_sz() == old(self).buf.len(),
             old(producer_token).value().write_in_progress == true,
-            old(producer_token).value() == old(self).granted_producer_state
+            old(producer_token).value() == old(self).granted_producer_state,
+            old(producer_token).value().grant_sz() >= old(self).buf.len()
             //old(self).wf_with_producer(old(producer_token).value(), buf_perms)
         ensures
             self.vbq.wf(),
@@ -1438,6 +1427,7 @@ impl GrantW {
             old(producer_token).value().grant_sz() == old(self).buf.len(),
             old(producer_token).value() == old(self).granted_producer_state,
             old(producer_token).value().write_in_progress == true,
+            old(producer_token).value().grant_sz() >= old(self).buf.len(),
         ensures
             self.vbq.wf(),
             producer_token.instance_id() == self.vbq.instance@.id(),
@@ -1451,7 +1441,7 @@ impl GrantW {
                 update prev -> next;
                 returning ret;
                 ghost write_in_progress_token => {
-                    let _ = self.vbq.instance.borrow().commit_start(producer_token);
+                    let _ = self.vbq.instance.borrow().commit_start();//(producer_token);
                     //assert(producer_token.value().write_in_progress == write_in_progress_token.value());
                 }
         );
@@ -1469,8 +1459,10 @@ impl GrantW {
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
+                assert(producer_token.value().grant_sz() >= used);
                 // assert(producer_token.value().write == write_token.value());
                 let _ = self.vbq.instance.borrow().commit_load_write(&write_token, producer_token);//(&write_token, producer_token);
+                assert(producer_token.value().grant_sz() >= used);
             }
         );
 
