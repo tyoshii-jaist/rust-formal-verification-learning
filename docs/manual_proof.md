@@ -165,3 +165,6 @@ Prod がいくら動いても、last は動かせない。write & reserve が追
 
 _obs が None のときはどう扱えばよいのか？
  読めている時だけ足せばよさそう。これはすなわち grant や read を行っているときは制約が足されているということを意味しそう。
+
+## atomic_with_ghost
+atomic_with_ghost はつまりその時にだけ token が得られるので、その時だけ遷移する権利 (=トークン) が与えられる。
