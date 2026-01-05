@@ -168,3 +168,13 @@ _obs が None のときはどう扱えばよいのか？
 
 ## atomic_with_ghost
 atomic_with_ghost はつまりその時にだけ token が得られるので、その時だけ遷移する権利 (=トークン) が与えられる。
+
+
+
+            update producer = ProducerState {
+                write_in_progress: pre.producer.write_in_progress,
+                write: pre.producer.write,
+                reserve: pre.producer.reserve,
+                last: pre.producer.last,
+                read_obs: pre.producer.read_obs,
+            };
