@@ -245,7 +245,7 @@ tokenized_state_machine!{VBQueue {
     }
 
     transition!{
-        commit_end() {
+        end_commit() {
             update write_in_progress = false;
             update producer_read_obs = None;
         }
@@ -308,7 +308,6 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         add_read_at_release(used: nat) {
-            require(pre.read_in_progress == true);
             require(pre.consumer_write_obs is Some);
             require(pre.consumer_last_obs is Some);
 
@@ -336,7 +335,7 @@ tokenized_state_machine!{VBQueue {
     }
     
     transition!{
-        release_end() {
+        end_release() {
             require(pre.read_in_progress == true);
 
             update read_in_progress = false;
@@ -425,8 +424,8 @@ tokenized_state_machine!{VBQueue {
         );
     }
     
-    #[inductive(commit_end)]
-    fn commit_end_inductive(pre: Self, post: Self) { }
+    #[inductive(end_commit)]
+    fn end_commit_inductive(pre: Self, post: Self) { }
     
     #[inductive(start_read)]
     fn start_read_inductive(pre: Self, post: Self) { }
@@ -452,8 +451,8 @@ tokenized_state_machine!{VBQueue {
     #[inductive(add_read_at_release)]
     fn add_read_at_release_inductive(pre: Self, post: Self, used: nat) { }
     
-    #[inductive(release_end)]
-    fn release_end_inductive(pre: Self, post: Self) { }
+    #[inductive(end_release)]
+    fn end_release_inductive(pre: Self, post: Self) { }
 }}
 
 struct_with_invariants!{
@@ -671,7 +670,8 @@ impl Producer {
 
         let read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
-                let _ = self.vbq.instance.borrow().load_read_at_grant(&read_token, &mut self.producer_read_obs.borrow_mut()->0);
+                let pr = self.producer_read_obs.borrow_mut()->0;
+                let _ = self.vbq.instance.borrow().load_read_at_grant(&read_token, &mut pr);
             }
         );
         // ここで Prod は write と read_obs を得ている。
@@ -887,7 +887,7 @@ impl GrantW {
         // Allow subsequent grants
         atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
             ghost write_in_progress_token => {
-                let _ = self.vbq.instance.borrow().commit_end(&mut write_in_progress_token, &mut self.producer_read_obs.borrow()->0);
+                let _ = self.vbq.instance.borrow().end_commit(&mut write_in_progress_token, &mut self.producer_read_obs.borrow()->0);
                 assert(write_in_progress_token.value() == false);
             }
         );
@@ -998,7 +998,7 @@ impl Consumer {
         if sz == 0 {
             atomic_with_ghost!(&self.vbq.read_in_progress => store(false);
                 ghost read_in_progress_token => {
-                    let _ = self.vbq.instance.borrow().read_fail(&mut read_in_progress_token, &self.consumer_write_obs.borrow()->0, &self.consumer_last_obs.borrow()->0);
+                    let _ = self.vbq.instance.borrow().read_fail(&mut read_in_progress_token, &mut self.consumer_write_obs.borrow()->0, &mut self.consumer_last_obs.borrow()->0);
                     assert(read_in_progress_token.value() == false);
                 }
             );
@@ -1061,7 +1061,7 @@ impl GrantR {
         let is_read_in_progress =
             atomic_with_ghost!(&self.vbq.read_in_progress => load();
                 ghost read_in_progress_token => {
-                    let _ = self.vbq.instance.borrow().start_release(&mut read_in_progress_token);
+                    let _ = self.vbq.instance.borrow().start_release(&mut read_in_progress_token, &mut self.consumer_write_obs.borrow()->0, &mut self.consumer_last_obs.borrow()->0);
                 }
         );
 
@@ -1077,13 +1077,13 @@ impl GrantR {
             update prev -> next;
             returning ret;
             ghost read_token => {
-                let _ = self.vbq.instance.borrow().release_add_read(used as nat, &mut read_token);
+                let _ = self.vbq.instance.borrow().add_read_at_release(used as nat, &mut read_token, &mut self.consumer_write_obs.borrow()->0, &mut self.consumer_last_obs.borrow()->0);
             }
         );
 
         atomic_with_ghost!(&self.vbq.read_in_progress => store(false);
             ghost read_in_progress_token => {
-                let _ = self.vbq.instance.borrow().release_end(&mut read_in_progress_token);
+                let _ = self.vbq.instance.borrow().end_release(&mut read_in_progress_token);
                 assert(read_in_progress_token.value() == false);
             }
         );
