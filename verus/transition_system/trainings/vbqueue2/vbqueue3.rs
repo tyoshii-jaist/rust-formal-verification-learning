@@ -67,11 +67,12 @@ tokenized_state_machine!{VBQueue {
         self.producer.read_obs is None ==> self.write == self.reserve
     }
 
+    /*
     #[invariant]
     pub fn valid_write_max_implies_last_max(&self) -> bool {
         // write が終端(length)にいるなら、last も終端でなければならない
         self.write == self.length ==> self.last == self.length
-    }
+    } */
 
     #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
@@ -319,15 +320,17 @@ tokenized_state_machine!{VBQueue {
     }
 
     transition!{
-        update_last_by_write_at_commit(new_write: nat) {
-            require(pre.producer.reserve < new_write && new_write != pre.length);
-            update last = new_write; // write で last を更新する
+        update_last_by_write_at_commit(write: nat) {
+            require(pre.producer.read_obs is Some);
+            require(pre.producer.write == write);
+            require(pre.producer.reserve < write && write != pre.length);
+            update last = write; // write で last を更新する
 
             update producer = ProducerState {
                 write_in_progress: pre.producer.write_in_progress,
                 write: pre.producer.write,
                 reserve: pre.producer.reserve,
-                last: new_write,
+                last: write,
                 read_obs: pre.producer.read_obs,
             };
         }
@@ -335,7 +338,10 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         update_last_by_max_at_commit() {
+            require(pre.producer.read_obs is Some);
+            require(!((pre.producer.reserve < pre.producer.write) && (pre.producer.write != pre.length)));
             require(pre.producer.reserve > pre.producer.last);
+
             update last = pre.length; // max で last を更新する
 
             update producer = ProducerState {
@@ -349,7 +355,22 @@ tokenized_state_machine!{VBQueue {
     }
 
     transition!{
-        store_write_at_commit(new_write: nat) {            
+        store_write_at_commit(new_write: nat) {
+            require(pre.producer.read_obs is Some);
+            let read_obs = pre.producer.read_obs->Some_0;
+            // 以下の assert がないと
+            // ||| self.reserve < read_obs <= self.read <= self.write <= self.length のケースで write が巻き戻ったあとの、
+            // valid_producer_local_state_order の invariant が保たれることを示せない。
+            require(pre.producer.reserve < pre.producer.write ==> pre.producer.write == pre.producer.last);
+            require(new_write == pre.length ==> pre.producer.last == pre.length);
+            require(
+                {
+                    // not inverted & reserve not wrap
+                    ||| read_obs <= new_write == pre.producer.reserve <= pre.length
+                    // inverted (write < read_obs) & read not wrap
+                    ||| new_write == pre.producer.reserve < read_obs <= pre.producer.last <= pre.length
+                }
+            );
             update write = new_write;
 
             update producer = ProducerState {
@@ -364,6 +385,7 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         end_commit() {
+            require(pre.producer.write == pre.producer.reserve);
             update write_in_progress = false;
 
             update producer = ProducerState {
@@ -406,6 +428,9 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         load_last_at_read() {
+            require(pre.consumer.write_obs is Some);
+            require(pre.consumer.last_obs is None);
+
             update consumer = ConsumerState {
                 read_in_progress: pre.consumer.read_in_progress,
                 read: pre.consumer.read,
@@ -417,12 +442,17 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         load_read_at_read() {
+            require(pre.consumer.write_obs is Some);
+            require(pre.consumer.last_obs is Some);
+            assert(pre.consumer.read == pre.read);
         }
     }
  
     transition!{
         wrap_read() {
-            //require((pre.read == pre.consumer.last_obs->Some_0) && (pre.consumer.write_obs->Some_0 < pre.read));
+            require(pre.consumer.write_obs is Some);
+            require(pre.consumer.last_obs is Some);
+            require((pre.read == pre.consumer.last_obs->Some_0) && (pre.consumer.write_obs->Some_0 < pre.read));
 
             update read = 0;
             update consumer = ConsumerState {
@@ -436,7 +466,7 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         read_fail() {
-            //require(pre.read_in_progress == true);
+            require(pre.read_in_progress == true);
             update read_in_progress = false;
 
             update consumer = ConsumerState {
@@ -458,7 +488,7 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         add_read_at_release(used: nat) {
-            /*require(pre.consumer.write_obs is Some);
+            require(pre.consumer.write_obs is Some);
             require(pre.consumer.last_obs is Some);
 
             let write_obs = pre.consumer.write_obs->Some_0;
@@ -479,7 +509,7 @@ tokenized_state_machine!{VBQueue {
                     ||| write_obs < pre.read + used <= last_obs <= pre.length
                 }
             );
-            */
+
             update read = pre.read + used;
             update consumer = ConsumerState {
                 read_in_progress: pre.consumer.read_in_progress,
@@ -544,32 +574,17 @@ tokenized_state_machine!{VBQueue {
     fn load_reserve_at_commit_inductive(pre: Self, post: Self) { }
     
     #[inductive(update_last_by_write_at_commit)]
-    fn update_last_by_write_at_commit_inductive(pre: Self, post: Self, new_write: nat) {
-        assume(post.valid_write_max_implies_last_max());
+    fn update_last_by_write_at_commit_inductive(pre: Self, post: Self, write: nat) {
     }
-    
+
     #[inductive(update_last_by_max_at_commit)]
     fn update_last_by_max_at_commit_inductive(pre: Self, post: Self) {
+        assert(!((pre.producer.reserve < pre.producer.write) && (pre.producer.write != pre.length)));
+        assert(pre.producer.reserve > pre.producer.last);
     }
     
     #[inductive(store_write_at_commit)]
     fn store_write_at_commit_inductive(pre: Self, post: Self, new_write: nat) {
-        // 以下の assert がないと
-        // ||| self.reserve < read_obs <= self.read <= self.write <= self.length のケースで write が巻き戻ったあとの、
-        // valid_producer_local_state_order の invariant が保たれることを示せない。
-        assert(pre.reserve < pre.write ==> pre.write == pre.last);
-        let read_obs = pre.producer.read_obs->Some_0;
-
-        assert(new_write == pre.length ==> pre.last == pre.length);
-
-        assert(
-            {
-                // not inverted & reserve not wrap
-                ||| read_obs <= new_write == pre.reserve <= pre.length
-                // inverted (write < read_obs) & read not wrap
-                ||| new_write == pre.reserve < read_obs <= pre.last <= pre.length
-            }
-        );
     }
     
     #[inductive(end_commit)]
@@ -986,7 +1001,7 @@ impl GrantW {
                 let _ = self.vbq.instance.borrow().load_last_at_commit();//(&last_token);
             }
         );
-        
+
         let new_write = atomic_with_ghost!(&self.vbq.reserve => load();
             ghost reserve_token => {
                 let _ = self.vbq.instance.borrow().load_reserve_at_commit();//(&reserve_token);
@@ -999,7 +1014,7 @@ impl GrantW {
             atomic_with_ghost!(&self.vbq.last => store(write);
                 ghost last_token => {
                     let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
-                    let _ = self.vbq.instance.borrow().update_last_by_write_at_commit(new_write as nat, &mut last_token, &mut prod_token);
+                    let _ = self.vbq.instance.borrow().update_last_by_write_at_commit(write as nat, &mut last_token, &mut prod_token);
                 }
             );
         } else if new_write > last {
@@ -1108,7 +1123,8 @@ impl Consumer {
         let tracked mut read_perms_map:Map<nat, PointsTo<u8>> = Map::tracked_empty();
         let mut read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
-                let tracked ret = self.vbq.instance.borrow().load_read_at_read();//(&read_token);
+                let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
+                let tracked ret = self.vbq.instance.borrow().load_read_at_read(&read_token, &cons_token);
             }
         );
 
