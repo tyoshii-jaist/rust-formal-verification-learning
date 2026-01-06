@@ -710,7 +710,7 @@ impl VBBuffer
         }
     }
 
-    fn try_split(&self) -> (res: Result<(Producer, Consumer),  &'static str>)
+    fn try_split(self) -> (res: Result<(Producer, Consumer),  &'static str>)
         requires
             self.wf(),
             match (self.producer@, self.consumer@) {
@@ -726,13 +726,15 @@ impl VBBuffer
                 Err(_) => true
             },
     {
+        let mut slf = self;
+
         let already_splitted =
-            atomic_with_ghost!(&self.already_split => swap(true);
+            atomic_with_ghost!(&slf.already_split => swap(true);
                 update prev -> next;
                 returning ret;
                 ghost already_split_token => {
                     if !ret {
-                        let _ = self.instance.borrow().try_split(&mut already_split_token);
+                        let _ = slf.instance.borrow().try_split(&mut already_split_token);
                     };
                 }
         );
@@ -741,34 +743,36 @@ impl VBBuffer
             return Err("already splitted");
         }
 
+        let tracked prod_token = slf.producer.borrow_mut().tracked_take();
+        let tracked cons_token = slf.consumer.borrow_mut().tracked_take();
         // FIXME:元の実装は Arc は使っていない。
         // また、buffer のゼロ化もしているが、こちらは今はやっていない。
-        let vbbuffer_arc = Arc::new(self);
+        let vbbuffer_arc = Arc::new(slf);
         Ok((
             Producer {
                 vbq: vbbuffer_arc.clone(),
-                producer: Tracked(Some(self.producer.borrow_mut().tracked_take())),
+                producer: Tracked(Some(prod_token)),
             },
             Consumer {
                 vbq: vbbuffer_arc.clone(),
-                consumer: Tracked(Some(self.consumer.borrow_mut().tracked_take())),
+                consumer: Tracked(Some(cons_token)),
             }
         ))
     }
 }
 
-pub struct Producer<'a> {
-    vbq: Arc<&'a VBBuffer>,
+pub struct Producer {
+    vbq: Arc<VBBuffer>,
     producer: Tracked<Option<VBQueue::producer>>,
 }
 
-impl Producer<'a> {
+impl Producer {
     pub closed spec fn wf(&self) -> bool {
         (*self.vbq).wf()
     }
 }
 
-impl Producer<'a> {
+impl Producer {
     fn grant_exact(&mut self, sz: usize) -> (r: Result<GrantW, &'static str>)
         requires
             old(self).wf(),
@@ -787,7 +791,7 @@ impl Producer<'a> {
                 returning ret;
                 ghost write_in_progress_token => {
                     if !ret {
-                        let tracked prod_token = self.producer.borrow().tracked_unwrap();
+                        let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
                         let _ = self.vbq.instance.borrow().start_grant(&mut write_in_progress_token, &mut prod_token);
                         assert(write_in_progress_token.value() == true);
                         assert(ret == false);
@@ -805,13 +809,14 @@ impl Producer<'a> {
         let write = atomic_with_ghost!(&self.vbq.write => load();
             returning ret;
             ghost _write_token => {
-                let _ = self.vbq.instance.borrow().load_write_at_grant(&self.producer.borrow().tracked_unwrap());
+                let tracked prod_token = self.producer.borrow_mut().tracked_take();
+                let _ = self.vbq.instance.borrow().load_write_at_grant(&prod_token);
             }
         );
 
         let read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
-                let tracked prod_token = self.producer.borrow().tracked_unwrap();
+                let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
                 let _ = self.vbq.instance.borrow().load_read_at_grant(&read_token, &mut prod_token);
             }
         );
@@ -827,7 +832,7 @@ impl Producer<'a> {
                 // Inverted, no room is available
                 atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                     ghost write_in_progress_token => {
-                        let tracked prod_token = self.producer.borrow().tracked_unwrap();
+                        let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
                         let _ = self.vbq.instance.borrow().grant_fail(&mut write_in_progress_token, &mut prod_token);
                     }
                 );
@@ -850,7 +855,7 @@ impl Producer<'a> {
                     // Not invertible, no space
                     atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
                         ghost write_in_progress_token => {
-                            let tracked prod_token = self.producer.borrow().tracked_unwrap();
+                            let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
                             let _ = self.vbq.instance.borrow().grant_fail(&mut write_in_progress_token, &mut prod_token);
                             assert(write_in_progress_token.value() == false);
                         }
@@ -880,7 +885,7 @@ impl Producer<'a> {
                     // inverted (write < read_obs) & read not wrap
                     ||| write <= new_reserve < read <= max
                 });
-                let tracked prod_token = self.producer.borrow().tracked_unwrap();
+                let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
                 let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);
                 assert(reserve_token.value() == start + sz);
             }
@@ -956,7 +961,8 @@ impl GrantW {
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
-                let _ = self.vbq.instance.borrow().load_write_at_commit(&self.producer.borrow().tracked_unwrap());
+                let tracked prod_token = self.producer.borrow_mut().tracked_take();
+                let _ = self.vbq.instance.borrow().load_write_at_commit(&prod_token);
             }
         );
 
@@ -965,7 +971,7 @@ impl GrantW {
             returning ret;
             ghost reserve_token => {
                 //assume(usize::MIN as int <= prev - (len - used));
-                let tracked prod_token = self.producer.borrow().tracked_unwrap();
+                let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
                 let _ = self.vbq.instance.borrow().sub_reserve_at_commit((len - used) as nat, &mut reserve_token, &mut prod_token);
             }
         );
@@ -988,7 +994,7 @@ impl GrantW {
             // Mark `last` where the write pointer used to be to hold the line here
             atomic_with_ghost!(&self.vbq.last => store(write);
                 ghost last_token => {
-                    let tracked prod_token = self.producer.borrow().tracked_unwrap();
+                    let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
                     let _ = self.vbq.instance.borrow().update_last_by_write_at_commit(new_write as nat, &mut last_token, &mut prod_token);
                 }
             );
@@ -1002,7 +1008,7 @@ impl GrantW {
             // value
             atomic_with_ghost!(&self.vbq.last => store(max);
                 ghost last_token => {
-                    let tracked prod_token = self.producer.borrow().tracked_unwrap();
+                    let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
                     let _ = self.vbq.instance.borrow().update_last_by_max_at_commit(&mut last_token, &mut prod_token);
                 }
             );
@@ -1017,7 +1023,7 @@ impl GrantW {
         // time to invert early!
         atomic_with_ghost!(&self.vbq.write => store(new_write);
             ghost write_token => {
-                let tracked prod_token = self.producer.borrow().tracked_unwrap();
+                let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
                 let _ = self.vbq.instance.borrow().store_write_at_commit(new_write as nat, &mut write_token, &mut prod_token);
             }
         );
@@ -1025,7 +1031,7 @@ impl GrantW {
         // Allow subsequent grants
         atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
             ghost write_in_progress_token => {
-                let tracked prod_token = self.producer.borrow().tracked_unwrap();
+                let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
                 let _ = self.vbq.instance.borrow().end_commit(&mut write_in_progress_token, &mut prod_token);
                 assert(write_in_progress_token.value() == false);
             }
@@ -1038,8 +1044,8 @@ impl GrantW {
     }
 }
 
-pub struct Consumer<'a> {
-    vbq: Arc<&'a VBBuffer>,
+pub struct Consumer {
+    vbq: Arc<VBBuffer>,
     consumer: Tracked<Option<VBQueue::consumer>>,
 }
 
@@ -1049,7 +1055,7 @@ impl Consumer {
     }
 }
 
-impl Consumer<'a> {
+impl Consumer {
     fn read(&mut self) ->  (r: Result<GrantR, &'static str>)
         requires
             old(self).wf(),
@@ -1067,7 +1073,7 @@ impl Consumer<'a> {
                 returning ret;
                 ghost read_in_progress_token => {
                     if !ret {
-                        let tracked cons_token = self.consumer.borrow().tracked_unwrap();
+                        let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
                         let _ = self.vbq.instance.borrow().start_read(&mut read_in_progress_token, &mut cons_token);
                         assert(read_in_progress_token.value() == true);
                     } else {
@@ -1083,14 +1089,14 @@ impl Consumer<'a> {
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
-                let tracked cons_token = self.consumer.borrow().tracked_unwrap();
+                let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
                 let _ = self.vbq.instance.borrow().load_write_at_read(&write_token, &mut cons_token);
             }
         );
 
         let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
-                let tracked cons_token = self.consumer.borrow().tracked_unwrap();
+                let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
                 let _ = self.vbq.instance.borrow().load_last_at_read(&last_token, &mut cons_token);
             }
         );
@@ -1117,7 +1123,7 @@ impl Consumer<'a> {
                 ghost read_token => {
                     // ここで read が wrap する。
                     // read == last の状態で、かつ、write < read なので、inverted 状態になる。
-                    let tracked cons_token = self.consumer.borrow().tracked_unwrap();
+                    let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
                     let _ = self.vbq.instance.borrow().wrap_read(&mut read_token, &mut cons_token);
                     // ↑をまたぐと
                     // read == 0 になるので not inverted に切り替わる
@@ -1140,7 +1146,7 @@ impl Consumer<'a> {
         if sz == 0 {
             atomic_with_ghost!(&self.vbq.read_in_progress => store(false);
                 ghost read_in_progress_token => {
-                    let tracked cons_token = self.consumer.borrow().tracked_unwrap();
+                    let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
                     let _ = self.vbq.instance.borrow().read_fail(&mut read_in_progress_token, &mut cons_token);
                     assert(read_in_progress_token.value() == false);
                 }
@@ -1202,7 +1208,7 @@ impl GrantR {
         let is_read_in_progress =
             atomic_with_ghost!(&self.vbq.read_in_progress => load();
                 ghost read_in_progress_token => {
-                    let tracked cons_token = self.consumer.borrow().tracked_unwrap();
+                    let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
                     let _ = self.vbq.instance.borrow().start_release(&mut read_in_progress_token, &mut cons_token);
                 }
         );
@@ -1219,14 +1225,14 @@ impl GrantR {
             update prev -> next;
             returning ret;
             ghost read_token => {
-                let tracked cons_token = self.consumer.borrow().tracked_unwrap();
+                let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
                 let _ = self.vbq.instance.borrow().add_read_at_release(used as nat, &mut read_token, &mut cons_token);
             }
         );
 
         atomic_with_ghost!(&self.vbq.read_in_progress => store(false);
             ghost read_in_progress_token => {
-                let tracked cons_token = self.consumer.borrow().tracked_unwrap();
+                let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
                 let _ = self.vbq.instance.borrow().end_release(&mut read_in_progress_token, &mut cons_token);
                 assert(read_in_progress_token.value() == false);
             }
