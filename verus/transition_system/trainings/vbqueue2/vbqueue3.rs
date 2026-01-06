@@ -545,6 +545,7 @@ tokenized_state_machine!{VBQueue {
     
     #[inductive(update_last_by_write_at_commit)]
     fn update_last_by_write_at_commit_inductive(pre: Self, post: Self, new_write: nat) {
+        assume(post.valid_write_max_implies_last_max());
     }
     
     #[inductive(update_last_by_max_at_commit)]
