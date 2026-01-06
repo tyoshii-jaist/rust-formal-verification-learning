@@ -213,6 +213,7 @@ tokenized_state_machine!{VBQueue {
     transition!{
         load_write_at_grant() {
             require(pre.producer.read_obs is None);
+            assert(pre.producer.write == pre.write);
         }
     }
 
@@ -232,6 +233,20 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         do_reserve(start: nat, sz: nat) {
+            require(pre.producer.read_obs is Some);
+            let new_reserve = start + sz;
+            let read_obs = pre.producer.read_obs->Some_0;
+            require(
+                {
+                    // not inverted & reserve not wrap
+                    ||| read_obs <= pre.producer.write <= new_reserve <= pre.length
+                    // not inverted & reserve wrap
+                    ||| new_reserve < read_obs <= pre.producer.write <= pre.length
+                    // inverted (write < read_obs) & read not wrap
+                    ||| pre.producer.write <= new_reserve < read_obs /*<= pre.last */ <= pre.length
+                }
+            );
+
             update reserve = start + sz;
 
             update producer = ProducerState {
@@ -247,6 +262,7 @@ tokenized_state_machine!{VBQueue {
     transition!{
         grant_fail() {
             require(pre.write_in_progress == true);
+            require(pre.producer.write == pre.producer.reserve);
 
             update write_in_progress = false;
 
@@ -276,10 +292,10 @@ tokenized_state_machine!{VBQueue {
         sub_reserve_at_commit(commited: nat) {
             require(pre.reserve >= commited);
 
-            //let grant_start = if pre.write <= pre.reserve {pre.write} else {0};
-            //require(pre.reserve - grant_start >= commited);
+            let grant_start = if pre.producer.write <= pre.producer.reserve {pre.producer.write} else {0};
+            require(pre.producer.reserve - grant_start >= commited);
 
-            let new_reserve = (pre.reserve - commited) as nat;
+            let new_reserve = (pre.producer.reserve - commited) as nat;
 
             update reserve = new_reserve;
             update producer = ProducerState {
@@ -304,6 +320,7 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         update_last_by_write_at_commit(new_write: nat) {
+            require(pre.producer.reserve < new_write && new_write != pre.length);
             update last = new_write; // write で last を更新する
 
             update producer = ProducerState {
@@ -318,6 +335,7 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         update_last_by_max_at_commit() {
+            require(pre.producer.reserve > pre.producer.last);
             update last = pre.length; // max で last を更新する
 
             update producer = ProducerState {
@@ -504,23 +522,10 @@ tokenized_state_machine!{VBQueue {
     
     #[inductive(do_reserve)]
     fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
-        let new_reserve = start + sz;
-        let read_obs = pre.producer.read_obs->Some_0;
-        assert(
-            {
-                // not inverted & reserve not wrap
-                ||| read_obs <= pre.write <= new_reserve <= pre.length
-                // not inverted & reserve wrap
-                ||| new_reserve < read_obs <= pre.write <= pre.length
-                // inverted (write < read_obs) & read not wrap
-                ||| pre.write <= new_reserve < read_obs /*<= pre.last */ <= pre.length
-            }
-        );
     }
     
     #[inductive(grant_fail)]
     fn grant_fail_inductive(pre: Self, post: Self) {
-        assert(pre.write == pre.reserve);
     }
     
     #[inductive(start_commit)]
@@ -540,12 +545,10 @@ tokenized_state_machine!{VBQueue {
     
     #[inductive(update_last_by_write_at_commit)]
     fn update_last_by_write_at_commit_inductive(pre: Self, post: Self, new_write: nat) {
-        assert(pre.reserve < new_write && new_write != pre.length);
     }
     
     #[inductive(update_last_by_max_at_commit)]
     fn update_last_by_max_at_commit_inductive(pre: Self, post: Self) {
-        assert(pre.reserve > pre.last);
     }
     
     #[inductive(store_write_at_commit)]
@@ -808,9 +811,9 @@ impl Producer {
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             returning ret;
-            ghost _write_token => {
+            ghost write_token => {
                 let tracked prod_token = self.producer.borrow_mut().tracked_take();
-                let _ = self.vbq.instance.borrow().load_write_at_grant(&prod_token);
+                let _ = self.vbq.instance.borrow().load_write_at_grant(&write_token, &prod_token);
             }
         );
 
@@ -1246,5 +1249,23 @@ impl GrantR {
 }
 
 
-fn main() {}
+fn main() {
+    /*
+    let vbuf = VBBuffer::new(6);
+    let (mut prod, mut cons) = match vbuf.try_split() {
+        Ok((prod, cons)) => (prod, cons),
+        Err(_) => {
+            return;
+        }
+    };
+
+    // Request space for one byte
+    match prod.grant_exact(2) {
+        Ok(wgr) => {
+            wgr.commit(2);
+        },
+        _ => {}
+    }
+     */
+}
 }
