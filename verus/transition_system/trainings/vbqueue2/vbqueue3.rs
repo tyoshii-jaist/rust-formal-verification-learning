@@ -787,7 +787,13 @@ pub struct Producer {
 
 impl Producer {
     pub closed spec fn wf(&self) -> bool {
-        (*self.vbq).wf()
+        &&& (*self.vbq).wf()
+        &&& self.producer@->0.instance_id() == self.vbq.instance@.id()
+    }
+
+    pub closed spec fn is_idle(&self) -> bool {
+        &&& self.producer@ is Some
+        &&& self.producer@->0.value().read_obs is None
     }
 }
 
@@ -795,6 +801,7 @@ impl Producer {
     fn grant_exact(&mut self, sz: usize) -> (r: Result<GrantW, &'static str>)
         requires
             old(self).wf(),
+            old(self).is_idle(),
         ensures
             self.wf(),
             match r {
@@ -804,13 +811,16 @@ impl Producer {
                 _ => true
             },
     {
+        proof{
+            assert(self.producer@.tracked_is_some());
+        }
+        let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => swap(true);
                 update prev -> next;
                 returning ret;
                 ghost write_in_progress_token => {
                     if !ret {
-                        let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
                         let _ = self.vbq.instance.borrow().start_grant(&mut write_in_progress_token, &mut prod_token);
                         assert(write_in_progress_token.value() == true);
                         assert(ret == false);
