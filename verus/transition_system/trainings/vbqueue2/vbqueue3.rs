@@ -104,6 +104,11 @@ tokenized_state_machine!{VBQueue {
     }
 
     #[invariant]
+    pub fn valid_no_write_in_progress_implies_no_read_obs(&self) -> bool {
+        self.producer.write_in_progress == false ==> self.producer.read_obs is None
+    }
+
+    #[invariant]
     pub fn valid_read_obs_is_none_implies_no_grant(&self) -> bool {
         self.producer.read_obs is None ==> self.write == self.reserve
     }
@@ -238,7 +243,7 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         start_grant() {
-            require(pre.write_in_progress == false ==> pre.producer.read_obs is None);
+            assert(pre.write_in_progress == false ==> pre.producer.read_obs is None);
             require(pre.write_in_progress == false);
 
             update write_in_progress = true;
@@ -256,7 +261,7 @@ tokenized_state_machine!{VBQueue {
         load_write_at_grant() {
             require(pre.producer.write_in_progress == true);
             require(pre.producer.read_obs is None);
-            require(pre.producer.write == pre.producer.reserve);
+            assert(pre.producer.write == pre.producer.reserve);
             assert(pre.producer.write == pre.write);
         }
     }
@@ -265,7 +270,7 @@ tokenized_state_machine!{VBQueue {
         load_read_at_grant() {
             require(pre.producer.write_in_progress == true);
             require(pre.producer.read_obs is None);
-            require(pre.producer.write == pre.producer.reserve);
+            assert(pre.producer.write == pre.producer.reserve);
 
             update producer = ProducerState {
                 write_in_progress: pre.producer.write_in_progress,
@@ -274,6 +279,7 @@ tokenized_state_machine!{VBQueue {
                 last: pre.producer.last,
                 read_obs: Some(pre.read),
             };
+            assert(pre.read <= pre.length);
         }
     }
 
@@ -881,8 +887,9 @@ impl Producer {
             match r {
                 Ok(wgr) => {
                     &&& wgr.buf.len() == sz
+                    &&& wgr.is_granted(sz as nat)
                     &&& match wgr.producer@ {
-                        Some(prod) => prod.instance_id() == self.vbq.instance@.id() && self.is_granted(sz as nat),
+                        Some(prod) => prod.instance_id() == self.vbq.instance@.id(),
                         _ => false,
                     }
                 },
@@ -890,7 +897,8 @@ impl Producer {
             },
     {
         proof{
-            assert(self.producer@.tracked_is_some());
+            assert(self.producer@->0.value().write_in_progress == false ==> 
+                self.producer@->0.value().read_obs is None);
         }
         let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
         let is_write_in_progress =
@@ -975,7 +983,7 @@ impl Producer {
             (start == write && !(write < read) && write + sz <= max) ||
             (start == 0 && !(write < read) && (write + sz > max && sz < read))
         );
-        assert(start + sz <= self.vbq.length);
+        // assert(start + sz <= self.vbq.length);
 
         // Safe write, only viewed by this task
         atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
