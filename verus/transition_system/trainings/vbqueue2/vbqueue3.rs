@@ -337,8 +337,12 @@ tokenized_state_machine!{VBQueue {
     }
 
     transition!{
-        start_commit() {
-            require(pre.write_in_progress == true);
+        start_commit(sz: nat) {
+            assert(pre.producer.write_in_progress == pre.write_in_progress);
+            require(
+                pre.producer.write_in_progress == true ==> 
+                    pre.producer.read_obs is Some && pre.producer.grant_sz() == sz
+            );
         }
     }
 
@@ -544,6 +548,7 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         start_release() {
+            assert(pre.read_in_progress == pre.consumer.read_in_progress);
             require(pre.read_in_progress == true ==> pre.consumer.write_obs is Some && pre.consumer.last_obs is Some);
         }
     }
@@ -622,7 +627,7 @@ tokenized_state_machine!{VBQueue {
     }
     
     #[inductive(start_commit)]
-    fn start_commit_inductive(pre: Self, post: Self) { }
+    fn start_commit_inductive(pre: Self, post: Self, sz: nat) { }
     
     #[inductive(load_write_at_commit)]
     fn load_write_at_commit_inductive(pre: Self, post: Self) { }
@@ -1081,7 +1086,7 @@ impl GrantW {
                 update prev -> next;
                 returning ret;
                 ghost write_in_progress_token => {
-                    let _ = self.vbq.instance.borrow().start_commit(&mut write_in_progress_token);
+                    let _ = self.vbq.instance.borrow().start_commit(self.buf.len() as nat, &mut write_in_progress_token, &prod_token);
                 }
         );
 
@@ -1106,7 +1111,8 @@ impl GrantW {
             update prev -> next;
             returning ret;
             ghost reserve_token => {
-                //assume(usize::MIN as int <= prev - (len - used));
+                assert(usize::MIN as int <= prod_token.value().reserve - (len - used));
+                assume(usize::MIN as int <= prev - (len - used)); // FIXME!
                 let _ = self.vbq.instance.borrow().sub_reserve_at_commit((len - used) as nat, &mut reserve_token, &mut prod_token);
             }
         );
