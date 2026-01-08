@@ -291,6 +291,13 @@ tokenized_state_machine!{VBQueue {
             let read_obs = pre.producer.read_obs->Some_0;
             require(
                 {
+                    ||| start == pre.producer.write && pre.producer.write < read_obs && pre.producer.write + sz < read_obs
+                    ||| start == pre.producer.write && !(pre.producer.write < read_obs) && pre.producer.write + sz <= pre.length
+                    ||| start == 0 && !(pre.producer.write < read_obs) && (pre.producer.write + sz > pre.length && sz < read_obs)
+                }
+            );/*
+            require(
+                {
                     // not inverted & reserve not wrap
                     ||| read_obs <= pre.producer.write <= new_reserve <= pre.length
                     // not inverted & reserve wrap
@@ -298,7 +305,7 @@ tokenized_state_machine!{VBQueue {
                     // inverted (write < read_obs) & read not wrap
                     ||| pre.producer.write <= new_reserve < read_obs /*<= pre.last */ <= pre.length
                 }
-            );
+            ); */
 
             update reserve = start + sz;
 
@@ -989,14 +996,11 @@ impl Producer {
         atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
             ghost reserve_token => {
                 let ghost new_reserve: nat = (start + sz) as nat;
-                assert({
-                    // not inverted & reserve not wrap
-                    ||| read <= write <= new_reserve <= max
-                    // not inverted & reserve wrap
-                    ||| new_reserve < read <= write <= max
-                    // inverted (write < read_obs) & read not wrap
-                    ||| write <= new_reserve < read <= max
-                });
+                assert(
+                    (start == write && write < read && write + sz < read) ||
+                    (start == write && !(write < read) && write + sz <= max) ||
+                    (start == 0 && !(write < read) && (write + sz > max && sz < read))
+                );
                 let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);
                 assert(reserve_token.value() == start + sz);
             }
