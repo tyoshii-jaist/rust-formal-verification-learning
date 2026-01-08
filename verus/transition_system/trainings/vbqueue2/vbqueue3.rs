@@ -374,11 +374,13 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         load_last_at_commit() {
+            assert(pre.last == pre.producer.last);
         }
     }
 
     transition!{
         load_reserve_at_commit() {
+            assert(pre.reserve == pre.producer.reserve);
         }
     }
 
@@ -1111,8 +1113,10 @@ impl GrantW {
             update prev -> next;
             returning ret;
             ghost reserve_token => {
+                assert(prod_token.value().grant_sz() == len as int);
+                assert(prod_token.value().reserve >= len as int);
                 assert(usize::MIN as int <= prod_token.value().reserve - (len - used));
-                assume(usize::MIN as int <= prev - (len - used)); // FIXME!
+                assert(usize::MIN as int <= prev - (len - used));
                 let _ = self.vbq.instance.borrow().sub_reserve_at_commit((len - used) as nat, &mut reserve_token, &mut prod_token);
             }
         );
@@ -1120,13 +1124,14 @@ impl GrantW {
         let max = self.vbq.length as usize;
         let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
-                let _ = self.vbq.instance.borrow().load_last_at_commit();//(&last_token);
+                let _ = self.vbq.instance.borrow().load_last_at_commit(&last_token, &prod_token);
             }
         );
 
         let new_write = atomic_with_ghost!(&self.vbq.reserve => load();
             ghost reserve_token => {
-                let _ = self.vbq.instance.borrow().load_reserve_at_commit();//(&reserve_token);
+                let _ = self.vbq.instance.borrow().load_reserve_at_commit(&reserve_token, &prod_token);
+                assert(reserve_token.value() == prod_token.value().reserve);
             }
         );
 
