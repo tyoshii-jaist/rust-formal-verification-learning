@@ -1,3 +1,10 @@
+# 全体的な方針
+
+prod/cons がお互いの領域を侵害しないように write/reserve/last/read を更新していることを示す invariant を定義する。
+
+atomic 操作は transition と対応させる。この時にしか共有変数は変更できない。ただ、これだと情報が閉鎖されてしまうので、producer_token/consumer_token も用意し、これは atomic 変数とは紐づかないので、他の遷移時にも値を変更できる。ただ、prod.write は write と一致していることなどを invariant で示す。
+
+
 # Variables
 
 write
