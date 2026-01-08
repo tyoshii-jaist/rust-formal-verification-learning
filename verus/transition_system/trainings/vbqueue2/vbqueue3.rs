@@ -348,9 +348,10 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         load_write_at_commit() {
+            assert(pre.producer.write == pre.write);
             require(pre.producer.read_obs is Some);
         }
-    }
+    } 
  
     transition!{
         sub_reserve_at_commit(commited: nat) {
@@ -604,6 +605,30 @@ tokenized_state_machine!{VBQueue {
         }
     }
 
+    transition!{
+        check_write_equality() {
+            assert(pre.producer.write == pre.write);
+        }
+    }
+
+    transition!{
+        check_reserve_equality() {
+            assert(pre.producer.reserve == pre.reserve);
+        }
+    }
+
+    transition!{
+        check_last_equality() {
+            assert(pre.producer.last == pre.last);
+        }
+    }
+
+    transition!{
+        check_read_equality() {
+            assert(pre.consumer.read == pre.read);
+        }
+    }
+
     #[inductive(try_split)]
     fn try_split_inductive(pre: Self, post: Self) { }
     
@@ -619,7 +644,8 @@ tokenized_state_machine!{VBQueue {
     fn load_read_at_grant_inductive(pre: Self, post: Self) {
         assert(pre.write == pre.reserve);
     }
-    
+
+
     #[inductive(do_reserve)]
     fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
     }
@@ -634,6 +660,7 @@ tokenized_state_machine!{VBQueue {
     #[inductive(load_write_at_commit)]
     fn load_write_at_commit_inductive(pre: Self, post: Self) { }
     
+
     #[inductive(sub_reserve_at_commit)]
     fn sub_reserve_at_commit_inductive(pre: Self, post: Self, commited: nat) { }
     
@@ -686,6 +713,18 @@ tokenized_state_machine!{VBQueue {
     
     #[inductive(end_release)]
     fn end_release_inductive(pre: Self, post: Self) { }
+
+    #[inductive(check_write_equality)]
+    fn check_write_equality_inductive(pre: Self, post: Self) { }
+
+    #[inductive(check_reserve_equality)]
+    fn check_reserve_equality_inductive(pre: Self, post: Self) { }
+
+    #[inductive(check_last_equality)]
+    fn check_last_equality_inductive(pre: Self, post: Self) { }
+    
+    #[inductive(check_read_equality)]
+    fn check_read_equality_inductive(pre: Self, post: Self) { }
 }}
 
 struct_with_invariants!{
@@ -1105,7 +1144,8 @@ impl GrantW {
 
         let write = atomic_with_ghost!(&self.vbq.write => load();
             ghost write_token => {
-                let _ = self.vbq.instance.borrow().load_write_at_commit(&prod_token);
+                self.vbq.instance.borrow().check_write_equality(&write_token, &prod_token);
+                let _ = self.vbq.instance.borrow().load_write_at_commit(&write_token, &prod_token);
             }
         );
 
@@ -1113,8 +1153,11 @@ impl GrantW {
             update prev -> next;
             returning ret;
             ghost reserve_token => {
+                self.vbq.instance.borrow().check_reserve_equality(&reserve_token, &prod_token);
                 assert(prod_token.value().grant_sz() == len as int);
                 assert(prod_token.value().reserve >= len as int);
+                assert(prod_token.value().reserve == reserve_token.value());
+                assert(prod_token.value().reserve == prev);
                 assert(usize::MIN as int <= prod_token.value().reserve - (len - used));
                 assert(usize::MIN as int <= prev - (len - used));
                 let _ = self.vbq.instance.borrow().sub_reserve_at_commit((len - used) as nat, &mut reserve_token, &mut prod_token);
@@ -1140,6 +1183,7 @@ impl GrantW {
             // Mark `last` where the write pointer used to be to hold the line here
             atomic_with_ghost!(&self.vbq.last => store(write);
                 ghost last_token => {
+                    self.vbq.instance.borrow().check_last_equality(&last_token, &prod_token);
                     let _ = self.vbq.instance.borrow().update_last_by_write_at_commit(write as nat, &mut last_token, &mut prod_token);
                 }
             );
