@@ -423,20 +423,8 @@ tokenized_state_machine!{VBQueue {
     transition!{
         store_write_at_commit(new_write: nat) {
             require(pre.producer.read_obs is Some);
-            let read_obs = pre.producer.read_obs->Some_0;
-            // 以下の assert がないと
-            // ||| self.reserve < read_obs <= self.read <= self.write <= self.length のケースで write が巻き戻ったあとの、
-            // valid_producer_local_state_order の invariant が保たれることを示せない。
-            require(pre.producer.reserve < pre.producer.write ==> pre.producer.write == pre.producer.last);
-            require(new_write == pre.length ==> pre.producer.last == pre.length);
-            require(
-                {
-                    // not inverted & reserve not wrap
-                    ||| read_obs <= new_write == pre.producer.reserve <= pre.length
-                    // inverted (write < read_obs) & read not wrap
-                    ||| new_write == pre.producer.reserve < read_obs <= pre.producer.last <= pre.length
-                }
-            );
+            require(new_write == pre.producer.reserve);
+
             update write = new_write;
 
             update producer = ProducerState {
@@ -679,9 +667,85 @@ tokenized_state_machine!{VBQueue {
         assert(!((pre.producer.reserve < pre.producer.write) && (pre.producer.write != pre.length)));
         assert(pre.producer.reserve > pre.producer.last);
     }
-    
+
     #[inductive(store_write_at_commit)]
     fn store_write_at_commit_inductive(pre: Self, post: Self, new_write: nat) {
+        // 基本的な変数の不変性を確認
+        assert(post.write == new_write);
+        assert(post.reserve == pre.reserve);
+        assert(post.read == pre.read);
+        assert(post.last == pre.last);
+        assert(post.length == pre.length);
+        
+        // 前提条件の再確認
+        assert(new_write == pre.reserve);
+
+        // ==========================================
+        // 1. Producer View の証明
+        // ==========================================
+        if let Some(read_obs) = pre.producer.read_obs {
+            // pre が Invariant を満たしていることを前提に、パターン分けをする
+            if read_obs <= pre.read && pre.read <= pre.write && pre.write <= pre.reserve && pre.reserve <= pre.length {
+                // パターン: Not Inverted & No Wrap
+                // post.write (= pre.reserve) >= pre.write >= pre.read >= read_obs
+                // よって read_obs <= post.read <= post.write となり、Not Inverted が維持される
+            }
+            else if pre.reserve < read_obs && read_obs <= pre.read && pre.read <= pre.write && pre.write <= pre.length {
+                // パターン: Not Inverted & Wrap (本命)
+                // post.write (= pre.reserve) < read_obs
+                // よって post.write <= post.reserve < read_obs <= post.read となり、Inverted に移行する
+            }
+            else if pre.write <= pre.reserve && pre.reserve < read_obs && read_obs <= pre.read && pre.read <= pre.last && pre.last <= pre.length {
+                // パターン: Inverted
+                // post.write (= pre.reserve) < read_obs
+                // よって Inverted が維持される
+            }
+            else {
+                // パターン: Converted (read wrapping)
+                // pre.read <= pre.write <= pre.reserve < read_obs
+                // post.write (= pre.reserve) < read_obs
+                // よって post.read <= post.write <= post.reserve < read_obs となり、Converted が維持される
+            }
+        }
+
+        // ==========================================
+        // 2. Consumer View の証明
+        // ==========================================
+        if let Some(write_obs) = pre.consumer.write_obs {
+            // Consumer View の Invariant パターン分け
+            if pre.read <= write_obs && write_obs <= pre.write && pre.write <= pre.reserve && pre.reserve <= pre.length {
+                // パターン: Not Inverted
+                if new_write < write_obs {
+                    // Wrap が発生し、Consumer から見て Inverted に見える状態へ移行
+                    // pre.write <= pre.reserve <= pre.length
+                    // update_last されているはずなので、pre.last は pre.write か length
+                    // よって write_obs <= pre.write <= pre.last (post.last)
+                    assert(write_obs <= post.last);
+                } else {
+                    // write が進んだだけ
+                    assert(write_obs <= post.write);
+                }
+            }
+            else if pre.reserve < pre.read && pre.read <= write_obs && write_obs <= pre.write && pre.write <= pre.length {
+                // パターン: Not Inverted & Wrap
+                 if new_write < write_obs {
+                    // Wrap 発生
+                    assert(write_obs <= post.last);
+                }
+            }
+            else if pre.write <= pre.reserve && pre.reserve < pre.read && pre.read <= write_obs && write_obs <= pre.last && pre.last <= pre.length {
+                // パターン: Converted
+                if new_write < write_obs {
+                    // post.write < write_obs
+                    // post.write <= post.reserve < pre.read <= write_obs <= post.last
+                }
+            }
+            else {
+                // パターン: Inverted (write_obs < read)
+                // write_obs <= pre.write <= pre.reserve
+                // post.write (= pre.reserve) >= write_obs なので関係維持
+            }
+        }
     }
     
     #[inductive(end_commit)]
@@ -1211,6 +1275,14 @@ impl GrantW {
         // time to invert early!
         atomic_with_ghost!(&self.vbq.write => store(new_write);
             ghost write_token => {
+                if new_write < write as nat && write != max as nat {
+                    assert(prod_token.value().last == write as nat);
+                    // Wrap しているので reserve < write であることも確認
+                    assert(prod_token.value().reserve < prod_token.value().write);
+                } else if new_write > last as nat {
+                     assert(prod_token.value().last == max as nat);
+                }
+                assert(prod_token.value().write == write as nat);
                 let _ = self.vbq.instance.borrow().store_write_at_commit(new_write as nat, &mut write_token, &mut prod_token);
             }
         );
