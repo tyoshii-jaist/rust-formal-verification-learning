@@ -113,12 +113,20 @@ tokenized_state_machine!{VBQueue {
         self.producer.read_obs is None ==> self.write == self.reserve
     }
 
-    /*
     #[invariant]
     pub fn valid_write_max_implies_last_max(&self) -> bool {
-        // write が終端(length)にいるなら、last も終端でなければならない
         self.write == self.length ==> self.last == self.length
-    } */
+    }
+
+    #[invariant]
+    pub fn valid_write_in_range(&self) -> bool {
+        self.write <= self.length
+    }
+
+    #[invariant]
+    pub fn valid_last_in_range(&self) -> bool {
+        self.last <= self.length
+    }
 
     #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
@@ -425,6 +433,13 @@ tokenized_state_machine!{VBQueue {
             require(pre.producer.read_obs is Some);
             require(new_write == pre.producer.reserve);
 
+            // これは post.valid_write_max_implies_last_max のため
+            require(new_write == pre.length ==> pre.producer.last == pre.length);
+
+            // これはこれまでの条件分岐から言える
+            require(!(new_write < pre.write && pre.write != pre.length) || pre.producer.last == pre.write);
+            require(!(!(new_write < pre.write && pre.write != pre.length) && new_write > pre.producer.last) || pre.producer.last == pre.length);
+
             update write = new_write;
 
             update producer = ProducerState {
@@ -596,18 +611,21 @@ tokenized_state_machine!{VBQueue {
     transition!{
         check_write_equality() {
             assert(pre.producer.write == pre.write);
+            assert(pre.write <= pre.length);
         }
     }
 
     transition!{
         check_reserve_equality() {
             assert(pre.producer.reserve == pre.reserve);
+            assert(pre.reserve <= pre.length);
         }
     }
 
     transition!{
         check_last_equality() {
             assert(pre.producer.last == pre.last);
+            assert(pre.last <= pre.length);
         }
     }
 
@@ -670,82 +688,88 @@ tokenized_state_machine!{VBQueue {
 
     #[inductive(store_write_at_commit)]
     fn store_write_at_commit_inductive(pre: Self, post: Self, new_write: nat) {
-        // 基本的な変数の不変性を確認
+        assert(pre.producer.read_obs is Some);
+        assert(new_write == pre.producer.reserve);
         assert(post.write == new_write);
-        assert(post.reserve == pre.reserve);
+
+        let read_obs = pre.producer.read_obs->Some_0;
+
+        assert(pre.valid_producer_local_state());
+        assert(post.valid_producer_local_state());
+
+        assert(pre.producer.reserve == pre.reserve);
+        assert(pre.producer.last == pre.last);
+        assert(post.producer.reserve == post.reserve);
+        assert(post.producer.last == post.last);
+
         assert(post.read == pre.read);
+        assert(post.reserve == pre.reserve);
         assert(post.last == pre.last);
-        assert(post.length == pre.length);
-        
-        // 前提条件の再確認
-        assert(new_write == pre.reserve);
+        assert(post.consumer.read == pre.consumer.read);
+        assert(post.consumer.write_obs == pre.consumer.write_obs);
+        assert(post.consumer.last_obs == pre.consumer.last_obs);
 
-        // ==========================================
-        // 1. Producer View の証明
-        // ==========================================
-        if let Some(read_obs) = pre.producer.read_obs {
-            // pre が Invariant を満たしていることを前提に、パターン分けをする
-            if read_obs <= pre.read && pre.read <= pre.write && pre.write <= pre.reserve && pre.reserve <= pre.length {
-                // パターン: Not Inverted & No Wrap
-                // post.write (= pre.reserve) >= pre.write >= pre.read >= read_obs
-                // よって read_obs <= post.read <= post.write となり、Not Inverted が維持される
-            }
-            else if pre.reserve < read_obs && read_obs <= pre.read && pre.read <= pre.write && pre.write <= pre.length {
-                // パターン: Not Inverted & Wrap (本命)
-                // post.write (= pre.reserve) < read_obs
-                // よって post.write <= post.reserve < read_obs <= post.read となり、Inverted に移行する
-            }
-            else if pre.write <= pre.reserve && pre.reserve < read_obs && read_obs <= pre.read && pre.read <= pre.last && pre.last <= pre.length {
-                // パターン: Inverted
-                // post.write (= pre.reserve) < read_obs
-                // よって Inverted が維持される
-            }
-            else {
-                // パターン: Converted (read wrapping)
-                // pre.read <= pre.write <= pre.reserve < read_obs
-                // post.write (= pre.reserve) < read_obs
-                // よって post.read <= post.write <= post.reserve < read_obs となり、Converted が維持される
+        assert(post.write == new_write);
+        assert(new_write == pre.producer.reserve);
+        assert(pre.producer.reserve == pre.reserve);
+        assert(post.reserve == pre.reserve);
+        assert(post.write == post.reserve);
+
+        assert(pre.valid_write_max_implies_last_max());
+
+        assert(post.valid_write_max_implies_last_max()) by {
+            if post.write == post.length {
+                // post.write == new_write
+                assert(new_write == post.length);
+
+                // length は不変
+                assert(post.length == pre.length);
+
+                // よって new_write == pre.length
+                assert(new_write == pre.length);
+
+                // require から pre.producer.last == pre.length
+                assert(pre.producer.last == pre.length);
+
+                // valid_producer_local_state で pre.producer.last == pre.last
+                assert(pre.last == pre.length);
+
+                // last は更新してないので post.last == pre.last
+                assert(post.last == pre.last);
+
+                // よって post.last == post.length
+                assert(post.last == post.length);
             }
         }
 
-        // ==========================================
-        // 2. Consumer View の証明
-        // ==========================================
-        if let Some(write_obs) = pre.consumer.write_obs {
-            // Consumer View の Invariant パターン分け
-            if pre.read <= write_obs && write_obs <= pre.write && pre.write <= pre.reserve && pre.reserve <= pre.length {
-                // パターン: Not Inverted
-                if new_write < write_obs {
-                    // Wrap が発生し、Consumer から見て Inverted に見える状態へ移行
-                    // pre.write <= pre.reserve <= pre.length
-                    // update_last されているはずなので、pre.last は pre.write か length
-                    // よって write_obs <= pre.write <= pre.last (post.last)
-                    assert(write_obs <= post.last);
-                } else {
-                    // write が進んだだけ
-                    assert(write_obs <= post.write);
+        assert(post.valid_order_from_producer_view()) by {
+            if read_obs <= pre.read <= pre.write <= pre.reserve <= pre.length {
+            } 
+            else if pre.reserve < read_obs <= pre.read <= pre.write <= pre.length {
+            }
+            else if pre.write <= pre.reserve < read_obs <= pre.read <= pre.last <= pre.length {
+                
+            } else {
+                
+            }
+        };
+
+        assert(post.valid_order_from_consumer_view()) by {
+            match (pre.consumer.write_obs, pre.consumer.last_obs) {
+                (Some(write_obs), Some(last_obs)) => {
+                    post.valid_order_from_consumer_view()
+                },
+                (Some(write_obs), None) => {
+                    post.valid_order_from_consumer_view()
+                },
+                (None, Some(last_obs)) => {
+                    false
+                },
+                (None, None) => {
+                    post.valid_order_from_consumer_view()
                 }
-            }
-            else if pre.reserve < pre.read && pre.read <= write_obs && write_obs <= pre.write && pre.write <= pre.length {
-                // パターン: Not Inverted & Wrap
-                 if new_write < write_obs {
-                    // Wrap 発生
-                    assert(write_obs <= post.last);
-                }
-            }
-            else if pre.write <= pre.reserve && pre.reserve < pre.read && pre.read <= write_obs && write_obs <= pre.last && pre.last <= pre.length {
-                // パターン: Converted
-                if new_write < write_obs {
-                    // post.write < write_obs
-                    // post.write <= post.reserve < pre.read <= write_obs <= post.last
-                }
-            }
-            else {
-                // パターン: Inverted (write_obs < read)
-                // write_obs <= pre.write <= pre.reserve
-                // post.write (= pre.reserve) >= write_obs なので関係維持
-            }
-        }
+            };
+        };
     }
     
     #[inductive(end_commit)]
@@ -1210,6 +1234,8 @@ impl GrantW {
             ghost write_token => {
                 self.vbq.instance.borrow().check_write_equality(&write_token, &prod_token);
                 let _ = self.vbq.instance.borrow().load_write_at_commit(&write_token, &prod_token);
+                self.vbq.instance.borrow().check_write_equality(&write_token, &prod_token);
+                assert(write_token.value() <= self.vbq.length);
             }
         );
 
@@ -1232,6 +1258,7 @@ impl GrantW {
         let last = atomic_with_ghost!(&self.vbq.last => load();
             ghost last_token => {
                 let _ = self.vbq.instance.borrow().load_last_at_commit(&last_token, &prod_token);
+                self.vbq.instance.borrow().check_last_equality(&last_token, &prod_token);
             }
         );
 
@@ -1262,6 +1289,7 @@ impl GrantW {
             atomic_with_ghost!(&self.vbq.last => store(max);
                 ghost last_token => {
                     let _ = self.vbq.instance.borrow().update_last_by_max_at_commit(&mut last_token, &mut prod_token);
+                    assert(prod_token.value().last == max as nat);
                 }
             );
         }
@@ -1275,14 +1303,34 @@ impl GrantW {
         // time to invert early!
         atomic_with_ghost!(&self.vbq.write => store(new_write);
             ghost write_token => {
-                if new_write < write as nat && write != max as nat {
-                    assert(prod_token.value().last == write as nat);
-                    // Wrap しているので reserve < write であることも確認
-                    assert(prod_token.value().reserve < prod_token.value().write);
-                } else if new_write > last as nat {
-                     assert(prod_token.value().last == max as nat);
-                }
-                assert(prod_token.value().write == write as nat);
+                assert(new_write == max ==> prod_token.value().last == max) by {
+                    if new_write == max {
+                        assert(write <= max);
+                        assert(!(new_write < write));
+                        if new_write > last {
+                            // このパスでは上で assert(prod_token.last==max) を入れてあるので、もう終わり
+                            assert(prod_token.value().last == max as nat);
+                        } else {
+                            // ここは new_write==max かつ !(new_write>last) なので max <= last が言える
+                            assert(!(new_write > last));
+                            assert(max <= last);
+
+                            // さらに last <= max が必要（これが握れてないとここが詰む）
+                            // 典型は「last <= max」(or prod_token.last <= max) をどこかの invariant / wf から引く
+                            assert(last <= max);
+
+                            // よって last == max
+                            assert(last == max);
+
+                            // load_last_at_commit 直後に入れた橋より prod_token.last == last
+                            assert(prod_token.value().last == last as int);
+
+                            // したがって prod_token.last == max
+                            assert(prod_token.value().last == max as int);
+                        }
+                    }
+                };
+                self.vbq.instance.borrow().check_write_equality(&write_token, &prod_token);
                 let _ = self.vbq.instance.borrow().store_write_at_commit(new_write as nat, &mut write_token, &mut prod_token);
             }
         );
