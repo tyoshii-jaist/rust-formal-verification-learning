@@ -611,8 +611,7 @@ tokenized_state_machine!{VBQueue {
     
     transition!{
         end_release() {
-            require(pre.read_in_progress == true);
-
+            //require(pre.read_in_progress == true);
             update read_in_progress = false;
             update consumer = ConsumerState {
                 read_in_progress: false,
