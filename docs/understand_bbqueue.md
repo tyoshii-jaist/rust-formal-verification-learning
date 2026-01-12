@@ -356,3 +356,6 @@ split_read、frame 機能などは対応しない。
 write_in_progress 状態でのみ write ~ reserve の間を Prod に貸し出す。reserve は増やされる可能性があるので、そうすると貸し出しも増やす。
 
 read_in_progress 状態でのみ read ~ write または read ~ last の間を Prod に貸し出す。read 位置は調整される可能性があるおで、その際には貸し出し領域も変更する。
+
+
+commit と release では　-> Tracked<ProducerToken>　として値を返さなければならない。

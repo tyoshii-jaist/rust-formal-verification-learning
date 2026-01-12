@@ -120,6 +120,17 @@ tokenized_state_machine!{VBQueue {
     }
 
     #[invariant]
+    pub fn valid_zoning(&self) -> bool {
+        {
+            ||| self.read <= self.write <= self.reserve <= self.length
+            // not inverted & reserve wrap
+            ||| self.reserve < self.read <= self.write <= self.length
+            // inverted (write < read_obs) & read not wrap
+            ||| self.write <= self.reserve < self.read <= self.last <= self.length
+        }
+    }
+
+    #[invariant]
     pub fn valid_no_write_in_progress_implies_no_read_obs(&self) -> bool {
         self.producer.write_in_progress == false ==> self.producer.read_obs is None
     }
@@ -673,6 +684,15 @@ tokenized_state_machine!{VBQueue {
     }
 
     transition!{
+        check_read_is_le_last_in_inverted() {
+            if pre.consumer.write_obs is Some && pre.consumer.last_obs is Some && pre.consumer.write_obs->Some_0 < pre.consumer.read {
+                assert(pre.consumer.read <= pre.consumer.last_obs->Some_0);
+                assert(pre.consumer.read == pre.read);
+            }
+        }
+    }
+
+    transition!{
         check_consumer_obs_in_range() {
             if pre.consumer.write_obs is Some {
                 assert(pre.consumer.write_obs->Some_0 <= pre.length);
@@ -704,7 +724,6 @@ tokenized_state_machine!{VBQueue {
     fn load_read_at_grant_inductive(pre: Self, post: Self) {
         assert(pre.write == pre.reserve);
     }
-
 
     #[inductive(do_reserve)]
     fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
@@ -793,6 +812,9 @@ tokenized_state_machine!{VBQueue {
 
     #[inductive(check_read_in_progress_equality)]
     fn check_read_in_progress_equality_inductive(pre: Self, post: Self) { }
+
+    #[inductive(check_read_is_le_last_in_inverted)]
+    fn check_read_is_le_last_in_inverted_inductive(pre: Self, post: Self) { }    
 }}
 
 struct_with_invariants!{
@@ -1372,6 +1394,8 @@ impl Consumer {
         let mut read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
                 let tracked ret = self.vbq.instance.borrow().load_read_at_read(&read_token, &cons_token);
+                self.vbq.instance.borrow().check_read_is_le_last_in_inverted(&read_token, &cons_token);
+                assert(write < read_token.value() ==> read_token.value() <= last);
             }
         );
 
@@ -1406,7 +1430,6 @@ impl Consumer {
             last
         } else {
             // Not inverted, only believe write
-            assume(write >= read);
             write
         } - read;
 
