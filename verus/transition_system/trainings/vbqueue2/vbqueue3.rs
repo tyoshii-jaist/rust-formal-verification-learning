@@ -34,6 +34,14 @@ impl ProducerState {
     pub open spec fn grant_sz(&self) -> int {
         self.grant_end() - self.grant_start()
     }
+
+    pub open spec fn is_idle(&self) -> bool {
+        self.write_in_progress == false && self.read_obs is None
+    }
+
+    pub open spec fn is_granted(&self, sz: nat) -> bool {
+        self.write_in_progress == true && self.read_obs is Some && self.grant_sz() == sz
+    }
 }
 
 pub struct ConsumerState {
@@ -65,6 +73,14 @@ impl ConsumerState {
 
     pub open spec fn grant_sz(&self) -> int {
         self.grant_end() - self.grant_start()
+    }
+
+    pub open spec fn is_idle(&self) -> bool {
+        self.read_in_progress == false && self.last_obs is None && self.write_obs is None
+    }
+
+    pub open spec fn is_granted(&self, sz: nat) -> bool {
+        self.read_in_progress == true && self.last_obs is Some && self.write_obs is Some && self.grant_sz() == sz
     }
 }
 
@@ -623,6 +639,12 @@ tokenized_state_machine!{VBQueue {
     }
 
     transition!{
+        check_write_in_progress_equality() {
+            assert(pre.producer.write_in_progress == pre.write_in_progress);
+        }
+    }
+
+    transition!{
         check_write_equality() {
             assert(pre.producer.write == pre.write);
             assert(pre.write <= pre.length);
@@ -658,6 +680,12 @@ tokenized_state_machine!{VBQueue {
             if pre.consumer.last_obs is Some {
                 assert(pre.consumer.last_obs->Some_0 <= pre.length);
             }
+        }
+    }
+
+    transition!{
+        check_read_in_progress_equality() {
+            assert(pre.consumer.read_in_progress == pre.read_in_progress);
         }
     }
 
@@ -745,6 +773,9 @@ tokenized_state_machine!{VBQueue {
     #[inductive(end_release)]
     fn end_release_inductive(pre: Self, post: Self) { }
 
+    #[inductive(check_write_in_progress_equality)]
+    fn check_write_in_progress_equality_inductive(pre: Self, post: Self) { }
+
     #[inductive(check_write_equality)]
     fn check_write_equality_inductive(pre: Self, post: Self) { }
 
@@ -759,6 +790,9 @@ tokenized_state_machine!{VBQueue {
 
     #[inductive(check_consumer_obs_in_range)]
     fn check_consumer_obs_in_range_inductive(pre: Self, post: Self) { }
+
+    #[inductive(check_read_in_progress_equality)]
+    fn check_read_in_progress_equality_inductive(pre: Self, post: Self) { }
 }}
 
 struct_with_invariants!{
@@ -832,14 +866,10 @@ impl VBBuffer {
     pub closed spec fn is_splittable(&self) -> bool {
         &&& self.producer@ is Some
         &&& self.producer@->0.instance_id() == self.instance@.id()
-        &&& (
-            self.producer@->0.value().write_in_progress == false ==> 
-                self.producer@->0.value().read_obs is None
-        )
+        &&& self.producer@->0.value().is_idle()
         &&& self.consumer@ is Some
         &&& self.consumer@->0.instance_id() == self.instance@.id()
-        &&& self.consumer@->0.value().write_obs is None
-        &&& self.consumer@->0.value().last_obs is None  
+        &&& self.consumer@->0.value().is_idle()
     }
 }
 
@@ -956,19 +986,13 @@ impl Producer {
     pub closed spec fn is_idle(&self) -> bool {
         &&& self.producer@ is Some
         &&& self.producer@->0.instance_id() == self.vbq.instance@.id()
-        &&& (
-            self.producer@->0.value().write_in_progress == false ==> 
-                self.producer@->0.value().read_obs is None
-        )
+        &&& self.producer@->0.value().is_idle()
     }
 
     pub closed spec fn is_granted(&self, sz: nat) -> bool {
         &&& self.producer@ is Some
         &&& self.producer@->0.instance_id() == self.vbq.instance@.id()
-        &&& (
-            self.producer@->0.value().write_in_progress == true ==> 
-                self.producer@->0.value().read_obs is Some && self.producer@->0.value().grant_sz() == sz
-        )
+        &&& self.producer@->0.value().is_granted(sz)
     }
 }
 
@@ -985,13 +1009,7 @@ impl Producer {
             self.wf(),
             match r {
                 Ok(wgr) => {
-                    &&& wgr.vbq.wf()
-                    &&& wgr.buf.len() == sz
-                    &&& wgr.is_granted(sz as nat)
-                    &&& match wgr.producer@ {
-                        Some(prod) => prod.instance_id() == self.vbq.instance@.id(),
-                        _ => false,
-                    }
+                    &&& wgr.commit_callable(sz as nat)
                 },
                 _ => true
             },
@@ -1136,33 +1154,28 @@ struct GrantW {
 }
 
 impl GrantW {
-    pub closed spec fn is_granted(&self, sz: nat) -> bool {
+    pub closed spec fn commit_callable(&self, sz: nat) -> bool {
+        &&& self.vbq.wf()
+        &&& self.buf.len() as nat == sz
         &&& self.producer@ is Some
         &&& self.producer@->0.instance_id() == self.vbq.instance@.id()
-        &&& (
-            self.producer@->0.value().write_in_progress == true ==> 
-                self.producer@->0.value().read_obs is Some && self.producer@->0.value().grant_sz() == sz
-        )
+        &&& self.producer@->0.value().is_idle() || self.producer@->0.value().is_granted(sz)
+    }
+
+    pub closed spec fn commit_called(&self) -> bool {
+        &&& self.vbq.wf()
+        &&& self.producer@ is None
     }
 }
 
 impl GrantW {
-    fn commit(&mut self, used: usize)
+    fn commit(&mut self, used: usize) -> (prod_token: Tracked<VBQueue::producer>)
         requires
-            old(self).vbq.wf(),
+            old(self).commit_callable(old(self).buf.len() as nat),
             used <= old(self).buf.len(),
-            old(self).is_granted(old(self).buf.len() as nat),
-            match old(self).producer@ {
-                Some(prod) => prod.instance_id() == old(self).vbq.instance@.id(),
-                _ => false,
-            }
         ensures
-            self.vbq.wf(),
-            /*
-            match self.producer@ {
-                Some(prod) => prod.instance_id() == self.vbq.instance@.id(),
-                _ => false,
-            } */
+            self.commit_called(),
+            prod_token@.value().is_idle(),
     {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
@@ -1171,15 +1184,18 @@ impl GrantW {
 
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => load();
-                update prev -> next;
                 returning ret;
                 ghost write_in_progress_token => {
+                    self.vbq.instance.borrow().check_write_in_progress_equality(&write_in_progress_token, &prod_token);
                     let _ = self.vbq.instance.borrow().start_commit(self.buf.len() as nat, &mut write_in_progress_token, &prod_token);
+                    if !ret {
+                        assert(prod_token.value().is_idle());
+                    }
                 }
         );
 
         if !is_write_in_progress {
-            return;
+            return Tracked(prod_token);
         }
 
         // Writer component. Must never write to READ,
@@ -1273,6 +1289,8 @@ impl GrantW {
                 assert(write_in_progress_token.value() == false);
             }
         );
+
+        return Tracked(prod_token);
     }
 
     /// Configures the amount of bytes to be commited on drop.
@@ -1294,8 +1312,7 @@ impl Consumer {
     pub closed spec fn is_idle(&self) -> bool {
         &&& self.consumer@ is Some
         &&& self.consumer@->0.instance_id() == self.vbq.instance@.id()
-        &&& self.consumer@->0.value().write_obs is None
-        &&& self.consumer@->0.value().last_obs is None  
+        &&& self.consumer@->0.value().is_idle()
     }
 }
 
@@ -1306,15 +1323,8 @@ impl Consumer {
             old(self).is_idle(),
         ensures
             match r {
-                Ok(rgr) => {
-                    &&& rgr.vbq.wf()
-                    &&& rgr.is_granted(rgr.buf.len() as nat)
-                    &&& match rgr.consumer@ {
-                        Some(cons) => cons.instance_id() == self.vbq.instance@.id(),
-                        _ => false,
-                    }
-                },
-                _ => true
+                Ok(rgr) => rgr.releasable(rgr.buf.len() as nat),
+                _ => true,
             },
     {
         let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
@@ -1441,14 +1451,17 @@ struct GrantR {
 }
 
 impl GrantR {
-    pub closed spec fn is_granted(&self, sz: nat) -> bool {
+    pub closed spec fn releasable(&self, sz: nat) -> bool {
+        &&& self.vbq.wf()
+        &&& self.buf.len() as nat == sz
         &&& self.consumer@ is Some
         &&& self.consumer@->0.instance_id() == self.vbq.instance@.id()
-        &&& (
-            self.consumer@->0.value().read_in_progress == true ==> 
-                self.consumer@->0.value().write_obs is Some && self.consumer@->0.value().last_obs is Some && self.consumer@->0.value().grant_sz() == sz
-        )
-        //&&& self.consumer@->0.value().read + sz <= self.vbq.length
+        &&& self.consumer@->0.value().is_idle() || self.consumer@->0.value().is_granted(sz)
+    }
+
+    pub closed spec fn released(&self) -> bool {
+        &&& self.vbq.wf()
+        &&& self.consumer@ is None
     }
 }
 
@@ -1458,10 +1471,7 @@ impl GrantR {
     )
         requires
             used <= old(self).buf.len(),
-
-            //old(self).wf_with_buf_perms(buf_perms),
-            old(self).vbq.wf(),
-            old(self).is_granted(old(self).buf.len() as nat),
+            old(self).releasable(old(self).buf.len() as nat),
         ensures
             self.vbq.wf(),
 
