@@ -828,6 +828,21 @@ struct_with_invariants!{
     }
 }
 
+impl VBBuffer {
+    pub closed spec fn is_splittable(&self) -> bool {
+        &&& self.producer@ is Some
+        &&& self.producer@->0.instance_id() == self.instance@.id()
+        &&& (
+            self.producer@->0.value().write_in_progress == false ==> 
+                self.producer@->0.value().read_obs is None
+        )
+        &&& self.consumer@ is Some
+        &&& self.consumer@->0.instance_id() == self.instance@.id()
+        &&& self.consumer@->0.value().write_obs is None
+        &&& self.consumer@->0.value().last_obs is None  
+    }
+}
+
 impl VBBuffer
 {
     fn new(length: usize) -> (r: Self)
@@ -836,10 +851,7 @@ impl VBBuffer
             length > 0, // TODO: 元の BBQueue はこの制約は持っていない。0で使うことはないと思うが。
         ensures
             r.wf(),
-            match (r.producer@, r.consumer@) {
-                (Some(_), Some(_)) => true,
-                _ => false,
-            }
+            r.is_splittable(),
     {
         let tracked (
             Tracked(instance),
@@ -884,15 +896,14 @@ impl VBBuffer
     fn try_split(self) -> (res: Result<(Producer, Consumer),  &'static str>)
         requires
             self.wf(),
-            match (self.producer@, self.consumer@) {
-                (Some(prod), Some(cons)) => prod.instance_id() == self.instance@.id() && cons.instance_id() == self.instance@.id(),
-                _ => false,
-            }
+            self.is_splittable(),
         ensures
             match res {
                 Ok((prod, cons)) => {
                     &&& prod.wf()
+                    &&& prod.is_idle()
                     &&& cons.wf()
+                    &&& cons.is_idle()
                 }, 
                 Err(_) => true
             },
@@ -974,6 +985,7 @@ impl Producer {
             self.wf(),
             match r {
                 Ok(wgr) => {
+                    &&& wgr.vbq.wf()
                     &&& wgr.buf.len() == sz
                     &&& wgr.is_granted(sz as nat)
                     &&& match wgr.producer@ {
@@ -1295,6 +1307,7 @@ impl Consumer {
         ensures
             match r {
                 Ok(rgr) => {
+                    &&& rgr.vbq.wf()
                     &&& rgr.is_granted(rgr.buf.len() as nat)
                     &&& match rgr.consumer@ {
                         Some(cons) => cons.instance_id() == self.vbq.instance@.id(),
@@ -1505,25 +1518,91 @@ impl GrantR {
         self.to_release = self.buf.len().min(amt);
     }
 }
-
-
 fn main() {
-    /*
     let vbuf = VBBuffer::new(6);
     let (mut prod, mut cons) = match vbuf.try_split() {
-        Ok((prod, cons)) => (prod, cons),
-        Err(_) => {
-            return;
-        }
+        Ok((p, c)) => (p, c),
+        Err(_) => return,
     };
 
-    // Request space for one byte
-    match prod.grant_exact(2) {
-        Ok(wgr) => {
-            wgr.commit(2);
-        },
-        _ => {}
+    // ---- phase 1: write 5, read 5 (advance read to 5) ----
+    {
+        let mut wgr = match prod.grant_exact(5) {
+            Ok(w) => w,
+            Err(_) => return,
+        };
+        // 必要なら長さチェック（bufフィールド名が違うなら調整）
+        if wgr.buf.len() != 5 { return; }
+        wgr.commit(5);
+
+        let mut rgr = match cons.read() {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+        if rgr.buf.len() != 5 { return; }
+        rgr.release(5);
     }
-     */
+
+    // ---- phase 2: wrap with "skip end chunk" (write=5, read=5, sz=4 -> start=0) ----
+    // This should set last := old write (=5) during commit, then write := 4.
+    {
+        let mut wgr = match prod.grant_exact(4) {
+            Ok(w) => w,
+            Err(_) => return,
+        };
+        if wgr.buf.len() != 4 { return; }
+        wgr.commit(4);
+
+        let mut rgr = match cons.read() {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+        if rgr.buf.len() != 4 { return; }
+        rgr.release(4);
+    }
+
+    // ---- phase 3: unlock last back to max (last was 5, now new_write should become 6) ----
+    {
+        let mut wgr = match prod.grant_exact(2) {
+            Ok(w) => w,
+            Err(_) => return,
+        };
+        if wgr.buf.len() != 2 { return; }
+        wgr.commit(2);
+
+        let mut rgr = match cons.read() {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+        if rgr.buf.len() != 2 { return; }
+        rgr.release(2);
+    }
+
+    // ---- phase 4: wrap when old write == max (write=6, read=6, sz=1 -> start=0) ----
+    // This time "skip" branch should NOT trigger because pre.write == max.
+    {
+        let mut wgr = match prod.grant_exact(1) {
+            Ok(w) => w,
+            Err(_) => return,
+        };
+        if wgr.buf.len() != 1 { return; }
+        wgr.commit(1);
+
+        let mut rgr = match cons.read() {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+        if rgr.buf.len() != 1 { return; }
+        rgr.release(1);
+    }
+
+    // ---- phase 5: empty read should fail ----
+    {
+        match cons.read() {
+            Ok(_) => return,
+            Err(_) => { /* OK */ }
+        }
+    }
 }
+
 }
