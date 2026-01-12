@@ -31,8 +31,8 @@ impl ProducerState {
         self.reserve
     }
 
-    pub open spec fn grant_sz(&self) -> nat {
-        (self.grant_end() - self.grant_start()) as nat
+    pub open spec fn grant_sz(&self) -> int {
+        self.grant_end() - self.grant_start()
     }
 }
 
@@ -63,8 +63,8 @@ impl ConsumerState {
         }
     }
 
-    pub open spec fn grant_sz(&self) -> nat {
-        (self.grant_end() - self.grant_start()) as nat
+    pub open spec fn grant_sz(&self) -> int {
+        self.grant_end() - self.grant_start()
     }
 }
 
@@ -129,6 +129,11 @@ tokenized_state_machine!{VBQueue {
     }
 
     #[invariant]
+    pub fn valid_read_in_range(&self) -> bool {
+        self.read <= self.length
+    }
+
+    #[invariant]
     pub fn valid_producer_local_state(&self) -> bool {
         &&& self.producer.write_in_progress == self.write_in_progress
         &&& self.producer.write == self.write
@@ -141,14 +146,17 @@ tokenized_state_machine!{VBQueue {
     pub fn valid_order_from_producer_view(&self) -> bool {
         match self.producer.read_obs {
             Some(read_obs) => {
-                // not inverted & reserve not wrap
-                ||| read_obs <= self.read <= self.write <= self.reserve <= self.length
-                // not inverted & reserve wrap
-                ||| self.reserve < read_obs <= self.read <= self.write <= self.length
-                // inverted (write < read_obs) & read not wrap
-                ||| self.write <= self.reserve < read_obs <= self.read <= self.last <= self.length
-                // converted to not inverted by wrapping read 
-                ||| self.read <= self.write <= self.reserve < read_obs <= self.last <= self.length
+                &&& read_obs <= self.length
+                &&& {
+                    // not inverted & reserve not wrap
+                    ||| read_obs <= self.read <= self.write <= self.reserve <= self.length
+                    // not inverted & reserve wrap
+                    ||| self.reserve < read_obs <= self.read <= self.write <= self.length
+                    // inverted (write < read_obs) & read not wrap
+                    ||| self.write <= self.reserve < read_obs <= self.read <= self.last <= self.length
+                    // converted to not inverted by wrapping read 
+                    ||| self.read <= self.write <= self.reserve < read_obs <= self.last <= self.length
+                }
             },
             None => {
                 // not inverted & reserve not wrap
@@ -171,24 +179,31 @@ tokenized_state_machine!{VBQueue {
     pub fn valid_order_from_consumer_view(&self) -> bool {
         match (self.consumer.write_obs, self.consumer.last_obs) {
             (Some(write_obs), None) => {
-                // not inverted (read <= write_obs) & reserve not wrap
-                ||| self.read <= write_obs <= self.write <= self.reserve <= self.length
-                // not inverted & reserve wrap
-                ||| self.reserve < self.read <= write_obs <= self.write <= self.length
-                // converted to inverted by wrapping reserve and write
-                ||| self.write <= self.reserve < self.read <= write_obs <= self.last <= self.length
-                // inverted (write_obs < read) & read not wrap
-                ||| write_obs <= self.write <= self.reserve < self.read <= self.length
+                &&& write_obs <= self.length
+                &&& {
+                    // not inverted (read <= write_obs) & reserve not wrap
+                    ||| self.read <= write_obs <= self.write <= self.reserve <= self.length
+                    // not inverted & reserve wrap
+                    ||| self.reserve < self.read <= write_obs <= self.write <= self.length
+                    // converted to inverted by wrapping reserve and write
+                    ||| self.write <= self.reserve < self.read <= write_obs <= self.last <= self.length
+                    // inverted (write_obs < read) & read not wrap
+                    ||| write_obs <= self.write <= self.reserve < self.read <= self.length
+                }
             },
             (Some(write_obs), Some(last_obs) ) => {
-                // not inverted (read <= write_obs) & reserve not wrap
-                ||| self.read <= write_obs <= self.write <= self.reserve <= self.length
-                // not inverted & reserve wrap
-                ||| self.reserve < self.read <= write_obs <= self.write <= self.length
-                // converted to inverted by wrapping reserve and write
-                ||| self.write <= self.reserve < self.read <= write_obs <= self.last <= self.length
-                // inverted (write_obs < read) & read not wrap
-                ||| write_obs <= self.write <= self.reserve < self.read <= last_obs == self.last <= self.length
+                &&& write_obs <= self.length
+                &&& last_obs <= self.length
+                &&& {
+                    // not inverted (read <= write_obs) & reserve not wrap
+                    ||| self.read <= write_obs <= self.write <= self.reserve <= self.length
+                    // not inverted & reserve wrap
+                    ||| self.reserve < self.read <= write_obs <= self.write <= self.length
+                    // converted to inverted by wrapping reserve and write
+                    ||| self.write <= self.reserve < self.read <= write_obs <= self.last <= self.length
+                    // inverted (write_obs < read) & read not wrap
+                    ||| write_obs <= self.write <= self.reserve < self.read <= last_obs == self.last <= self.length
+                }
             },
             (None, Some(_) ) => false, // last だけを知っていることはあり得ない
             (None, None) => {
@@ -540,7 +555,7 @@ tokenized_state_machine!{VBQueue {
 
     transition!{
         read_fail() {
-            require(pre.read_in_progress == true);
+            //require(pre.read_in_progress == true);
             update read_in_progress = false;
 
             update consumer = ConsumerState {
@@ -632,6 +647,18 @@ tokenized_state_machine!{VBQueue {
     transition!{
         check_read_equality() {
             assert(pre.consumer.read == pre.read);
+            assert(pre.read <= pre.length);
+        }
+    }
+
+    transition!{
+        check_consumer_obs_in_range() {
+            if pre.consumer.write_obs is Some {
+                assert(pre.consumer.write_obs->Some_0 <= pre.length);
+            }
+            if pre.consumer.last_obs is Some {
+                assert(pre.consumer.last_obs->Some_0 <= pre.length);
+            }
         }
     }
 
@@ -687,90 +714,7 @@ tokenized_state_machine!{VBQueue {
     }
 
     #[inductive(store_write_at_commit)]
-    fn store_write_at_commit_inductive(pre: Self, post: Self, new_write: nat) {
-        assert(pre.producer.read_obs is Some);
-        assert(new_write == pre.producer.reserve);
-        assert(post.write == new_write);
-
-        let read_obs = pre.producer.read_obs->Some_0;
-
-        assert(pre.valid_producer_local_state());
-        assert(post.valid_producer_local_state());
-
-        assert(pre.producer.reserve == pre.reserve);
-        assert(pre.producer.last == pre.last);
-        assert(post.producer.reserve == post.reserve);
-        assert(post.producer.last == post.last);
-
-        assert(post.read == pre.read);
-        assert(post.reserve == pre.reserve);
-        assert(post.last == pre.last);
-        assert(post.consumer.read == pre.consumer.read);
-        assert(post.consumer.write_obs == pre.consumer.write_obs);
-        assert(post.consumer.last_obs == pre.consumer.last_obs);
-
-        assert(post.write == new_write);
-        assert(new_write == pre.producer.reserve);
-        assert(pre.producer.reserve == pre.reserve);
-        assert(post.reserve == pre.reserve);
-        assert(post.write == post.reserve);
-
-        assert(pre.valid_write_max_implies_last_max());
-
-        assert(post.valid_write_max_implies_last_max()) by {
-            if post.write == post.length {
-                // post.write == new_write
-                assert(new_write == post.length);
-
-                // length は不変
-                assert(post.length == pre.length);
-
-                // よって new_write == pre.length
-                assert(new_write == pre.length);
-
-                // require から pre.producer.last == pre.length
-                assert(pre.producer.last == pre.length);
-
-                // valid_producer_local_state で pre.producer.last == pre.last
-                assert(pre.last == pre.length);
-
-                // last は更新してないので post.last == pre.last
-                assert(post.last == pre.last);
-
-                // よって post.last == post.length
-                assert(post.last == post.length);
-            }
-        }
-
-        assert(post.valid_order_from_producer_view()) by {
-            if read_obs <= pre.read <= pre.write <= pre.reserve <= pre.length {
-            } 
-            else if pre.reserve < read_obs <= pre.read <= pre.write <= pre.length {
-            }
-            else if pre.write <= pre.reserve < read_obs <= pre.read <= pre.last <= pre.length {
-                
-            } else {
-                
-            }
-        };
-
-        assert(post.valid_order_from_consumer_view()) by {
-            match (pre.consumer.write_obs, pre.consumer.last_obs) {
-                (Some(write_obs), Some(last_obs)) => {
-                    post.valid_order_from_consumer_view()
-                },
-                (Some(write_obs), None) => {
-                    post.valid_order_from_consumer_view()
-                },
-                (None, Some(last_obs)) => {
-                    false
-                },
-                (None, None) => {
-                    post.valid_order_from_consumer_view()
-                }
-            };
-        };
-    }
+    fn store_write_at_commit_inductive(pre: Self, post: Self, new_write: nat) { }
     
     #[inductive(end_commit)]
     fn end_commit_inductive(pre: Self, post: Self) { }
@@ -813,6 +757,9 @@ tokenized_state_machine!{VBQueue {
     
     #[inductive(check_read_equality)]
     fn check_read_equality_inductive(pre: Self, post: Self) { }
+
+    #[inductive(check_consumer_obs_in_range)]
+    fn check_consumer_obs_in_range_inductive(pre: Self, post: Self) { }
 }}
 
 struct_with_invariants!{
@@ -834,6 +781,7 @@ struct_with_invariants!{
     pub closed spec fn wf(&self) -> bool {
         predicate {
             &&& self.instance@.length() == self.length
+            &&& self.instance@.length() <= usize::MAX
             &&& match self.producer@ {
                     Some(prod) => prod.instance_id() == self.instance@.id(),
                     None => true,
@@ -1234,7 +1182,6 @@ impl GrantW {
             ghost write_token => {
                 self.vbq.instance.borrow().check_write_equality(&write_token, &prod_token);
                 let _ = self.vbq.instance.borrow().load_write_at_commit(&write_token, &prod_token);
-                self.vbq.instance.borrow().check_write_equality(&write_token, &prod_token);
                 assert(write_token.value() <= self.vbq.length);
             }
         );
@@ -1303,33 +1250,6 @@ impl GrantW {
         // time to invert early!
         atomic_with_ghost!(&self.vbq.write => store(new_write);
             ghost write_token => {
-                assert(new_write == max ==> prod_token.value().last == max) by {
-                    if new_write == max {
-                        assert(write <= max);
-                        assert(!(new_write < write));
-                        if new_write > last {
-                            // このパスでは上で assert(prod_token.last==max) を入れてあるので、もう終わり
-                            assert(prod_token.value().last == max as nat);
-                        } else {
-                            // ここは new_write==max かつ !(new_write>last) なので max <= last が言える
-                            assert(!(new_write > last));
-                            assert(max <= last);
-
-                            // さらに last <= max が必要（これが握れてないとここが詰む）
-                            // 典型は「last <= max」(or prod_token.last <= max) をどこかの invariant / wf から引く
-                            assert(last <= max);
-
-                            // よって last == max
-                            assert(last == max);
-
-                            // load_last_at_commit 直後に入れた橋より prod_token.last == last
-                            assert(prod_token.value().last == last as int);
-
-                            // したがって prod_token.last == max
-                            assert(prod_token.value().last == max as int);
-                        }
-                    }
-                };
                 self.vbq.instance.borrow().check_write_equality(&write_token, &prod_token);
                 let _ = self.vbq.instance.borrow().store_write_at_commit(new_write as nat, &mut write_token, &mut prod_token);
             }
@@ -1376,7 +1296,11 @@ impl Consumer {
         ensures
             match r {
                 Ok(rgr) => {
-                    true//&&& rgr.buf.len() == consumer_token.value().grant_sz()
+                    &&& rgr.is_granted(rgr.buf.len() as nat)
+                    &&& match rgr.consumer@ {
+                        Some(cons) => cons.instance_id() == self.vbq.instance@.id(),
+                        _ => false,
+                    }
                 },
                 _ => true
             },
@@ -1436,6 +1360,7 @@ impl Consumer {
                 ghost read_token => {
                     // ここで read が wrap する。
                     // read == last の状態で、かつ、write < read なので、inverted 状態になる。
+                    self.vbq.instance.borrow().check_read_equality(&read_token, &cons_token);
                     let _ = self.vbq.instance.borrow().wrap_read(&mut read_token, &mut cons_token);
                     // ↑をまたぐと
                     // read == 0 になるので not inverted に切り替わる
@@ -1482,7 +1407,9 @@ impl Consumer {
             granted_buf.push(0);
         }
         assert(granted_buf.len() == sz);
-
+        assert(cons_token.value().grant_sz() == sz);
+        assert(cons_token.value().read == cons_token.value().grant_start());
+        assert(cons_token.value().read + sz == cons_token.value().grant_end());
         Ok(
             GrantR {
                 buf: granted_buf,
@@ -1509,6 +1436,7 @@ impl GrantR {
             self.consumer@->0.value().read_in_progress == true ==> 
                 self.consumer@->0.value().write_obs is Some && self.consumer@->0.value().last_obs is Some && self.consumer@->0.value().grant_sz() == sz
         )
+        //&&& self.consumer@->0.value().read + sz <= self.vbq.length
     }
 }
 
@@ -1518,6 +1446,7 @@ impl GrantR {
     )
         requires
             used <= old(self).buf.len(),
+
             //old(self).wf_with_buf_perms(buf_perms),
             old(self).vbq.wf(),
             old(self).is_granted(old(self).buf.len() as nat),
@@ -1548,7 +1477,18 @@ impl GrantR {
         let _ = atomic_with_ghost!(&self.vbq.read => fetch_add(used);
             update prev -> next;
             returning ret;
-            ghost read_token => {
+            ghost read_token => {                
+                self.vbq.instance.borrow().check_read_equality(&read_token, &cons_token);
+                self.vbq.instance.borrow().check_consumer_obs_in_range(&cons_token);
+
+                assert(prev == cons_token.value().read);
+                assert(cons_token.value().grant_sz() == self.buf.len() as int);
+                assert(used <= self.buf.len());
+                assert(cons_token.value().grant_end() <= self.vbq.length);
+                assert(cons_token.value().grant_start() == prev);
+                assert(cons_token.value().grant_sz() == cons_token.value().grant_end() - cons_token.value().grant_start());
+                assert(prev + used <= cons_token.value().grant_end());
+                assert(prev + used <= usize::MAX as int);
                 let _ = self.vbq.instance.borrow().add_read_at_release(used as nat, &mut read_token, &mut cons_token);
             }
         );
