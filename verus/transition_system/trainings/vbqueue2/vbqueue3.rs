@@ -984,12 +984,14 @@ impl Producer {
     }
 
     pub closed spec fn is_idle(&self) -> bool {
+        &&& self.wf()
         &&& self.producer@ is Some
         &&& self.producer@->0.instance_id() == self.vbq.instance@.id()
         &&& self.producer@->0.value().is_idle()
     }
 
     pub closed spec fn is_granted(&self, sz: nat) -> bool {
+        &&& self.wf()
         &&& self.producer@ is Some
         &&& self.producer@->0.instance_id() == self.vbq.instance@.id()
         &&& self.producer@->0.value().is_granted(sz)
@@ -1001,14 +1003,12 @@ impl Producer {
         requires
             old(self).wf(),
             old(self).is_idle(),
-            match old(self).producer@ {
-                Some(prod) => true, //prod.instance_id() == old(self).vbq.instance@.id(),
-                _ => false,
-            }
         ensures
             self.wf(),
             match r {
                 Ok(wgr) => {
+                    &&& wgr.vbq.instance@.id() == self.vbq.instance@.id()
+                    &&& wgr.producer@->0.instance_id() == old(self).producer@->0.instance_id()
                     &&& wgr.commit_callable(sz as nat)
                 },
                 _ => true
@@ -1036,6 +1036,7 @@ impl Producer {
         );
 
         if is_write_in_progress {
+            self.producer = Tracked(Some(prod_token));
             return Err("write in progress");
         }
 
@@ -1175,6 +1176,8 @@ impl GrantW {
             used <= old(self).buf.len(),
         ensures
             self.commit_called(),
+            prod_token@.instance_id() == old(self).producer@->0.instance_id(),
+            prod_token@.instance_id() == self.vbq.instance@.id(),
             prod_token@.value().is_idle(),
     {
         // If there is no grant in progress, return early. This
@@ -1322,8 +1325,13 @@ impl Consumer {
             old(self).wf(),
             old(self).is_idle(),
         ensures
+            self.wf(),
             match r {
-                Ok(rgr) => rgr.releasable(rgr.buf.len() as nat),
+                Ok(rgr) => {
+                    &&& rgr.vbq.instance@.id() == self.vbq.instance@.id()
+                    &&& rgr.consumer@->0.instance_id() == old(self).consumer@->0.instance_id()
+                    &&& rgr.releasable(rgr.buf.len() as nat)
+                },
                 _ => true,
             },
     {
@@ -1468,13 +1476,16 @@ impl GrantR {
 impl GrantR {
     fn release(&mut self,
         used: usize
-    )
+    ) -> (cons_token: Tracked<VBQueue::consumer>)
         requires
             used <= old(self).buf.len(),
             old(self).releasable(old(self).buf.len() as nat),
         ensures
             self.vbq.wf(),
-
+            self.released(),
+            cons_token@.instance_id() == old(self).consumer@->0.instance_id(),
+            cons_token@.instance_id() == self.vbq.instance@.id(),
+            cons_token@.value().is_idle(),
     {
         let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
 
@@ -1489,7 +1500,7 @@ impl GrantR {
         );
 
         if !is_read_in_progress {
-            return;
+            return Tracked(cons_token);
         }
 
         // This should always be checked by the public interfaces
@@ -1521,6 +1532,8 @@ impl GrantR {
                 assert(read_in_progress_token.value() == false);
             }
         );
+
+        return Tracked(cons_token);
     }
 
     /// Configures the amount of bytes to be released on drop.
@@ -1541,16 +1554,21 @@ fn main() {
             Ok(w) => w,
             Err(_) => return,
         };
-        // 必要なら長さチェック（bufフィールド名が違うなら調整）
         if wgr.buf.len() != 5 { return; }
-        wgr.commit(5);
+        let Tracked(prod_token) = wgr.commit(5);
+        assert(prod_token.instance_id() == wgr.vbq.instance@.id());
+        assert(prod_token.instance_id() == prod.vbq.instance@.id());
+        assert(prod_token.value().is_idle());
+
+        prod.producer = Tracked(Some(prod_token));
 
         let mut rgr = match cons.read() {
             Ok(r) => r,
             Err(_) => return,
         };
         if rgr.buf.len() != 5 { return; }
-        rgr.release(5);
+        let Tracked(cons_token) = rgr.release(5);
+        cons.consumer = Tracked(Some(cons_token));
     }
 
     // ---- phase 2: wrap with "skip end chunk" (write=5, read=5, sz=4 -> start=0) ----
@@ -1561,14 +1579,17 @@ fn main() {
             Err(_) => return,
         };
         if wgr.buf.len() != 4 { return; }
-        wgr.commit(4);
+        let Tracked(prod_token) = wgr.commit(4);
+
+        prod.producer = Tracked(Some(prod_token));
 
         let mut rgr = match cons.read() {
             Ok(r) => r,
             Err(_) => return,
         };
         if rgr.buf.len() != 4 { return; }
-        rgr.release(4);
+        let Tracked(cons_token) = rgr.release(4);
+        cons.consumer = Tracked(Some(cons_token));
     }
 
     // ---- phase 3: unlock last back to max (last was 5, now new_write should become 6) ----
@@ -1578,14 +1599,17 @@ fn main() {
             Err(_) => return,
         };
         if wgr.buf.len() != 2 { return; }
-        wgr.commit(2);
+        let Tracked(prod_token) = wgr.commit(2);
+
+        prod.producer = Tracked(Some(prod_token));
 
         let mut rgr = match cons.read() {
             Ok(r) => r,
             Err(_) => return,
         };
         if rgr.buf.len() != 2 { return; }
-        rgr.release(2);
+        let Tracked(cons_token) = rgr.release(2);
+        cons.consumer = Tracked(Some(cons_token));
     }
 
     // ---- phase 4: wrap when old write == max (write=6, read=6, sz=1 -> start=0) ----
@@ -1596,14 +1620,17 @@ fn main() {
             Err(_) => return,
         };
         if wgr.buf.len() != 1 { return; }
-        wgr.commit(1);
+        let Tracked(prod_token) = wgr.commit(1);
+
+        prod.producer = Tracked(Some(prod_token));
 
         let mut rgr = match cons.read() {
             Ok(r) => r,
             Err(_) => return,
         };
         if rgr.buf.len() != 1 { return; }
-        rgr.release(1);
+        let Tracked(cons_token) = rgr.release(1);
+        cons.consumer = Tracked(Some(cons_token));
     }
 
     // ---- phase 5: empty read should fail ----
