@@ -230,7 +230,7 @@ Const generics は Partially Supported らしい。
 https://verus-lang.github.io/verus/verusdoc/vstd/raw_ptr/fn.allocate.html
 
 [u8; N] は使えないことが分かった。
-https://github.com/verus-lang/verus/issues/187
+https://github.com/verus-lang/verus/issues/1878
 [u8; N] の *mut T への変換ができない。
 
 ということで妥協してヒープの allocate を使う。
@@ -245,7 +245,7 @@ error: `core::cmp::min` is not supported (note: you may be able to add a Verus s
 ```
 
 
-mut self も使えない。今回は &mut self にした。
+mut self も使えない。今回は &mut self にした。=> let mut s = self とかにすると使えるよ。
 ```
 error: The verifier does not yet support the following Rust feature: mut self
    --> vbqueue_proto_use_allocate_no_const_generics.rs:640:5
@@ -359,3 +359,11 @@ read_in_progress 状態でのみ read ~ write または read ~ last の間を Pr
 
 
 commit と release では　-> Tracked<ProducerToken>　として値を返さなければならない。
+
+do_reserve で Prod の使える領域に変化がある
+sub_reserve でも Prod の使える領域に変化がある
+store_write で Prod の使える領域に変化がある (0 になる)、かつ、Cons が読める領域が決まる。2つに割れているときもある。ここはどうするか仕様決めが必要。Consのread時に確定させる方がよい気がするなあ。
+
+cons は
+store_read で wrap させるときに使える領域に変化がある
+fetch_add で読める領域に変化がある
