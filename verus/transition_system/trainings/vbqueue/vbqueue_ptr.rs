@@ -6,6 +6,12 @@ use vstd::layout::*;
 use std::sync::Arc;
 
 verus! {
+pub struct Grant {
+    pub base_addr: nat,
+    pub buffer: raw_ptr::PointsToRaw,
+    pub length: nat,
+}
+
 pub struct ProducerState {
     pub write_in_progress: bool,
 
@@ -16,6 +22,9 @@ pub struct ProducerState {
 
     // 観測して持つものは Option で持つ
     pub read_obs: Option<nat>,
+
+    // 権限を有しているメモリ領域
+    pub grant: Option<Grant>,
 }
 
 impl ProducerState {
@@ -51,6 +60,9 @@ pub struct ConsumerState {
     // 観測して持つものは Option で持つ
     pub write_obs: Option<nat>,
     pub last_obs: Option<nat>,
+
+    // 権限を有しているメモリ領域
+    pub grant: Option<Grant>,
 }
 
 impl ConsumerState {
@@ -117,6 +129,18 @@ tokenized_state_machine!{VBQueue {
         // Represents the local state of the single-consumer
         #[sharding(variable)]
         pub consumer: ConsumerState,
+
+        #[sharding(constant)]
+        pub base_addr: nat,
+
+        #[sharding(constant)]
+        pub provenance: raw_ptr::Provenance,
+
+        #[sharding(storage_option)]
+        pub buffer_perm: Option<raw_ptr::PointsToRaw>,
+
+        #[sharding(storage_option)]
+        pub buffer_dealloc: Option<raw_ptr::Dealloc>,
     }
 
     #[invariant]
@@ -235,6 +259,10 @@ tokenized_state_machine!{VBQueue {
     init! {
         initialize(
             length: nat,
+            base_addr: nat,
+            provenance: raw_ptr::Provenance,
+            buffer_perm: raw_ptr::PointsToRaw,
+            buffer_dealloc: raw_ptr::Dealloc,
         )
         {
             require(
@@ -258,6 +286,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: 0,
                 last: length,
                 read_obs: None,
+                grant: None,
             };
 
             init consumer = ConsumerState {
@@ -265,12 +294,25 @@ tokenized_state_machine!{VBQueue {
                 read: 0,
                 write_obs: None,
                 last_obs: None,
+                grant: None,
             };
+
+            init base_addr = base_addr;
+            init provenance = provenance;
+            init buffer_perm = Some(buffer_perm);
+            init buffer_dealloc = Some(buffer_dealloc);
         }
     }
     
     #[inductive(initialize)]
-    fn initialize_inductive(post: Self, length: nat) {}
+    fn initialize_inductive(
+        post: Self,
+        length: nat,
+        base_addr: nat,
+        provenance: raw_ptr::Provenance,
+        buffer_perm: raw_ptr::PointsToRaw,
+        buffer_dealloc: raw_ptr::Dealloc
+    ) {}
 
     transition!{
         try_split() {
@@ -292,6 +334,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: pre.producer.last,
                 read_obs: pre.producer.read_obs,
+                grant: pre.producer.grant,
             };
         }
     }
@@ -317,6 +360,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: pre.producer.last,
                 read_obs: Some(pre.read),
+                grant: pre.producer.grant,
             };
             assert(pre.read <= pre.length);
         }
@@ -354,6 +398,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: start + sz,
                 last: pre.producer.last,
                 read_obs: pre.producer.read_obs,
+                grant: pre.producer.grant,
             };
         }
     }
@@ -371,6 +416,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: pre.producer.last,
                 read_obs: None,
+                grant: pre.producer.grant,
             };
         }
     }
@@ -408,6 +454,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: new_reserve,
                 last: pre.producer.last,
                 read_obs: pre.producer.read_obs,
+                grant: pre.producer.grant,
             };
         }
     }
@@ -437,6 +484,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: write,
                 read_obs: pre.producer.read_obs,
+                grant: pre.producer.grant,
             };
         }
     }
@@ -455,6 +503,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: pre.length,
                 read_obs: pre.producer.read_obs,
+                grant: pre.producer.grant,
             };
         }
     }
@@ -479,6 +528,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: pre.producer.last,
                 read_obs: pre.producer.read_obs,
+                grant: pre.producer.grant,
             };
         }
     }
@@ -494,6 +544,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: pre.producer.last,
                 read_obs: None,
+                grant: pre.producer.grant,
             };
         }
     }
@@ -509,6 +560,7 @@ tokenized_state_machine!{VBQueue {
                 read: pre.consumer.read,
                 write_obs: pre.consumer.write_obs,
                 last_obs: pre.consumer.last_obs,
+                grant: pre.consumer.grant,
             };
         }
     }
@@ -524,6 +576,7 @@ tokenized_state_machine!{VBQueue {
                 read: pre.consumer.read,
                 write_obs: Some(pre.write),
                 last_obs: pre.consumer.last_obs,
+                grant: pre.consumer.grant,
             };
         }
     }
@@ -539,6 +592,7 @@ tokenized_state_machine!{VBQueue {
                 read: pre.consumer.read,
                 write_obs: pre.consumer.write_obs,
                 last_obs: Some(pre.last),
+                grant: pre.consumer.grant,
             };
         }
     }
@@ -565,6 +619,7 @@ tokenized_state_machine!{VBQueue {
                 read: 0,
                 write_obs: pre.consumer.write_obs,
                 last_obs: pre.consumer.last_obs,
+                grant: pre.consumer.grant,
             };
         }
     }
@@ -579,6 +634,7 @@ tokenized_state_machine!{VBQueue {
                 read: pre.consumer.read,
                 write_obs: None,
                 last_obs: None,
+                grant: pre.consumer.grant,
             };
         }
     }
@@ -621,6 +677,7 @@ tokenized_state_machine!{VBQueue {
                 read: pre.consumer.read + used,
                 write_obs: pre.consumer.write_obs,
                 last_obs: pre.consumer.last_obs,
+                grant: pre.consumer.grant,
             };
         }
     }
@@ -634,6 +691,7 @@ tokenized_state_machine!{VBQueue {
                 read: pre.consumer.read,
                 write_obs: None,
                 last_obs: None,
+                grant: pre.consumer.grant,
             };
         }
     }
@@ -911,6 +969,12 @@ impl VBBuffer
             Tracked(consumer_token),
         ) = VBQueue::Instance::initialize(
             length as nat,
+            buffer_ptr as nat,
+            buffer_ptr@.provenance,
+            buffer_perm,
+            buffer_dealloc,
+            Some(buffer_perm),
+            Some(buffer_dealloc),
         );
 
         let tracked_inst: Tracked<VBQueue::Instance> = Tracked(instance.clone());
