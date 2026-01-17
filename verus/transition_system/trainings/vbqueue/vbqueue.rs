@@ -1415,7 +1415,7 @@ impl Consumer {
 
         let sz = if write < read {
             // Inverted, only believe last
-            assume(last >= read);
+            //assume(last >= read);
             last
         } else {
             // Not inverted, only believe write

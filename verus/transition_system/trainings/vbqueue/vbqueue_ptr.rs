@@ -256,6 +256,12 @@ tokenized_state_machine!{VBQueue {
         }
     }
 
+    #[invariant]
+    pub fn valid_memory_range(&self) -> bool {
+        self.buffer_perm is Some &&
+        self.buffer_perm->Some_0.is_range(self.base_addr as int, self.length as int)
+    }
+
     init! {
         initialize(
             length: nat,
@@ -268,6 +274,7 @@ tokenized_state_machine!{VBQueue {
             require(
                 {
                     &&& length > 0 // TODO: 元の BBQueue はこの制約は持っていない
+                    &&& buffer_perm.is_range(base_addr as int, length as int)
                 }
             );
 
@@ -312,7 +319,8 @@ tokenized_state_machine!{VBQueue {
         provenance: raw_ptr::Provenance,
         buffer_perm: raw_ptr::PointsToRaw,
         buffer_dealloc: raw_ptr::Dealloc
-    ) {}
+    )
+    {}
 
     transition!{
         try_split() {
@@ -953,7 +961,7 @@ impl VBBuffer
             r.is_splittable(),
     {
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
-        assert(buffer_perm.is_range(buffer_ptr as int, length as int));
+        assert(buffer_perm.is_range(buffer_ptr as nat as int, length as int));
         assert(buffer_ptr as int + length <= usize::MAX + 1);
 
         let tracked (
@@ -1483,7 +1491,6 @@ impl Consumer {
 
         let sz = if write < read {
             // Inverted, only believe last
-            assume(last >= read);
             last
         } else {
             // Not inverted, only believe write
