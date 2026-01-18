@@ -467,11 +467,6 @@ tokenized_state_machine!{VBQueue {
                 }
             );
 
-            /*
-            let (granted_perm, rest_perm) = pre.buffer_perm.split(
-                crate::set_lib::set_int_range((pre.base_addr + start) as int, (pre.base_addr + start + sz) as int)
-            );//Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + new_reserve));
-            */
             update reserve = new_reserve;
             //update buffer_perm = pre.buffer_perm;
  
@@ -1339,7 +1334,15 @@ impl Producer {
         );
         open_atomic_invariant!(self.vbq.inv.borrow().borrow() => g => {
             let tracked GhostStuff {buffer_perm_token: mut buffer_perm_token} = g;
+            
             proof {
+                let bp = buffer_perm_token.value();
+                let tracked x = buffer_perm_token.value().split(
+                    crate::set_lib::set_int_range(0, 0)
+                );
+                let start_addr = self.vbq.length as int + prod_token.value().grant_start() as int;
+                let end_addr = start_addr + prod_token.value().grant_sz() as int;
+                
                 self.vbq.instance.borrow().do_reserve_grant(&mut prod_token, &mut buffer_perm_token);
                 g = GhostStuff { buffer_perm_token };
             }
