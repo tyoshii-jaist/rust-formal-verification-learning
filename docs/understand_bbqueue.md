@@ -367,3 +367,9 @@ store_write で Prod の使える領域に変化がある (0 になる)、かつ
 cons は
 store_read で wrap させるときに使える領域に変化がある
 fetch_add で読める領域に変化がある
+
+
+open_atomic_invariant!は入れ子にできる namespace が違うことが必要だが。
+write も PAtomicにしてしまってopen_atomic_invariantを使うようにすれば同じ遷移内でやれるかもしれない。
+
+だが、そもそもまずは PointsToRaw の分割をもう少し熟達しなければならない。

@@ -1320,26 +1320,26 @@ impl Producer {
         // assert(start + sz <= self.vbq.length);
 
         // Safe write, only viewed by this task
-        atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
-            ghost reserve_token => {
-                let ghost new_reserve: nat = (start + sz) as nat;
-                assert(
-                    (start == write && write < read && write + sz < read) ||
-                    (start == write && !(write < read) && write + sz <= max) ||
-                    (start == 0 && !(write < read) && (write + sz > max && sz < read))
-                );
-                let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);//, &mut buffer_perm_token);
-                assert(reserve_token.value() == start + sz);
-            }
-        );
         open_atomic_invariant!(self.vbq.inv.borrow().borrow() => g => {
             let tracked GhostStuff {buffer_perm_token: mut buffer_perm_token} = g;
-            
+            atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
+                ghost reserve_token => {
+                    assert(self.vbq.reserve.inv().namespace() != self.vbq.inv.borrow().borrow().namespace());
+                    let ghost new_reserve: nat = (start + sz) as nat;
+                    assert(
+                        (start == write && write < read && write + sz < read) ||
+                        (start == write && !(write < read) && write + sz <= max) ||
+                        (start == 0 && !(write < read) && (write + sz > max && sz < read))
+                    );
+                    let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);//, &mut buffer_perm_token);
+                    assert(reserve_token.value() == start + sz);
+                }
+            );
             proof {
                 let bp = buffer_perm_token.value();
-                let tracked x = buffer_perm_token.value().split(
+                /*let tracked x = buffer_perm_token.value().split(
                     crate::set_lib::set_int_range(0, 0)
-                );
+                );*/
                 let start_addr = self.vbq.length as int + prod_token.value().grant_start() as int;
                 let end_addr = start_addr + prod_token.value().grant_sz() as int;
                 
