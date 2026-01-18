@@ -1,8 +1,11 @@
 use state_machines_macros::tokenized_state_machine;
 use vstd::atomic_ghost::*;
+use vstd::invariant::*;
 use vstd::raw_ptr::*;
 use vstd::{prelude::*, *};
 use vstd::layout::*;
+use vstd::shared::*;
+
 use std::sync::Arc;
 
 verus! {
@@ -938,6 +941,19 @@ tokenized_state_machine!{VBQueue {
     fn check_read_is_le_last_in_inverted_inductive(pre: Self, post: Self) { }    
 }}
 
+// https://github.com/verus-lang/verus/blob/88f7396e0f76fd11efaf8368004c39172a0b9f0c/examples/state_machines/arc.rs と
+// https://verus-lang.github.io/verus/state_machines/examples/src-rc.html を参考にしている
+// VBQueue::buffer_perm は Producer/Consumer の両者からアクセスする必要がある
+pub tracked struct GhostStuff {
+    pub tracked buffer_perm_token: VBQueue::buffer_perm,
+}
+
+impl GhostStuff {
+    pub open spec fn wf(self, inst: VBQueue::Instance) -> bool {
+        &&& self.buffer_perm_token.instance_id() == inst.id()
+    }
+}
+
 struct_with_invariants!{
     pub struct VBBuffer {
         length: usize,
@@ -951,6 +967,7 @@ struct_with_invariants!{
         already_split: AtomicBool<_, VBQueue::already_split, _>,
 
         instance: Tracked<VBQueue::Instance>,
+        inv: Tracked< Shared<AtomicInvariant<_, GhostStuff, _>> >,
         producer: Tracked<Option<VBQueue::producer>>,
         consumer: Tracked<Option<VBQueue::consumer>>,
     }
@@ -1003,6 +1020,13 @@ struct_with_invariants!{
             &&& g.instance_id() === instance@.id()
             &&& g.value() == v
         }
+
+        invariant on inv with (instance)
+            specifically (self.inv@@)
+            is (v: GhostStuff)
+        {
+            v.wf(instance@)
+        }
     }
 }
 
@@ -1042,13 +1066,13 @@ impl VBBuffer
             Tracked(already_split_token),
             Tracked(producer_token),
             Tracked(consumer_token),
+            Tracked(buffer_perm_token),
         ) = VBQueue::Instance::initialize(
             length as nat,
             buffer_ptr as nat,
             buffer_ptr@.provenance,
             buffer_perm,
             buffer_dealloc,
-            Some(buffer_perm),
             Some(buffer_dealloc),
         );
 
@@ -1061,6 +1085,11 @@ impl VBBuffer
         let write_in_progress_atomic = AtomicBool::new(Ghost(tracked_inst), false, Tracked(write_in_progress_token));
         let already_split_atomic = AtomicBool::new(Ghost(tracked_inst), false, Tracked(already_split_token));
 
+        let tr_inst = Tracked(instance);
+        let tracked g = GhostStuff {buffer_perm_token};
+        let tracked inv = AtomicInvariant::new(tr_inst, g, 0);
+        let tracked inv = Shared::new(inv);
+
         // Initialize the queue
         Self {
             length,
@@ -1072,7 +1101,8 @@ impl VBBuffer
             read_in_progress: read_in_progress_atomic,
             write_in_progress: write_in_progress_atomic,
             already_split: already_split_atomic,
-            instance: Tracked(instance),
+            instance: tr_inst,
+            inv: Tracked(inv),
             producer: Tracked(Some(producer_token)),
             consumer: Tracked(Some(consumer_token)),
         }
