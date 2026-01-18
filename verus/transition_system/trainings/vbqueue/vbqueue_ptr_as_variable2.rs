@@ -491,6 +491,26 @@ tokenized_state_machine!{VBQueue {
         }
     }
 
+    
+    transition!{
+        do_reserve_grant() {
+            update buffer_perm = pre.buffer_perm;
+ 
+            update producer = ProducerState {
+                write_in_progress: pre.producer.write_in_progress,
+                write: pre.producer.write,
+                reserve: pre.producer.reserve,
+                last: pre.producer.last,
+                read_obs: pre.producer.read_obs,
+                grant: Some(Grant {
+                    length: pre.producer.grant_sz() as nat,
+                    base_addr: pre.producer.grant_start() + pre.base_addr,
+                    buffer_perm: pre.buffer_perm,
+                }),
+            };
+        }
+    }
+
     transition!{
         grant_fail() {
             require(pre.producer.write_in_progress == true);
@@ -862,6 +882,10 @@ tokenized_state_machine!{VBQueue {
 
     #[inductive(do_reserve)]
     fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
+    }
+
+    #[inductive(do_reserve_grant)]
+    fn do_reserve_grant_inductive(pre: Self, post: Self) {
     }
 
     #[inductive(grant_fail)]
@@ -1315,7 +1339,10 @@ impl Producer {
         );
         open_atomic_invariant!(self.vbq.inv.borrow().borrow() => g => {
             let tracked GhostStuff {buffer_perm_token: mut buffer_perm_token} = g;
-            proof {g = GhostStuff { buffer_perm_token };}
+            proof {
+                self.vbq.instance.borrow().do_reserve_grant(&mut prod_token, &mut buffer_perm_token);
+                g = GhostStuff { buffer_perm_token };
+            }
         });
 
 
