@@ -51,7 +51,7 @@ impl ProducerState {
         {
             &&& self.write_in_progress == false
             &&& self.read_obs is None
-            &&& self.grant is None
+            //&&& self.grant is None
         }
     }
 
@@ -60,7 +60,7 @@ impl ProducerState {
             &&& self.write_in_progress == true
             &&& self.read_obs is Some
             &&& self.grant_sz() == sz
-            &&& self.grant is Some
+            //&&& self.grant is Some
         }
     }
 }
@@ -104,7 +104,7 @@ impl ConsumerState {
             &&& self.read_in_progress == false
             &&& self.last_obs is None
             &&& self.write_obs is None
-            &&& self.grant is None
+            //&&& self.grant is None
         }
     }
 
@@ -114,7 +114,7 @@ impl ConsumerState {
             &&& self.last_obs is Some
             &&& self.write_obs is Some
             &&& self.grant_sz() == sz
-            &&& self.grant is Some
+            //&&& self.grant is Some
         }
     }
 }
@@ -307,7 +307,7 @@ tokenized_state_machine!{VBQueue {
             }
         }
     }
- */
+
     #[invariant]
     pub fn valid_producer_grant_range(&self) -> bool {
         match self.producer.grant {
@@ -335,7 +335,7 @@ tokenized_state_machine!{VBQueue {
             None => true,
         }
     }
-
+ */
     pub open spec fn U(&self) -> Set<int> {
         Set::new(|i: int| self.base_addr as int <= i && i < (self.base_addr + self.length) as int)
     }
@@ -456,7 +456,7 @@ tokenized_state_machine!{VBQueue {
         do_reserve(start: nat, sz: nat) {
             require(pre.producer.write_in_progress == true);
             require(pre.producer.read_obs is Some);
-            require(pre.producer.grant is None);
+            // require(pre.producer.grant is None);
             let new_reserve = start + sz;
             let read_obs = pre.producer.read_obs->Some_0;
             require(
@@ -473,7 +473,7 @@ tokenized_state_machine!{VBQueue {
             );//Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + new_reserve));
             */
             update reserve = new_reserve;
-            update buffer_perm = pre.buffer_perm;
+            //update buffer_perm = pre.buffer_perm;
  
             update producer = ProducerState {
                 write_in_progress: pre.producer.write_in_progress,
@@ -481,11 +481,12 @@ tokenized_state_machine!{VBQueue {
                 reserve: start + sz,
                 last: pre.producer.last,
                 read_obs: pre.producer.read_obs,
-                grant: Some(Grant {
+                grant: pre.producer.grant,
+                /*grant: Some(Grant {
                     length: sz,
                     base_addr: start + pre.base_addr,
                     buffer_perm: pre.buffer_perm,
-                }),
+                }),*/
             };
         }
     }
@@ -1300,20 +1301,21 @@ impl Producer {
         // assert(start + sz <= self.vbq.length);
 
         // Safe write, only viewed by this task
+        atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
+            ghost reserve_token => {
+                let ghost new_reserve: nat = (start + sz) as nat;
+                assert(
+                    (start == write && write < read && write + sz < read) ||
+                    (start == write && !(write < read) && write + sz <= max) ||
+                    (start == 0 && !(write < read) && (write + sz > max && sz < read))
+                );
+                let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);//, &mut buffer_perm_token);
+                assert(reserve_token.value() == start + sz);
+            }
+        );
         open_atomic_invariant!(self.vbq.inv.borrow().borrow() => g => {
             let tracked GhostStuff {buffer_perm_token: mut buffer_perm_token} = g;
-            atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
-                ghost reserve_token => {
-                    let ghost new_reserve: nat = (start + sz) as nat;
-                    assert(
-                        (start == write && write < read && write + sz < read) ||
-                        (start == write && !(write < read) && write + sz <= max) ||
-                        (start == 0 && !(write < read) && (write + sz > max && sz < read))
-                    );
-                    let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token, &mut buffer_perm_token);
-                    assert(reserve_token.value() == start + sz);
-                }
-            );
+            proof {g = GhostStuff { buffer_perm_token };}
         });
 
 
