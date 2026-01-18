@@ -57,7 +57,7 @@ impl ProducerState {
             &&& self.write_in_progress == true
             &&& self.read_obs is Some
             &&& self.grant_sz() == sz
-            &&& self.grant is None
+            &&& self.grant is Some
         }
     }
 }
@@ -111,7 +111,7 @@ impl ConsumerState {
             &&& self.last_obs is Some
             &&& self.write_obs is Some
             &&& self.grant_sz() == sz
-            &&& self.grant is None
+            &&& self.grant is Some
         }
     }
 }
@@ -156,8 +156,8 @@ tokenized_state_machine!{VBQueue {
         #[sharding(constant)]
         pub provenance: raw_ptr::Provenance,
 
-        #[sharding(storage_option)]
-        pub buffer_perm: Option<raw_ptr::PointsToRaw>,
+        #[sharding(variable)]
+        pub buffer_perm: raw_ptr::PointsToRaw,
 
         #[sharding(storage_option)]
         pub buffer_dealloc: Option<raw_ptr::Dealloc>,
@@ -278,29 +278,29 @@ tokenized_state_machine!{VBQueue {
 
     #[invariant]
     pub fn valid_memory_range(&self) -> bool {
-        self.buffer_perm is Some ==> match (self.producer.grant, self.consumer.grant) {
+        match (self.producer.grant, self.consumer.grant) {
             (Some(pg), Some(cg)) => {
                 {
                     &&& pg.buffer_perm.dom().disjoint(cg.buffer_perm.dom())
-                    &&& pg.buffer_perm.dom().disjoint(self.buffer_perm->Some_0.dom())
-                    &&& cg.buffer_perm.dom().disjoint(self.buffer_perm->Some_0.dom())
-                    &&& pg.buffer_perm.dom().union(cg.buffer_perm.dom()).union(self.buffer_perm->Some_0.dom()) == self.U()
+                    &&& pg.buffer_perm.dom().disjoint(self.buffer_perm.dom())
+                    &&& cg.buffer_perm.dom().disjoint(self.buffer_perm.dom())
+                    &&& pg.buffer_perm.dom().union(cg.buffer_perm.dom()).union(self.buffer_perm.dom()) == self.U()
                 }
             },
             (Some(pg), None) => {
                 {
-                    &&& pg.buffer_perm.dom().disjoint(self.buffer_perm->Some_0.dom())
-                    &&& pg.buffer_perm.dom().union(self.buffer_perm->Some_0.dom()) == self.U()
+                    &&& pg.buffer_perm.dom().disjoint(self.buffer_perm.dom())
+                    &&& pg.buffer_perm.dom().union(self.buffer_perm.dom()) == self.U()
                 }
             },
             (None, Some(cg)) => {
                 {
-                    &&& cg.buffer_perm.dom().disjoint(self.buffer_perm->Some_0.dom())
-                    &&& cg.buffer_perm.dom().union(self.buffer_perm->Some_0.dom()) == self.U()
+                    &&& cg.buffer_perm.dom().disjoint(self.buffer_perm.dom())
+                    &&& cg.buffer_perm.dom().union(self.buffer_perm.dom()) == self.U()
                 }
             },
             (None, None) => {
-                self.buffer_perm->Some_0.dom() == self.U()
+                self.buffer_perm.dom() == self.U()
             }
         }
     }
@@ -381,7 +381,7 @@ tokenized_state_machine!{VBQueue {
 
             init base_addr = base_addr;
             init provenance = provenance;
-            init buffer_perm = Some(buffer_perm);
+            init buffer_perm = buffer_perm;
             init buffer_dealloc = Some(buffer_dealloc);
         }
     }
@@ -464,14 +464,6 @@ tokenized_state_machine!{VBQueue {
                 }
             );
 
-            /*
-            withdraw buffer_perm -= Some(let current_buffer_perm);
-
-            let (granted_perm, rest_perm) = current_buffer_perm.split(Set::new(|i: nat| pre.base_addr + start <= i && i < pre.base_addr + new_reserve));
-
-            deposit buffer_perm += Some(rest_perm);
-            */
-
             update reserve = new_reserve;
  
             update producer = ProducerState {
@@ -484,39 +476,6 @@ tokenized_state_machine!{VBQueue {
             };
         }
     }
-
-
-    transition!{
-        do_reserve_withdraw() {
-            withdraw buffer_perm -= Some(let _) by {
-                assume(pre.buffer_perm is Some); // FIXME!
-            };
-        }
-    }
-
-    transition!{
-        do_reserve_deposit(buffer_perm: raw_ptr::PointsToRaw, granted_perm: raw_ptr::PointsToRaw) {
-            require(pre.producer.write_in_progress == true);
-            require(pre.producer.read_obs is Some);
-            require(pre.producer.grant is None);
-
-            deposit buffer_perm += Some(buffer_perm);
-
-            update producer = ProducerState {
-                write_in_progress: pre.producer.write_in_progress,
-                write: pre.producer.write,
-                reserve: pre.producer.reserve,
-                last: pre.producer.last,
-                read_obs: pre.producer.read_obs,
-                grant: Some(Grant{
-                    length: pre.producer.grant_sz() as nat,
-                    base_addr: pre.base_addr + pre.producer.grant_start(),
-                    buffer_perm: granted_perm,
-                }),
-            };
-        }
-    }
-
 
     transition!{
         grant_fail() {
@@ -889,15 +848,6 @@ tokenized_state_machine!{VBQueue {
 
     #[inductive(do_reserve)]
     fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
-    }
-    
-    #[inductive(do_reserve_withdraw)]
-    fn do_reserve_withdraw_inductive(pre: Self, post: Self) {
-    }
-
-    #[inductive(do_reserve_deposit)]
-    fn do_reserve_deposit_inductive(pre: Self, post: Self, buffer_perm: raw_ptr::PointsToRaw, granted_perm: raw_ptr::PointsToRaw) {
-        assert(pre.buffer_perm is None);
     }
 
     #[inductive(grant_fail)]
@@ -1320,13 +1270,6 @@ impl Producer {
                 );
                 let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);
                 assert(reserve_token.value() == start + sz);
-
-                let tracked points_to_raw = self.vbq.instance.borrow().do_reserve_withdraw();
-                let tracked (granted_perm, rest_perm) = points_to_raw.split(
-                    Set::new(|i: int| (self.vbq.buffer_ptr as int + start as int) <= i && i < (self.vbq.buffer_ptr as int + start as int + sz as int))
-                );
-
-                self.vbq.instance.borrow().do_reserve_deposit(rest_perm, granted_perm, &mut prod_token, rest_perm);
             }
         );
 
