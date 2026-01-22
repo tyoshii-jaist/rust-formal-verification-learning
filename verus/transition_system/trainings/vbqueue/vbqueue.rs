@@ -232,6 +232,16 @@ tokenized_state_machine!{VBQueue {
         }
     }
 
+    #[invariant]
+    pub fn valid_producer_consumer_have_disjoint_range(&self) -> bool {
+        &&& 0 <= self.producer.grant_start() <= self.producer.grant_end() <= self.length
+        &&& 0 <= self.consumer.grant_start() <= self.consumer.grant_end() <= self.length
+        &&& {
+            ||| self.producer.grant_end() <= self.consumer.grant_start()
+            ||| self.consumer.grant_end() <= self.producer.grant_start()
+        }
+    }
+
     init! {
         initialize(
             length: nat,
