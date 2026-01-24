@@ -8,6 +8,10 @@ use std::sync::Arc;
 verus! {
 global layout u8 is size == 1, align == 1;
 
+spec fn set_from_range(base: int, sz: int) -> Set<int> {
+    Set::new(|i: int| base <= i && i < base + sz)
+}
+
 pub struct ProducerState {
     pub write_in_progress: bool,
 
@@ -864,6 +868,7 @@ tokenized_state_machine!{VBQueue {
 
 struct_with_invariants!{
     pub struct VBBuffer {
+        buffer: *mut u8,
         length: usize,
         write: AtomicUsize<_, VBQueue::write, _>,
         read: AtomicUsize<_, VBQueue::read, _>,
@@ -881,6 +886,10 @@ struct_with_invariants!{
     pub closed spec fn wf(&self) -> bool {
         predicate {
             &&& self.instance@.length() == self.length
+            &&& self.instance@.base_addr() == self.buffer as int
+            &&& self.instance@.provenance() == self.buffer@.provenance
+            &&& self.buffer.addr() + self.length <= usize::MAX + 1
+            &&& self.buffer.addr() as int % 1 as int == 0
             &&& self.instance@.length() <= usize::MAX
             &&& match self.producer@ {
                     Some(prod) => prod.instance_id() == self.instance@.id(),
@@ -1027,6 +1036,7 @@ impl VBBuffer
 
         // Initialize the queue
         Self {
+            buffer: buffer_ptr,
             length,
             write: write_atomic,
             read: read_atomic,
@@ -1232,6 +1242,12 @@ impl Producer {
                     (start == 0 && !(write < read) && (write + sz > max && sz < read))
                 );
                 let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);
+                let tracked granted_perms_map = ret.1.get();
+                let start_addr = prod_token.value().grant_start() + self.vbq.buffer as int;
+                let end_addr = prod_token.value().grant_end() + self.vbq.buffer as int;
+                let expected_dom = set_from_range(start_addr, end_addr);
+                assert(granted_perms_map.dom().subset_of(expected_dom));
+
                 assert(reserve_token.value() == start + sz);
             }
         );
@@ -1270,6 +1286,7 @@ struct GrantW {
     vbq: Arc<VBBuffer>,
     to_commit: usize,
     producer: Tracked<Option<VBQueue::producer>>,
+    buf_token: Tracked<Map<int, PointsTo<u8>>,
 }
 
 impl GrantW {
@@ -1486,7 +1503,7 @@ impl Consumer {
             }
         );
         
-        let tracked mut read_perms_map:Map<nat, PointsTo<u8>> = Map::tracked_empty();
+        let tracked mut read_perms_map:Map<int, PointsTo<u8>> = Map::tracked_empty();
         let mut read = atomic_with_ghost!(&self.vbq.read => load();
             ghost read_token => {
                 let tracked ret = self.vbq.instance.borrow().load_read_at_read(&read_token, &cons_token);
