@@ -92,13 +92,13 @@ tokenized_state_machine!{VBQueue {
         pub length: nat,
 
         #[sharding(constant)]
-        pub base_addr: nat,
+        pub base_addr: int,
 
         #[sharding(constant)]
         pub provenance: raw_ptr::Provenance,
 
         #[sharding(storage_map)]
-        pub storage: Map<nat, raw_ptr::PointsTo<u8>>,
+        pub storage: Map<int, raw_ptr::PointsTo<u8>>,
 
         #[sharding(storage_option)]
         pub buffer_dealloc: Option<raw_ptr::Dealloc>,
@@ -258,35 +258,41 @@ tokenized_state_machine!{VBQueue {
 
     #[invariant]
     pub fn valid_producer_consumer_have_disjoint_addr_set(&self) -> bool {
+        self.producer_grant_addr_set().disjoint(self.consumer_grant_addr_set())
+    }
+
+    pub open spec fn producer_grant_addr_set(&self) -> Set<int> {
         let ps = self.producer.grant_start() + self.base_addr as int;
         let pe = self.producer.grant_end() + self.base_addr as int;
+
+        Set::new(|i : int| ps <= i && i < pe)
+    }
+
+    pub open spec fn consumer_grant_addr_set(&self) -> Set<int> {
         let cs = self.consumer.grant_start() + self.base_addr as int;
         let ce = self.consumer.grant_end() + self.base_addr as int;
 
-        Set::new(|i: int| ps <= i && i < pe)
-            .disjoint(
-                Set::new(|i: int| cs <= i && i < ce)
-            )
+        Set::new(|i : int| cs <= i && i < ce)
     }
-
+/*
     pub open spec fn U(&self) -> Set<nat> {
         Set::new(|i : nat| 0 <= i && i <= self.length)
     }
-
+ */
     init! {
         initialize(
             length: nat,
-            base_addr: nat,
+            base_addr: int,
             provenance: raw_ptr::Provenance,
-            storage: Map<nat, raw_ptr::PointsTo<u8>>,
+            storage: Map<int, raw_ptr::PointsTo<u8>>,
             buffer_dealloc: raw_ptr::Dealloc)
         {
             require(
                 {
                     &&& length > 0 // 元の BBQueue はこの制約は持っていない
-                    &&& forall |i: nat| i >= base_addr && i < base_addr + length <==> storage.contains_key(i)
-                    &&& forall |i: nat| i >= base_addr && i < base_addr + length ==> storage.index(i).ptr().addr() == i
-                    &&& forall |i: nat| i >= base_addr && i < base_addr + length ==> storage.index(i).ptr()@.provenance == provenance
+                    &&& forall |i: int| i >= base_addr && i < base_addr + length <==> storage.contains_key(i)
+                    &&& forall |i: int| i >= base_addr && i < base_addr + length ==> storage.index(i).ptr().addr() == i
+                    &&& forall |i: int| i >= base_addr && i < base_addr + length ==> storage.index(i).ptr()@.provenance == provenance
                 }
             );
 
@@ -322,7 +328,7 @@ tokenized_state_machine!{VBQueue {
     }
     
     #[inductive(initialize)]
-    fn initialize_inductive(post: Self, length: nat, base_addr: nat, provenance: raw_ptr::Provenance, storage: Map<nat, raw_ptr::PointsTo<u8>>, buffer_dealloc: raw_ptr::Dealloc) {}
+    fn initialize_inductive(post: Self, length: nat, base_addr: int, provenance: raw_ptr::Provenance, storage: Map<int, raw_ptr::PointsTo<u8>>, buffer_dealloc: raw_ptr::Dealloc) {}
 
     transition!{
         try_split() {
@@ -386,17 +392,7 @@ tokenized_state_machine!{VBQueue {
                     ||| start == pre.producer.write && !(pre.producer.write < read_obs) && pre.producer.write + sz <= pre.length
                     ||| start == 0 && !(pre.producer.write < read_obs) && (pre.producer.write + sz > pre.length && sz < read_obs)
                 }
-            );/*
-            require(
-                {
-                    // not inverted & reserve not wrap
-                    ||| read_obs <= pre.producer.write <= new_reserve <= pre.length
-                    // not inverted & reserve wrap
-                    ||| new_reserve < read_obs <= pre.producer.write <= pre.length
-                    // inverted (write < read_obs) & read not wrap
-                    ||| pre.producer.write <= new_reserve < read_obs /*<= pre.last */ <= pre.length
-                }
-            ); */
+            );
 
             update reserve = start + sz;
 
@@ -407,6 +403,14 @@ tokenized_state_machine!{VBQueue {
                 last: pre.producer.last,
                 read_obs: pre.producer.read_obs,
             };
+
+            let ps = pre.producer.grant_start() + pre.base_addr as int;
+            let pe = pre.producer.grant_end() + pre.base_addr as int;
+
+            birds_eye let prod_keys = Set::new(|i : int| ps <= i && i < pe);
+            birds_eye let withdraw_range_map = pre.storage.restrict(prod_keys);
+
+            withdraw storage -= (withdraw_range_map);
         }
     }
 
@@ -953,22 +957,22 @@ impl VBBuffer
         let tracked mut buffer_perm = buffer_perm;
         assert(buffer_perm.is_range(buffer_ptr as int, length as int));
         assert(buffer_ptr as int + length <= usize::MAX + 1);
-        let tracked mut points_to_map = Map::<nat, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
+        let tracked mut points_to_map = Map::<int, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
 
         for len in 0..length
             invariant
                 len <= length,
                 buffer_ptr as int + length <= usize::MAX + 1,
                 buffer_perm.is_range(buffer_ptr as int + len as int, length - len),
-                forall |i: nat|
-                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
+                forall |i: int|
+                    i >= buffer_ptr as int && i < buffer_ptr as int + len as int
                         <==> points_to_map.contains_key(i),
-                forall |i: nat|
-                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
-                        ==> points_to_map.index(i as nat).ptr() as nat == i as nat,
-                forall |i: nat|
-                    i >= buffer_ptr as nat && i < buffer_ptr as nat + len as nat
-                        ==> points_to_map.index(i as nat).ptr()@.provenance == buffer_perm.provenance(),
+                forall |i: int|
+                    i >= buffer_ptr as int && i < buffer_ptr as int + len as int
+                        ==> points_to_map.index(i as int).ptr() as int == i as int,
+                forall |i: int|
+                    i >= buffer_ptr as int && i < buffer_ptr as int + len as int
+                        ==> points_to_map.index(i as int).ptr()@.provenance == buffer_perm.provenance(),
                 buffer_ptr@.provenance == buffer_perm.provenance(),
             decreases
                 length - len,
@@ -982,9 +986,9 @@ impl VBBuffer
 
                 let tracked top_pointsto = top.into_typed::<u8>(range_base_addr as usize);
                 buffer_perm = rest;
-                points_to_map.tracked_insert(range_base_addr as nat, top_pointsto);
-                assert(points_to_map.contains_key(range_base_addr as nat));
-                assert(points_to_map.index(range_base_addr as nat).ptr() as nat == range_base_addr as nat);
+                points_to_map.tracked_insert(range_base_addr as int, top_pointsto);
+                assert(points_to_map.contains_key(range_base_addr as int));
+                assert(points_to_map.index(range_base_addr as int).ptr() as int == range_base_addr as int);
                 assert(top_pointsto.ptr()@.provenance == top.provenance());
                 assert(top.provenance() == buffer_perm.provenance());
             }
@@ -1004,7 +1008,7 @@ impl VBBuffer
             Tracked(consumer_token),
         ) = VBQueue::Instance::initialize(
             length as nat,
-            buffer_ptr as nat,
+            buffer_ptr as int,
             buffer_ptr@.provenance,
             points_to_map,
             buffer_dealloc,
