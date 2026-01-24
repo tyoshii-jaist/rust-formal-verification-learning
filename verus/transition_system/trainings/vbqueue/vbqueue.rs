@@ -263,9 +263,9 @@ tokenized_state_machine!{VBQueue {
         let cs = self.consumer.grant_start() + self.base_addr as int;
         let ce = self.consumer.grant_end() + self.base_addr as int;
 
-        Set::new(|i: int| self.base_addr as int <= i && i < self.base_addr as int + self.length && ps <= i && i < pe)
+        Set::new(|i: int| ps <= i && i < pe)
             .disjoint(
-                Set::new(|i: int| self.base_addr as int <= i && i < self.base_addr as int + self.length && cs <= i && i < ce)
+                Set::new(|i: int| cs <= i && i < ce)
             )
     }
 
