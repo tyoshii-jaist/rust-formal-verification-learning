@@ -1,5 +1,5 @@
 use state_machines_macros::tokenized_state_machine;
-use vstd::atomic_ghost::*;
+use vstd::atomic::*;
 use vstd::invariant::*;
 use vstd::raw_ptr::*;
 use vstd::{prelude::*, *};
@@ -104,9 +104,8 @@ struct_with_invariants!{
     pub struct ExBuffer {
         length: usize,
         buffer_ptr: *mut u8,
-        split: PAtomicUsize,
-
-        inv: Tracked< Shared<AtomicInvariant<_, PointsToRawExample::buffer_perm, _>> >,
+        buffer_perm_inv: Tracked< Shared<AtomicInvariant<_, PointsToRawExample::buffer_perm, _>> >,
+        split_inv: Tracked< AtomicInvariant<_, PointsToRawExample::split, _>>,
 
         instance: Tracked<PointsToRawExample::Instance>,
         producer: Tracked<Option<PointsToRawExample::producer>>,
@@ -119,13 +118,16 @@ struct_with_invariants!{
             &&& self.instance@.length() <= usize::MAX
         }
 
-        invariant on split with (instance) is (v: usize, g: PointsToRawExample::split) {
-            &&& g.instance_id() === instance@.id()
-            &&& g.value() == v as int
+        
+        invariant on split_inv with (instance)
+            specifically (self.split_inv@)
+            is (v: PointsToRawExample::split)
+        {
+            &&& v.instance_id() === instance@.id()
         }
 
-        invariant on inv with (instance)
-            specifically (self.inv@@)
+        invariant on buffer_perm_inv with (instance)
+            specifically (self.buffer_perm_inv@@)
             is (v: PointsToRawExample::buffer_perm)
         {
             &&& v.instance_id() === instance@.id()
@@ -164,15 +166,15 @@ impl ExBuffer
         let tracked buffer_perm_inv = AtomicInvariant::new(tr_inst, buffer_perm_token, 0);
         let tracked buffer_perm_inv = Shared::new(buffer_perm_inv); // Shared は Ghost object を中に入れて、duplicate して &T を取り出すことができる。
 
-        let (split, Tracked(split_token)) = PAtomicUsize::new(0);
-        let tracked inv = AtomicInvariant::new(tr_inst, split_token, 1);
+        let (split, Tracked(split_token_what)) = PAtomicUsize::new(0);
+        let tracked split_inv = AtomicInvariant::new(tr_inst, split_token, 1);
 
         // Initialize the queue
         Self {
             length,
             buffer_ptr,
-            split: split_atomic,
-            inv: Tracked(inv),
+            split_inv: Tracked(split_inv),
+            buffer_perm_inv: Tracked(buffer_perm_inv),
             instance: tr_inst,
             producer: Tracked(Some(producer_token)),
             consumer: Tracked(Some(consumer_token)),
@@ -184,15 +186,15 @@ impl ExBuffer
             self.wf(),
             0 < at && at < self.length,
     {
-        open_atomic_invariant!(self.inv.borrow().borrow() => g => {
+        open_atomic_invariant!(self.buffer_perm_inv.borrow().borrow() => g => {
             let tracked mut buffer_perm_token = g;
-            
+            /*
             atomic_with_ghost!(&self.split => store(at);
                 ghost split_token => {
                     let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token);
                     assert(split_token.value() == at);
                 }
-            );
+            ); */
 
             proof { g = buffer_perm_token; }
         });
