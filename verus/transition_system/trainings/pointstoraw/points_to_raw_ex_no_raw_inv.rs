@@ -187,12 +187,16 @@ impl ExBuffer
             self.wf(),
             0 < at && at < self.length,
     {
-        atomic_with_ghost!(&self.split => store(at);
-            ghost split_token => {
-                let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token);
-                assert(split_token.value() == at);
-            }
-        );
+        open_atomic_invariant!(self.inv.borrow().borrow() => g => {
+            let tracked GhostStuff { buffer_perm_token: mut buffer_perm_token } = g;
+            atomic_with_ghost!(&self.split => store(at);
+                ghost split_token => {
+                    let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token);
+                    assert(split_token.value() == at);
+                }
+            );
+            proof { g = GhostStuff { buffer_perm_token }; }
+        });
     }
 }
 
