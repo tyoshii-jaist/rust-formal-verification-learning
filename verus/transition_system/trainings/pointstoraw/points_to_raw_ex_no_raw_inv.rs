@@ -85,11 +85,10 @@ tokenized_state_machine!(PointsToRawExample {
     }
 
     transition!{
-        do_split(to: nat) {
-            require(pre.split == 0);
-            require(to > 0 && to < pre.length);
+        do_split(at: nat) {
+            require(at > 0 && at < pre.length);
 
-            update split = to;
+            update split = at;
         }
     }
 
@@ -97,7 +96,7 @@ tokenized_state_machine!(PointsToRawExample {
     fn initialize_inductive(post: Self, length: nat, base_addr: nat, provenance: raw_ptr::Provenance, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc: raw_ptr::Dealloc) { }
 
     #[inductive(do_split)]
-    fn do_split_inductive(pre: Self, post: Self, to: nat) {
+    fn do_split_inductive(pre: Self, post: Self, at: nat) {
     }
 });
 
@@ -182,23 +181,22 @@ impl ExBuffer
             consumer: Tracked(Some(consumer_token)),
         }
     }
+
+    fn split(&self, at: usize)
+        requires
+            self.wf(),
+            0 < at && at < self.length,
+    {
+        atomic_with_ghost!(&self.split => store(at);
+            ghost split_token => {
+                let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token);
+                assert(split_token.value() == at);
+            }
+        );
+    }
 }
 
 fn main() {
     let ex_buffer = ExBuffer::new(10);
-    /*
-    atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
-        ghost reserve_token => {
-            let ghost new_reserve: nat = (start + sz) as nat;
-            assert(
-                (start == write && write < read && write + sz < read) ||
-                (start == write && !(write < read) && write + sz <= max) ||
-                (start == 0 && !(write < read) && (write + sz > max && sz < read))
-            );
-            let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);
-            assert(reserve_token.value() == start + sz);
-        }
-    );
-     */
 }
 }
