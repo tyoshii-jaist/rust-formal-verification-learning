@@ -3,7 +3,7 @@ use vstd::atomic_ghost::*;
 use vstd::invariant::*;
 use vstd::raw_ptr::*;
 use vstd::{prelude::*, *};
-//use vstd::layout::*;
+use vstd::layout::*;
 use vstd::shared::*;
 
 verus! {
@@ -114,6 +114,8 @@ struct_with_invariants!{
         inv: Tracked< Shared<AtomicInvariant<_, GhostStuff, _>> >,
 
         instance: Tracked<PointsToRawExample::Instance>,
+        producer: Tracked<Option<PointsToRawExample::producer>>,
+        consumer: Tracked<Option<PointsToRawExample::consumer>>,
     }
 
     pub closed spec fn wf(&self) -> bool {
@@ -136,23 +138,67 @@ struct_with_invariants!{
     }
 }
 
-fn main() {
-    let length = 10;
+impl ExBuffer
+{
+    fn new(length: usize) -> (r: Self)
+        requires
+            valid_layout(length, 1),
+            length > 0,
+        ensures
+            r.wf(),
+    {
+        let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
+        let tracked (
+            Tracked(instance),
+            Tracked(split_token),
+            Tracked(buffer_perm_token),
+            Tracked(producer_token),
+            Tracked(consumer_token),
+        ) = PointsToRawExample::Instance::initialize(
+            length as nat,
+            buffer_ptr as nat,
+            buffer_ptr@.provenance,
+            buffer_perm,
+            buffer_dealloc,
+            Some(buffer_dealloc),
+        );
 
-    let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
-    let tracked (
-        Tracked(instance),
-        Tracked(reserve_token),
-        Tracked(grant_state_token),
-        Tracked(producer_token),
-        Tracked(consumer_token),
-    ) = PointsToRawExample::Instance::initialize(
-        length as nat,
-        buffer_ptr as nat,
-        buffer_ptr@.provenance,
-        buffer_perm,
-        buffer_dealloc,
-        Some(buffer_dealloc),
+        let tracked_inst: Tracked<PointsToRawExample::Instance> = Tracked(instance.clone());
+        let split_atomic = AtomicUsize::new(Ghost(tracked_inst), 0, Tracked(split_token));
+
+        let tracked g = GhostStuff { buffer_perm_token };
+        let tr_inst = Tracked(instance);
+        let tracked inv = AtomicInvariant::new(tr_inst, g, 0);
+        let tracked inv = Shared::new(inv);
+
+        // Initialize the queue
+        Self {
+            length,
+            buffer_ptr,
+            split: split_atomic,
+            inv: Tracked(inv),
+            instance: tr_inst,
+            producer: Tracked(Some(producer_token)),
+            consumer: Tracked(Some(consumer_token)),
+        }
+    }
+}
+
+fn main() {
+    let ex_buffer = ExBuffer::new(10);
+    /*
+    atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
+        ghost reserve_token => {
+            let ghost new_reserve: nat = (start + sz) as nat;
+            assert(
+                (start == write && write < read && write + sz < read) ||
+                (start == write && !(write < read) && write + sz <= max) ||
+                (start == 0 && !(write < read) && (write + sz > max && sz < read))
+            );
+            let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);
+            assert(reserve_token.value() == start + sz);
+        }
     );
+     */
 }
 }
