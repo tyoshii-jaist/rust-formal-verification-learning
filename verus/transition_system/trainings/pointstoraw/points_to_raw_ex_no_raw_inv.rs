@@ -168,7 +168,7 @@ impl ExBuffer
         let tracked g = GhostStuff { buffer_perm_token };
         let tr_inst = Tracked(instance);
         let tracked inv = AtomicInvariant::new(tr_inst, g, 0);
-        let tracked inv = Shared::new(inv);
+        let tracked inv = Shared::new(inv); // Shared は Ghost object を中に入れて、duplicate して &T を取り出すことができる。
 
         // Initialize the queue
         Self {
