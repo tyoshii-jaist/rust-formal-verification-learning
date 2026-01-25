@@ -22,6 +22,8 @@ pub struct ProducerState {
 
     // 観測して持つものは Option で持つ
     pub read_obs: Option<nat>,
+
+    pub is_checked_out: bool,
 }
 
 impl ProducerState {
@@ -42,11 +44,16 @@ impl ProducerState {
     }
 
     pub open spec fn is_idle(&self) -> bool {
-        self.write_in_progress == false && self.read_obs is None
+        &&& self.write_in_progress == false
+        &&& self.read_obs is None
+        &&& self.is_checked_out == false
     }
 
     pub open spec fn is_granted(&self, sz: nat) -> bool {
-        self.write_in_progress == true && self.read_obs is Some && self.grant_sz() == sz
+        &&& self.write_in_progress == true
+        &&& self.read_obs is Some
+        &&& self.grant_sz() == sz
+        &&& self.is_checked_out == true
     }
 }
 
@@ -57,6 +64,8 @@ pub struct ConsumerState {
     // 観測して持つものは Option で持つ
     pub write_obs: Option<nat>,
     pub last_obs: Option<nat>,
+
+    pub is_checked_out: bool,
 }
 
 impl ConsumerState {
@@ -82,11 +91,17 @@ impl ConsumerState {
     }
 
     pub open spec fn is_idle(&self) -> bool {
-        self.read_in_progress == false && self.last_obs is None && self.write_obs is None
+        &&& self.read_in_progress == false
+        &&& self.last_obs is None
+        &&& self.write_obs is None
+        &&& self.is_checked_out == false
     }
 
     pub open spec fn is_granted(&self, sz: nat) -> bool {
-        self.read_in_progress == true && self.last_obs is Some && self.write_obs is Some && self.grant_sz() == sz
+        &&& self.read_in_progress == true
+        &&& self.last_obs is Some
+        &&& self.write_obs is Some
+        &&& self.grant_sz() == sz
     }
 }
 
@@ -177,7 +192,6 @@ tokenized_state_machine!{VBQueue {
     }
 
     #[invariant]
-    // ここは仕様から来た要件であるということを明確に論文・資料には書く
     pub fn valid_order_from_producer_view(&self) -> bool {
         match self.producer.read_obs {
             Some(read_obs) => {
@@ -266,24 +280,70 @@ tokenized_state_machine!{VBQueue {
         self.producer_grant_addr_set().disjoint(self.consumer_grant_addr_set())
     }
 
-    pub open spec fn producer_grant_addr_set(&self) -> Set<int> {
-        let ps = self.producer.grant_start() + self.base_addr as int;
-        let pe = self.producer.grant_end() + self.base_addr as int;
+    #[invariant]
+    pub fn well_partitioned(&self) -> bool {
+        let b = self.base_addr as int;
+        let e = b + self.length as int;
 
-        Set::new(|i : int| ps <= i && i < pe)
+        let ps = b + self.producer.grant_start();
+        let pe = b + self.producer.grant_end();
+        let cs = b + self.consumer.grant_start();
+        let ce = b + self.consumer.grant_end();
+
+        &&& forall |i:int|
+            b <= i && i < e ==>
+            ( self.storage.contains_key(i)
+                <==>
+                !(self.producer.is_checked_out && ps <= i && i < pe)
+                && !(self.consumer.is_checked_out && cs <= i && i < ce)
+            )
+    }
+
+    #[invariant]
+    pub fn valid_storage_all(&self) -> bool {
+        let b = self.base_addr as int;
+        let e = b + self.length as int;
+
+        &&& forall |i:int|
+            b <= i && i < e ==>
+            ( self.storage.contains_key(i)
+                ==>
+                self.storage.index(i).ptr().addr() == i
+            )
+        &&& forall |i:int|
+            b <= i && i < e ==>
+            ( self.storage.contains_key(i)
+                ==>
+                self.storage.index(i).ptr()@.provenance == self.provenance
+            )
+    }
+
+    pub open spec fn producer_grant_addr_set(&self) -> Set<int> {
+        if self.producer.is_checked_out {
+            let ps = self.producer.grant_start() + self.base_addr as int;
+            let pe = self.producer.grant_end() + self.base_addr as int;
+            Set::new(|i:int| ps <= i && i < pe)
+        } else {
+            Set::empty()
+        }
     }
 
     pub open spec fn consumer_grant_addr_set(&self) -> Set<int> {
-        let cs = self.consumer.grant_start() + self.base_addr as int;
-        let ce = self.consumer.grant_end() + self.base_addr as int;
+        if self.consumer.is_checked_out {
+            let cs = self.consumer.grant_start() + self.base_addr as int;
+            let ce = self.consumer.grant_end() + self.base_addr as int;
+            Set::new(|i : int| cs <= i && i < ce)
+        } else {
+            Set::empty()
+        }
+    }
 
-        Set::new(|i : int| cs <= i && i < ce)
+    pub open spec fn buffer_addr_set(&self) -> Set<int> {
+        let b = self.base_addr as int;
+        let e = b + self.length as int;
+        Set::new(|i:int| b <= i && i < e)
     }
-/*
-    pub open spec fn U(&self) -> Set<nat> {
-        Set::new(|i : nat| 0 <= i && i <= self.length)
-    }
- */
+
     init! {
         initialize(
             length: nat,
@@ -295,6 +355,7 @@ tokenized_state_machine!{VBQueue {
             require(
                 {
                     &&& length > 0 // 元の BBQueue はこの制約は持っていない
+                    &&& storage.dom() =~= Set::new(|i:int| base_addr <= i && i < base_addr + length as int)
                     &&& forall |i: int| i >= base_addr && i < base_addr + length <==> storage.contains_key(i)
                     &&& forall |i: int| i >= base_addr && i < base_addr + length ==> storage.index(i).ptr().addr() == i
                     &&& forall |i: int| i >= base_addr && i < base_addr + length ==> storage.index(i).ptr()@.provenance == provenance
@@ -321,6 +382,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: 0,
                 last: length,
                 read_obs: None,
+                is_checked_out: false,
             };
 
             init consumer = ConsumerState {
@@ -328,6 +390,7 @@ tokenized_state_machine!{VBQueue {
                 read: 0,
                 write_obs: None,
                 last_obs: None,
+                is_checked_out: false,
             };
         }
     }
@@ -355,6 +418,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: pre.producer.last,
                 read_obs: pre.producer.read_obs,
+                is_checked_out: pre.producer.is_checked_out,
             };
         }
     }
@@ -380,6 +444,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: pre.producer.last,
                 read_obs: Some(pre.read),
+                is_checked_out: pre.producer.is_checked_out,
             };
             assert(pre.read <= pre.length);
         }
@@ -388,6 +453,7 @@ tokenized_state_machine!{VBQueue {
     transition!{
         do_reserve(start: nat, sz: nat) {
             require(pre.producer.write_in_progress == true);
+            require(pre.producer.is_checked_out == false);
             require(pre.producer.read_obs is Some);
             let new_reserve = start + sz;
             let read_obs = pre.producer.read_obs->Some_0;
@@ -407,15 +473,27 @@ tokenized_state_machine!{VBQueue {
                 reserve: start + sz,
                 last: pre.producer.last,
                 read_obs: pre.producer.read_obs,
+                is_checked_out: true,
             };
 
-            let ps = pre.producer.grant_start() + pre.base_addr as int;
-            let pe = pre.producer.grant_end() + pre.base_addr as int;
+            let ps = pre.base_addr + start as int;
+            let pe = ps + sz as int;
+            let s = Set::new(|i:int| ps <= i && i < pe);
 
-            birds_eye let prod_keys = Set::new(|i : int| ps <= i && i < pe);
+            birds_eye let prod_keys = s;
             birds_eye let withdraw_range_map = pre.storage.restrict(prod_keys);
 
             withdraw storage -= (withdraw_range_map);
+
+            assert(
+                withdraw_range_map.dom().subset_of(s)
+            );
+            assert(
+                s.subset_of(withdraw_range_map.dom())
+            );
+            assert(forall |j: int| j >= ps && j < pe <==> withdraw_range_map.contains_key(j));
+            //assert(forall |j: int| j >= ps && j < pe ==> withdraw_range_map.index(j).ptr().addr() == j);
+            //assert(forall |j: int| j >= ps && j < pe ==> withdraw_range_map.index(j).ptr()@.provenance == pre.provenance);
         }
     }
 
@@ -432,6 +510,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: pre.producer.last,
                 read_obs: None,
+                is_checked_out: pre.producer.is_checked_out,
             };
         }
     }
@@ -454,8 +533,9 @@ tokenized_state_machine!{VBQueue {
     } 
  
     transition!{
-        sub_reserve_at_commit(commited: nat) {
+        sub_reserve_at_commit(commited: nat, to_deposit: Map<int, PointsTo<u8>>) {
             require(pre.reserve >= commited);
+            require(pre.producer.is_checked_out == true);
 
             let grant_start = if pre.producer.write <= pre.producer.reserve {pre.producer.write} else {0};
             require(pre.producer.reserve - grant_start >= commited);
@@ -469,7 +549,10 @@ tokenized_state_machine!{VBQueue {
                 reserve: new_reserve,
                 last: pre.producer.last,
                 read_obs: pre.producer.read_obs,
+                is_checked_out: pre.producer.is_checked_out,
             };
+
+            deposit storage += (to_deposit);
         }
     }
 
@@ -498,6 +581,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: write,
                 read_obs: pre.producer.read_obs,
+                is_checked_out: pre.producer.is_checked_out,
             };
         }
     }
@@ -516,6 +600,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: pre.length,
                 read_obs: pre.producer.read_obs,
+                is_checked_out: pre.producer.is_checked_out,
             };
         }
     }
@@ -540,6 +625,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: pre.producer.last,
                 read_obs: pre.producer.read_obs,
+                is_checked_out: pre.producer.is_checked_out,
             };
         }
     }
@@ -555,6 +641,7 @@ tokenized_state_machine!{VBQueue {
                 reserve: pre.producer.reserve,
                 last: pre.producer.last,
                 read_obs: None,
+                is_checked_out: false,
             };
         }
     }
@@ -570,6 +657,7 @@ tokenized_state_machine!{VBQueue {
                 read: pre.consumer.read,
                 write_obs: pre.consumer.write_obs,
                 last_obs: pre.consumer.last_obs,
+                is_checked_out: pre.consumer.is_checked_out,
             };
         }
     }
@@ -585,6 +673,7 @@ tokenized_state_machine!{VBQueue {
                 read: pre.consumer.read,
                 write_obs: Some(pre.write),
                 last_obs: pre.consumer.last_obs,
+                is_checked_out: pre.consumer.is_checked_out,
             };
         }
     }
@@ -600,6 +689,7 @@ tokenized_state_machine!{VBQueue {
                 read: pre.consumer.read,
                 write_obs: pre.consumer.write_obs,
                 last_obs: Some(pre.last),
+                is_checked_out: pre.consumer.is_checked_out,
             };
         }
     }
@@ -626,6 +716,7 @@ tokenized_state_machine!{VBQueue {
                 read: 0,
                 write_obs: pre.consumer.write_obs,
                 last_obs: pre.consumer.last_obs,
+                is_checked_out: pre.consumer.is_checked_out,
             };
         }
     }
@@ -640,6 +731,7 @@ tokenized_state_machine!{VBQueue {
                 read: pre.consumer.read,
                 write_obs: None,
                 last_obs: None,
+                is_checked_out: pre.consumer.is_checked_out,
             };
         }
     }
@@ -682,6 +774,7 @@ tokenized_state_machine!{VBQueue {
                 read: pre.consumer.read + used,
                 write_obs: pre.consumer.write_obs,
                 last_obs: pre.consumer.last_obs,
+                is_checked_out: pre.consumer.is_checked_out,
             };
         }
     }
@@ -695,6 +788,7 @@ tokenized_state_machine!{VBQueue {
                 read: pre.consumer.read,
                 write_obs: None,
                 last_obs: None,
+                is_checked_out: false,
             };
         }
     }
@@ -791,7 +885,7 @@ tokenized_state_machine!{VBQueue {
     
 
     #[inductive(sub_reserve_at_commit)]
-    fn sub_reserve_at_commit_inductive(pre: Self, post: Self, commited: nat) { }
+    fn sub_reserve_at_commit_inductive(pre: Self, post: Self, commited: nat, to_deposit: Map<int, PointsTo<u8>>) { }
     
     #[inductive(load_last_at_commit)]
     fn load_last_at_commit_inductive(pre: Self, post: Self) { }
@@ -1234,6 +1328,7 @@ impl Producer {
         // assert(start + sz <= self.vbq.length);
 
         // Safe write, only viewed by this task
+        let tracked mut granted_perms_map:Map<int, PointsTo<u8>>;
         atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
             ghost reserve_token => {
                 let ghost new_reserve: nat = (start + sz) as nat;
@@ -1243,29 +1338,51 @@ impl Producer {
                     (start == 0 && !(write < read) && (write + sz > max && sz < read))
                 );
                 let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);
-                let tracked granted_perms_map = ret.1.get();
-                let start_addr = prod_token.value().grant_start() + self.vbq.buffer as int;
-                let end_addr = prod_token.value().grant_end() + self.vbq.buffer as int;
+                granted_perms_map = ret.1.get();
+                let start_addr = start as int + self.vbq.buffer as int;
+                let end_addr = start_addr as int + self.vbq.length as int;
                 let expected_dom = set_from_range(start_addr, end_addr);
                 assert(granted_perms_map.dom().subset_of(expected_dom));
+                assert(self.vbq.buffer as int == self.vbq.instance@.base_addr());
+                assert(
+                    forall |j: int| j >= start_addr && j < end_addr
+                        <==> granted_perms_map.contains_key(j));
+                assert(
+                   forall |j: int| j >= start_addr && j < end_addr
+                        ==> granted_perms_map.index(j).ptr().addr() == j
+                );
+                assert(
+                   forall |j: int| j >= start_addr && j < end_addr
+                        ==> granted_perms_map.index(j).ptr()@.provenance == self.vbq.instance@.provenance()
+                );
 
                 assert(reserve_token.value() == start + sz);
             }
         );
 
-
-        let mut granted_buf: Vec<u8> = Vec::new();
+        let mut granted_buf: Vec<*mut u8> = Vec::new();
+        let base_ptr = self.vbq.buffer;
         let end_offset = start + sz;
 
         for idx in start..end_offset
             invariant
                 granted_buf.len() == idx - start,
                 idx <= end_offset,
+                base_ptr as usize + end_offset <= usize::MAX + 1,
+                base_ptr@.provenance == self.vbq.instance@.provenance(),
                 granted_buf.len() == (idx - start),
             decreases
                 end_offset - idx,
         {
-            granted_buf.push(0); // dummy
+            let addr = base_ptr as usize + idx;
+            let ptr: *mut u8 = with_exposed_provenance(addr, expose_provenance(base_ptr));
+            
+            granted_buf.push(ptr);
+            assert(ptr@.provenance == base_ptr@.provenance);
+            assert(granted_perms_map.contains_key(addr as int));
+            //assert(granted_perms_map.index(addr as int).ptr()@.provenance == base_ptr@.provenance);
+            //assert(granted_perms_map.index(addr as int).ptr()@.provenance == self.vbq.instance@.provenance());
+            //assert(equal(granted_perms_map.index(addr as int).ptr(), ptr)); 
         }
 
         proof {
@@ -1277,16 +1394,18 @@ impl Producer {
                 vbq: self.vbq.clone(),
                 to_commit: sz,
                 producer: Tracked(Some(prod_token)),
+                buf_token: Tracked(Some(granted_perms_map)),
             }
         )
     }
 }
 
 struct GrantW {
-    buf: Vec<u8>,//Vec<*mut u8>,
+    buf: Vec<*mut u8>,
     vbq: Arc<VBBuffer>,
     to_commit: usize,
     producer: Tracked<Option<VBQueue::producer>>,
+    buf_token: Tracked<Option<Map<int, PointsTo<u8>>>>,
 }
 
 impl GrantW {
@@ -1296,6 +1415,9 @@ impl GrantW {
         &&& self.producer@ is Some
         &&& self.producer@->0.instance_id() == self.vbq.instance@.id()
         &&& self.producer@->0.value().is_idle() || self.producer@->0.value().is_granted(sz)
+        &&& self.buf_token@ is Some
+        &&& forall|i: int| 0 <= i && i < self.buf.len() as int ==>
+            self.buf_token@->0.contains_key(self.buf[i] as int)
     }
 
     pub closed spec fn commit_called(&self) -> bool {
@@ -1319,7 +1441,8 @@ impl GrantW {
         // generally means we are dropping the grant within a
         // wrapper structure
         let tracked prod_token = self.producer.borrow_mut().tracked_take();
-
+        let tracked buf_token = self.buf_token.borrow_mut().tracked_take();
+        
         let is_write_in_progress =
             atomic_with_ghost!(&self.vbq.write_in_progress => load();
                 returning ret;
@@ -1362,7 +1485,8 @@ impl GrantW {
                 assert(prod_token.value().reserve == prev);
                 assert(usize::MIN as int <= prod_token.value().reserve - (len - used));
                 assert(usize::MIN as int <= prev - (len - used));
-                let _ = self.vbq.instance.borrow().sub_reserve_at_commit((len - used) as nat, &mut reserve_token, &mut prod_token);
+                let tracked to_deposit = buf_token.tracked_remove_keys(crate::set_lib::set_int_range(prev - (len - used), prev as int));
+                let _ = self.vbq.instance.borrow().sub_reserve_at_commit((len - used) as nat, to_deposit, to_deposit, &mut reserve_token, &mut prod_token);
             }
         );
 

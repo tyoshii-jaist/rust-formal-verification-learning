@@ -177,7 +177,6 @@ tokenized_state_machine!{VBQueue {
     }
 
     #[invariant]
-    // ここは仕様から来た要件であるということを明確に論文・資料には書く
     pub fn valid_order_from_producer_view(&self) -> bool {
         match self.producer.read_obs {
             Some(read_obs) => {
@@ -398,6 +397,10 @@ tokenized_state_machine!{VBQueue {
                     ||| start == 0 && !(pre.producer.write < read_obs) && (pre.producer.write + sz > pre.length && sz < read_obs)
                 }
             );
+
+            proof {
+                
+            }
 
             update reserve = start + sz;
 
