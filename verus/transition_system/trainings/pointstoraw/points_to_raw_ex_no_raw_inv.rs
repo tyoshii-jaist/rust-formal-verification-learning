@@ -104,7 +104,7 @@ struct_with_invariants!{
     pub struct ExBuffer {
         length: usize,
         buffer_ptr: *mut u8,
-        split: AtomicUsize<_, PointsToRawExample::split, _>,
+        split: PAtomicUsize,
 
         inv: Tracked< Shared<AtomicInvariant<_, PointsToRawExample::buffer_perm, _>> >,
 
@@ -159,11 +159,13 @@ impl ExBuffer
         );
 
         let tracked_inst: Tracked<PointsToRawExample::Instance> = Tracked(instance.clone());
-        let split_atomic = AtomicUsize::new(Ghost(tracked_inst), 0, Tracked(split_token));
 
         let tr_inst = Tracked(instance);
-        let tracked inv = AtomicInvariant::new(tr_inst, buffer_perm_token, 0);
-        let tracked inv = Shared::new(inv); // Shared は Ghost object を中に入れて、duplicate して &T を取り出すことができる。
+        let tracked buffer_perm_inv = AtomicInvariant::new(tr_inst, buffer_perm_token, 0);
+        let tracked buffer_perm_inv = Shared::new(buffer_perm_inv); // Shared は Ghost object を中に入れて、duplicate して &T を取り出すことができる。
+
+        let (split, Tracked(split_token)) = PAtomicUsize::new(0);
+        let tracked inv = AtomicInvariant::new(tr_inst, split_token, 1);
 
         // Initialize the queue
         Self {
@@ -184,16 +186,17 @@ impl ExBuffer
     {
         open_atomic_invariant!(self.inv.borrow().borrow() => g => {
             let tracked mut buffer_perm_token = g;
+            
+            atomic_with_ghost!(&self.split => store(at);
+                ghost split_token => {
+                    let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token);
+                    assert(split_token.value() == at);
+                }
+            );
 
             proof { g = buffer_perm_token; }
         });
 
-        atomic_with_ghost!(&self.split => store(at);
-            ghost split_token => {
-                let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token);
-                assert(split_token.value() == at);
-            }
-        );
     }
 }
 
