@@ -100,12 +100,28 @@ tokenized_state_machine!(PointsToRawExample {
     }
 });
 
+
+pub tracked struct GhostSplitStuff {
+    pub tracked perm: PermissionUsize,
+    pub tracked token: PointsToRawExample::split,
+}
+
+impl GhostSplitStuff {
+    pub open spec fn wf(self, inst: PointsToRawExample::Instance, cell: PAtomicUsize) -> bool {
+        &&& self.perm@.patomic == cell.id()
+        &&& self.token.instance_id() == inst.id()
+        &&& self.perm@.value as nat == self.token.value()
+    }
+}
+
 struct_with_invariants!{
     pub struct ExBuffer {
         length: usize,
         buffer_ptr: *mut u8,
+        split: PAtomicUsize,
+
         buffer_perm_inv: Tracked< Shared<AtomicInvariant<_, PointsToRawExample::buffer_perm, _>> >,
-        split_inv: Tracked< AtomicInvariant<_, PointsToRawExample::split, _>>,
+        split_inv: Tracked< Shared<AtomicInvariant<_, GhostSplitStuff, _>> >,
 
         instance: Tracked<PointsToRawExample::Instance>,
         producer: Tracked<Option<PointsToRawExample::producer>>,
@@ -116,14 +132,7 @@ struct_with_invariants!{
         predicate {
             &&& self.instance@.length() == self.length
             &&& self.instance@.length() <= usize::MAX
-        }
-
-        
-        invariant on split_inv with (instance)
-            specifically (self.split_inv@)
-            is (v: PointsToRawExample::split)
-        {
-            &&& v.instance_id() === instance@.id()
+            &&& self.split_inv@@.namespace() != self.buffer_perm_inv@@.namespace()
         }
 
         invariant on buffer_perm_inv with (instance)
@@ -131,6 +140,13 @@ struct_with_invariants!{
             is (v: PointsToRawExample::buffer_perm)
         {
             &&& v.instance_id() === instance@.id()
+        }
+
+        invariant on split_inv with (instance, split)
+            specifically (self.split_inv@@)
+            is (v: GhostSplitStuff)
+        {
+            v.wf(instance@, split)
         }
     }
 }
@@ -166,15 +182,18 @@ impl ExBuffer
         let tracked buffer_perm_inv = AtomicInvariant::new(tr_inst, buffer_perm_token, 0);
         let tracked buffer_perm_inv = Shared::new(buffer_perm_inv); // Shared は Ghost object を中に入れて、duplicate して &T を取り出すことができる。
 
-        let (split, Tracked(split_token_what)) = PAtomicUsize::new(0);
-        let tracked split_inv = AtomicInvariant::new(tr_inst, split_token, 1);
+        let (split, Tracked(split_perm)) = PAtomicUsize::new(0);
+        let tracked gss = GhostSplitStuff { perm: split_perm, token: split_token };
+        let tracked split_inv = AtomicInvariant::new((tr_inst, split), gss, 1);
+        let tracked split_inv = Shared::new(split_inv);
 
         // Initialize the queue
         Self {
             length,
             buffer_ptr,
-            split_inv: Tracked(split_inv),
+            split,
             buffer_perm_inv: Tracked(buffer_perm_inv),
+            split_inv: Tracked(split_inv),
             instance: tr_inst,
             producer: Tracked(Some(producer_token)),
             consumer: Tracked(Some(consumer_token)),
@@ -186,17 +205,17 @@ impl ExBuffer
             self.wf(),
             0 < at && at < self.length,
     {
-        open_atomic_invariant!(self.buffer_perm_inv.borrow().borrow() => g => {
-            let tracked mut buffer_perm_token = g;
-            /*
-            atomic_with_ghost!(&self.split => store(at);
-                ghost split_token => {
-                    let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token);
-                    assert(split_token.value() == at);
-                }
-            ); */
+        open_atomic_invariant!(self.buffer_perm_inv.borrow().borrow() => bp => {
+            let tracked mut buffer_perm_token = bp;
+            open_atomic_invariant!(self.split_inv.borrow().borrow() => s => {
+                let tracked GhostSplitStuff { perm: mut split_perm, token: mut split_token } = s;
 
-            proof { g = buffer_perm_token; }
+                //let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token);
+                //assert(split_token.value() == at);
+                proof { s = GhostSplitStuff { perm: split_perm, token: split_token }; }
+            });
+
+            proof { bp = buffer_perm_token; }
         });
 
     }
