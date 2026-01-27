@@ -5,6 +5,7 @@ use vstd::raw_ptr::*;
 use vstd::{prelude::*, *};
 use vstd::layout::*;
 use vstd::shared::*;
+use vstd::tokens::UniqueValueToken;
 
 verus! {
 pub struct ProducerState {
@@ -102,13 +103,18 @@ tokenized_state_machine!(PointsToRawExample {
     }
 });
 
-
-pub tracked struct GhostSplitStuff {
+pub tracked struct GhostStuff<Tok>
+where
+    Tok: UniqueValueToken<nat>,
+{
     pub tracked perm: PermissionUsize,
-    pub tracked token: PointsToRawExample::split,
+    pub tracked token: Tok,
 }
 
-impl GhostSplitStuff {
+impl<Tok> GhostStuff<Tok>
+where
+    Tok: UniqueValueToken<nat>,
+{
     pub open spec fn wf(self, inst: PointsToRawExample::Instance, cell: PAtomicUsize) -> bool {
         &&& self.perm@.patomic == cell.id()
         &&& self.token.instance_id() == inst.id()
@@ -123,7 +129,7 @@ struct_with_invariants!{
         split: PAtomicUsize,
 
         buffer_perm_inv: Tracked< Shared<AtomicInvariant<_, PointsToRawExample::buffer_perm, _>> >,
-        split_inv: Tracked< Shared<AtomicInvariant<_, GhostSplitStuff, _>> >,
+        split_inv: Tracked< Shared<AtomicInvariant<_, GhostStuff<PointsToRawExample::split>, _>> >,
 
         instance: Tracked<PointsToRawExample::Instance>,
         producer: Tracked<Option<PointsToRawExample::producer>>,
@@ -146,7 +152,7 @@ struct_with_invariants!{
 
         invariant on split_inv with (instance, split)
             specifically (self.split_inv@@)
-            is (v: GhostSplitStuff)
+            is (v: GhostStuff<PointsToRawExample::split>)
         {
             v.wf(instance@, split)
         }
@@ -185,7 +191,7 @@ impl ExBuffer
         let tracked buffer_perm_inv = Shared::new(buffer_perm_inv); // Shared は Ghost object を中に入れて、duplicate して &T を取り出すことができる。
 
         let (split, Tracked(split_perm)) = PAtomicUsize::new(0);
-        let tracked gss = GhostSplitStuff { perm: split_perm, token: split_token };
+        let tracked gss = GhostStuff { perm: split_perm, token: split_token };
         let tracked split_inv = AtomicInvariant::new((tr_inst, split), gss, 1);
         let tracked split_inv = Shared::new(split_inv);
 
@@ -210,12 +216,12 @@ impl ExBuffer
         open_atomic_invariant!(self.buffer_perm_inv.borrow().borrow() => bp => {
             let tracked mut buffer_perm_token = bp;
             open_atomic_invariant!(self.split_inv.borrow().borrow() => s => {
-                let tracked GhostSplitStuff { perm: mut split_perm, token: mut split_token } = s;
+                let tracked GhostStuff { perm: mut split_perm, token: mut split_token } = s;
 
                 self.split.store(Tracked(&mut split_perm), at);
                 let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token, &mut buffer_perm_token);
                 assert(split_token.value() == at);
-                proof { s = GhostSplitStuff { perm: split_perm, token: split_token }; }
+                proof { s = GhostStuff { perm: split_perm, token: split_token }; }
             });
 
             proof { bp = buffer_perm_token; }
