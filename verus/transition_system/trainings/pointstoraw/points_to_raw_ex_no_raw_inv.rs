@@ -210,8 +210,9 @@ impl ExBuffer
             open_atomic_invariant!(self.split_inv.borrow().borrow() => s => {
                 let tracked GhostSplitStuff { perm: mut split_perm, token: mut split_token } = s;
 
-                //let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token);
-                //assert(split_token.value() == at);
+                self.split.store(Tracked(&mut split_perm), at);
+                let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token);
+                assert(split_token.value() == at);
                 proof { s = GhostSplitStuff { perm: split_perm, token: split_token }; }
             });
 
