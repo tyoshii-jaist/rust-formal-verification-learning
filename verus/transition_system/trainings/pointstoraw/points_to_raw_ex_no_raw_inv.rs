@@ -50,6 +50,11 @@ tokenized_state_machine!(PointsToRawExample {
         0 <= self.split && self.split < self.length
     }
 
+    #[invariant]
+    pub fn valid_points_to_range(&self) -> bool {
+        self.buffer_perm.is_range(self.base_addr as int, self.length as int)
+    }
+
     init! {
         initialize(
             length: nat,
@@ -61,7 +66,7 @@ tokenized_state_machine!(PointsToRawExample {
         {
             require(
                 {
-                    &&& length > 0 // TODO: 元の BBQueue はこの制約は持っていない
+                    &&& length > 0
                     &&& buffer_perm.is_range(base_addr as int, length as int)
                 }
             );
@@ -99,8 +104,7 @@ tokenized_state_machine!(PointsToRawExample {
     fn initialize_inductive(post: Self, length: nat, base_addr: nat, provenance: raw_ptr::Provenance, buffer_perm: raw_ptr::PointsToRaw, buffer_dealloc: raw_ptr::Dealloc) { }
 
     #[inductive(do_split)]
-    fn do_split_inductive(pre: Self, post: Self, at: nat) {
-    }
+    fn do_split_inductive(pre: Self, post: Self, at: nat) {}
 });
 
 pub tracked struct GhostStuff<Tok>
@@ -167,6 +171,10 @@ impl ExBuffer
             length > 0,
         ensures
             r.wf(),
+            r.producer@ is Some,
+            r.producer@->Some_0.value().grant is None,
+            r.consumer@ is Some,
+            r.consumer@->Some_0.value().grant is None,
     {
         let (buffer_ptr, Tracked(buffer_perm), Tracked(buffer_dealloc)) = allocate(length, 1);
         let tracked (
