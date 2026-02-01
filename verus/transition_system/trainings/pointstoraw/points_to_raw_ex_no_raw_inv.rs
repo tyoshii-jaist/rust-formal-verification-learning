@@ -6,6 +6,7 @@ use vstd::{prelude::*, *};
 use vstd::layout::*;
 use vstd::shared::*;
 use vstd::tokens::UniqueValueToken;
+use vstd::set_lib::*;
 
 verus! {
 pub struct ProducerState {
@@ -25,7 +26,7 @@ pub struct GrantState {
     pub cons_end: int,
 }
 
-tokenized_state_machine!(PointsToRawExample {
+tokenized_state_machine!(SplitPermExample {
     fields {
         #[sharding(constant)]
         pub length: nat,
@@ -130,35 +131,38 @@ impl<Tok> GhostStuff<Tok>
 where
     Tok: UniqueValueToken<nat>,
 {
-    pub open spec fn wf(self, inst: PointsToRawExample::Instance, cell: PAtomicUsize) -> bool {
+    pub open spec fn wf(self, inst: SplitPermExample::Instance, cell: PAtomicUsize) -> bool {
         &&& self.perm@.patomic == cell.id()
         &&& self.token.instance_id() == inst.id()
         &&& self.perm@.value as nat == self.token.value()
     }
 }
 
-pub tracked struct BufferPermission {
-    pub tracked pool: PointsToRaw,
-    pub tracked prod: PointsToRaw,
-    pub tracked cons: PointsToRaw,
-}
-
 pub tracked struct GhostBufferPermission
 {
-    pub tracked token: PointsToRawExample::grant_state,
+    pub tracked pool: PointsToRaw,
+    pub tracked token: SplitPermExample::grant_state,
 }
 
 impl GhostBufferPermission
 {
-    pub open spec fn wf(self, inst: PointsToRawExample::Instance, buf_perm: BufferPermission) -> bool {
+    pub open spec fn wf(self, inst: SplitPermExample::Instance) -> bool {
         let ps = self.token.value().prod_start;
         let pe = self.token.value().prod_end;
         let cs = self.token.value().cons_start;
         let ce = self.token.value().cons_end;
+
+        let whole_set = set_int_range(inst.base_addr() as int, inst.base_addr() as int + inst.length() as int);
+        let prod_set = set_int_range(ps + inst.base_addr() as int, pe + inst.base_addr() as int);
+        let cons_set = set_int_range(cs + inst.base_addr() as int, ce + inst.base_addr() as int);
+
         {
             &&& self.token.instance_id() == inst.id()
-            &&& buf_perm.prod.is_range(ps, pe - ps)
-            &&& buf_perm.cons.is_range(cs, ce - cs)
+            &&& prod_set.disjoint(cons_set)
+            &&& self.pool.dom()
+              =~= Set::new(|i: int| whole_set.contains(i)
+                                   && !prod_set.contains(i)
+                                   && !cons_set.contains(i))
         }
     }
 }
@@ -170,12 +174,11 @@ struct_with_invariants!{
         split: PAtomicUsize,
 
         buf_perm_inv: Tracked< Shared<AtomicInvariant<_, GhostBufferPermission, _>> >,
-        split_inv: Tracked< Shared<AtomicInvariant<_, GhostStuff<PointsToRawExample::split>, _>> >,
+        split_inv: Tracked< Shared<AtomicInvariant<_, GhostStuff<SplitPermExample::split>, _>> >,
 
-        instance: Tracked<PointsToRawExample::Instance>,
-        buf_perm: Tracked<BufferPermission>,
-        producer: Tracked<Option<PointsToRawExample::producer>>,
-        consumer: Tracked<Option<PointsToRawExample::consumer>>,
+        instance: Tracked<SplitPermExample::Instance>,
+        producer: Tracked<Option<SplitPermExample::producer>>,
+        consumer: Tracked<Option<SplitPermExample::consumer>>,
     }
 
     pub closed spec fn wf(&self) -> bool {
@@ -185,16 +188,16 @@ struct_with_invariants!{
             &&& self.split_inv@@.namespace() != self.buf_perm_inv@@.namespace()
         }
 
-        invariant on buf_perm_inv with (instance, buf_perm)
+        invariant on buf_perm_inv with (instance)
             specifically (self.buf_perm_inv@@)
             is (v: GhostBufferPermission)
         {
-            v.wf(instance@, buf_perm@)
+            v.wf(instance@)
         }
 
         invariant on split_inv with (instance, split)
             specifically (self.split_inv@@)
-            is (v: GhostStuff<PointsToRawExample::split>)
+            is (v: GhostStuff<SplitPermExample::split>)
         {
             v.wf(instance@, split)
         }
@@ -221,7 +224,7 @@ impl ExBuffer
             Tracked(producer_token),
             Tracked(consumer_token),
             Tracked(grant_state_token),
-        ) = PointsToRawExample::Instance::initialize(
+        ) = SplitPermExample::Instance::initialize(
             length as nat,
             buffer_ptr as nat,
             buffer_ptr@.provenance,
@@ -229,19 +232,14 @@ impl ExBuffer
             Some(buffer_dealloc),
         );
 
-        let tracked_inst: Tracked<PointsToRawExample::Instance> = Tracked(instance.clone());
+        let tracked_inst: Tracked<SplitPermExample::Instance> = Tracked(instance.clone());
 
         let tr_inst = Tracked(instance);
-        let tracked buf_perm = BufferPermission {
-            pool: points_to_raw,
-            prod: PointsToRaw::empty(buffer_ptr@.provenance),
-            cons: PointsToRaw::empty(buffer_ptr@.provenance),
-        };
-        let buf_perm = Tracked(buf_perm);
         let tracked ghost_buffer_perm = GhostBufferPermission {
+            pool: points_to_raw,
             token: grant_state_token,
         };
-        let tracked buf_perm_inv = AtomicInvariant::new((tr_inst, buf_perm), ghost_buffer_perm, 0);
+        let tracked buf_perm_inv = AtomicInvariant::new(tr_inst, ghost_buffer_perm, 0);
         let tracked buf_perm_inv = Shared::new(buf_perm_inv); // Shared は Ghost object を中に入れて、duplicate して &T を取り出すことができる。
 
         let (split, Tracked(split_perm)) = PAtomicUsize::new(0);
@@ -257,7 +255,6 @@ impl ExBuffer
             buf_perm_inv: Tracked(buf_perm_inv),
             split_inv: Tracked(split_inv),
             instance: tr_inst,
-            buf_perm,
             producer: Tracked(Some(producer_token)),
             consumer: Tracked(Some(consumer_token)),
         }
@@ -268,8 +265,11 @@ impl ExBuffer
             self.wf(),
             0 < at && at < self.length,
     {
+        let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
+
         open_atomic_invariant!(self.buf_perm_inv.borrow().borrow() => bp => {
             let tracked GhostBufferPermission {
+                pool: mut current_pool,
                 token: mut grant_state_token,
             } = bp;
             open_atomic_invariant!(self.split_inv.borrow().borrow() => s => {
@@ -278,13 +278,32 @@ impl ExBuffer
                 self.split.store(Tracked(&mut split_perm), at);
                 let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token, &mut grant_state_token);
                 assert(split_token.value() == at);
+                assert(grant_state_token.value().prod_start == 0);
+                assert(grant_state_token.value().prod_end == at as int);
+                assert(grant_state_token.value().cons_start == at as int);
+                assert(grant_state_token.value().cons_end == self.length);
+
                 proof { s = GhostStuff { perm: split_perm, token: split_token }; }
             });
 
-            proof { bp = GhostBufferPermission { token: grant_state_token}; }
+            let tracked (points_to_raw_prod, mut pool_rest) = current_pool.split(set_int_range(
+                self.buffer_ptr as int + grant_state_token.value().prod_start,
+                self.buffer_ptr as int + grant_state_token.value().prod_end));
+
+            let tracked (_points_to_raw_cons, pool_rest) = pool_rest.split(set_int_range(
+                self.buffer_ptr as int + grant_state_token.value().prod_start,
+                self.buffer_ptr as int + grant_state_token.value().prod_end));
+
+            proof { bp = GhostBufferPermission { pool: pool_rest, token: grant_state_token}; }
         });
 
     }
+}
+
+pub struct Producer {
+    buf_ptr: *mut u8,
+    //buf_perm_inv: Tracked< Shared<AtomicInvariant<_, GhostBufferPermission, _>> >,
+    producer: Tracked<Option<SplitPermExample::producer>>,
 }
 
 fn main() {
