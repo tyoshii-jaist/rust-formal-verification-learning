@@ -101,6 +101,13 @@ tokenized_state_machine!(PointsToRawExample {
             require(at > 0 && at < pre.length);
 
             update split = at;
+
+            update grant_state = GrantState {
+                prod_start: 0,
+                prod_end: at as int,
+                cons_start: at as int,
+                cons_end: pre.length as int,
+            };
         }
     }
 
@@ -262,17 +269,19 @@ impl ExBuffer
             0 < at && at < self.length,
     {
         open_atomic_invariant!(self.buf_perm_inv.borrow().borrow() => bp => {
-            let tracked mut buffer_perm_token = bp;
+            let tracked GhostBufferPermission {
+                token: mut grant_state_token,
+            } = bp;
             open_atomic_invariant!(self.split_inv.borrow().borrow() => s => {
                 let tracked GhostStuff { perm: mut split_perm, token: mut split_token } = s;
 
                 self.split.store(Tracked(&mut split_perm), at);
-                let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token);//, &mut buffer_perm_token);
+                let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token, &mut grant_state_token);
                 assert(split_token.value() == at);
                 proof { s = GhostStuff { perm: split_perm, token: split_token }; }
             });
 
-            proof { bp = buffer_perm_token; }
+            proof { bp = GhostBufferPermission { token: grant_state_token}; }
         });
 
     }
