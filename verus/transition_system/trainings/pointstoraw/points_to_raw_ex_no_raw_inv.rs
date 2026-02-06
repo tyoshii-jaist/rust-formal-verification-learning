@@ -10,13 +10,23 @@ use vstd::set_lib::*;
 
 verus! {
 pub struct ProducerState {
-    pub split: nat,
-    pub grant: Option<raw_ptr::PointsToRaw>,
+    pub split: nat
+}
+
+impl ProducerState {
+    pub open spec fn is_idle(&self) -> bool {
+        self.split == 0
+    }
 }
 
 pub struct ConsumerState {
-    pub split: nat,
-    pub grant: Option<raw_ptr::PointsToRaw>,
+    pub split: nat
+}
+
+impl ConsumerState {
+    pub open spec fn is_idle(&self) -> bool {
+        self.split == 0
+    }
 }
 
 pub struct GrantState {
@@ -58,6 +68,11 @@ tokenized_state_machine!(SplitPermExample {
         0 <= self.split && self.split < self.length
     }
 
+    #[invariant]
+    pub fn valid_split_with_grant_state(&self) -> bool {
+        self.producer.split == self.split == self.grant_state.prod_end == self.grant_state.cons_start
+    }
+
     init! {
         initialize(
             length: nat,
@@ -80,12 +95,10 @@ tokenized_state_machine!(SplitPermExample {
             init buffer_dealloc = Some(buffer_dealloc);
             init producer = ProducerState {
                 split: 0,
-                grant: None,
             };
 
             init consumer = ConsumerState {
                 split: 0,
-                grant: None,
             };
 
             init grant_state = GrantState {
@@ -102,6 +115,10 @@ tokenized_state_machine!(SplitPermExample {
             require(at > 0 && at < pre.length);
 
             update split = at;
+
+            update producer = ProducerState {
+                split: at,
+            };
 
             update grant_state = GrantState {
                 prod_start: 0,
@@ -213,9 +230,7 @@ impl ExBuffer
         ensures
             r.wf(),
             r.producer@ is Some,
-            r.producer@->Some_0.value().grant is None,
             r.consumer@ is Some,
-            r.consumer@->Some_0.value().grant is None,
     {
         let (buffer_ptr, Tracked(points_to_raw), Tracked(buffer_dealloc)) = allocate(length, 1);
         let tracked (
@@ -260,43 +275,49 @@ impl ExBuffer
         }
     }
 
-    fn split(&self, at: usize)
+    fn split(self, at: usize)
         requires
             self.wf(),
+            self.producer@ is Some,
+            self.producer@->0.value().is_idle(),
+            self.consumer@->0.value().is_idle(),
             0 < at && at < self.length,
     {
+        let mut slf = self;
         let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
+        let tracked mut prod_token = slf.producer.borrow_mut().tracked_take();
 
-        open_atomic_invariant!(self.buf_perm_inv.borrow().borrow() => bp => {
+        open_atomic_invariant!(slf.buf_perm_inv.borrow().borrow() => bp => {
             let tracked GhostBufferPermission {
                 pool: mut current_pool,
                 token: mut grant_state_token,
             } = bp;
-            open_atomic_invariant!(self.split_inv.borrow().borrow() => s => {
+            open_atomic_invariant!(slf.split_inv.borrow().borrow() => s => {
                 let tracked GhostStuff { perm: mut split_perm, token: mut split_token } = s;
 
-                self.split.store(Tracked(&mut split_perm), at);
-                let tracked ret = self.instance.borrow().do_split(at as nat, &mut split_token, &mut grant_state_token);
+                slf.split.store(Tracked(&mut split_perm), at);
+                let tracked ret = slf.instance.borrow().do_split(at as nat, &mut split_token, &mut prod_token, &mut grant_state_token);
                 assert(split_token.value() == at);
                 assert(grant_state_token.value().prod_start == 0);
                 assert(grant_state_token.value().prod_end == at as int);
                 assert(grant_state_token.value().cons_start == at as int);
-                assert(grant_state_token.value().cons_end == self.length);
+                assert(grant_state_token.value().cons_end == slf.length);
 
                 proof { s = GhostStuff { perm: split_perm, token: split_token }; }
             });
 
             let tracked (points_to_raw_prod, mut pool_rest) = current_pool.split(set_int_range(
-                self.buffer_ptr as int + grant_state_token.value().prod_start,
-                self.buffer_ptr as int + grant_state_token.value().prod_end));
+                slf.buffer_ptr as int + grant_state_token.value().prod_start,
+                slf.buffer_ptr as int + grant_state_token.value().prod_end));
 
             let tracked (_points_to_raw_cons, pool_rest) = pool_rest.split(set_int_range(
-                self.buffer_ptr as int + grant_state_token.value().prod_start,
-                self.buffer_ptr as int + grant_state_token.value().prod_end));
+                slf.buffer_ptr as int + grant_state_token.value().prod_start,
+                slf.buffer_ptr as int + grant_state_token.value().prod_end));
 
             proof { bp = GhostBufferPermission { pool: pool_rest, token: grant_state_token}; }
         });
 
+        slf.producer = Tracked(Some(prod_token));
     }
 }
 
