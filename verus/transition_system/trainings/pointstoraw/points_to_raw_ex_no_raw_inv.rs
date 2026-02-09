@@ -230,7 +230,9 @@ impl ExBuffer
         ensures
             r.wf(),
             r.producer@ is Some,
+            r.instance@.id() == r.producer@->0.instance_id(),
             r.consumer@ is Some,
+            r.instance@.id() == r.consumer@->0.instance_id(),
     {
         let (buffer_ptr, Tracked(points_to_raw), Tracked(buffer_dealloc)) = allocate(length, 1);
         let tracked (
@@ -279,6 +281,8 @@ impl ExBuffer
         requires
             self.wf(),
             self.producer@ is Some,
+            self.instance@.id() == self.producer@->0.instance_id(),
+            self.instance@.id() == self.consumer@->0.instance_id(),
             self.producer@->0.value().is_idle(),
             self.consumer@->0.value().is_idle(),
             0 < at && at < self.length,
