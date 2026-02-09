@@ -73,6 +73,17 @@ tokenized_state_machine!(SplitPermExample {
         self.producer.split == self.split == self.grant_state.prod_end == self.grant_state.cons_start
     }
 
+    #[invariant]
+    pub fn valid_producer_start(&self) -> bool {
+        self.grant_state.prod_start == 0
+    }
+
+    #[invariant]
+    pub fn valid_consumer_end(&self) -> bool {
+        ||| self.split == 0 && self.grant_state.cons_end == 0
+        ||| self.split > 0 && self.grant_state.cons_end == self.length
+    }
+
     init! {
         initialize(
             length: nat,
@@ -129,11 +140,24 @@ tokenized_state_machine!(SplitPermExample {
         }
     }
 
+    transition!{
+        check_split() {
+            require(pre.producer.split == 0);
+            assert(pre.grant_state.prod_start == 0);
+            assert(pre.grant_state.prod_end == pre.producer.split);
+            assert(pre.grant_state.cons_start == pre.producer.split);
+            assert(pre.grant_state.cons_end == 0);
+        }
+    }
+
     #[inductive(initialize)]
     fn initialize_inductive(post: Self, length: nat, base_addr: nat, provenance: raw_ptr::Provenance, buffer_dealloc: raw_ptr::Dealloc) { }
 
     #[inductive(do_split)]
     fn do_split_inductive(pre: Self, post: Self, at: nat) {}
+
+    #[inductive(check_split)]
+    fn check_split_inductive(pre: Self, post: Self) {}
 });
 
 pub tracked struct GhostStuff<Tok>
@@ -250,7 +274,10 @@ impl ExBuffer
         );
 
         let tracked_inst: Tracked<SplitPermExample::Instance> = Tracked(instance.clone());
-
+        proof {
+            assert(points_to_raw.is_range(buffer_ptr as int, length as int));
+            assert(points_to_raw.dom() =~= Set::new(|i: int| buffer_ptr as int <= i && i < buffer_ptr as int + length as int));
+        }
         let tr_inst = Tracked(instance);
         let tracked ghost_buffer_perm = GhostBufferPermission {
             pool: points_to_raw,
@@ -296,6 +323,16 @@ impl ExBuffer
                 pool: mut current_pool,
                 token: mut grant_state_token,
             } = bp;
+
+            proof {
+                slf.instance.borrow().check_split(&mut prod_token, &mut grant_state_token);
+
+                assert(grant_state_token.value().prod_start == 0);
+                assert(grant_state_token.value().prod_end == 0);
+                assert(grant_state_token.value().cons_start == 0);
+                assert(grant_state_token.value().cons_end == 0);
+            }
+
             open_atomic_invariant!(slf.split_inv.borrow().borrow() => s => {
                 let tracked GhostStuff { perm: mut split_perm, token: mut split_token } = s;
 
