@@ -227,6 +227,7 @@ struct_with_invariants!{
             &&& self.instance@.length() == self.length
             &&& self.instance@.length() <= usize::MAX
             &&& self.split_inv@@.namespace() != self.buf_perm_inv@@.namespace()
+            &&& self.instance@.base_addr() == self.buffer_ptr as nat 
         }
 
         invariant on buf_perm_inv with (instance)
@@ -352,8 +353,8 @@ impl ExBuffer
                 slf.buffer_ptr as int + grant_state_token.value().prod_end));
 
             let tracked (_points_to_raw_cons, pool_rest) = pool_rest.split(set_int_range(
-                slf.buffer_ptr as int + grant_state_token.value().prod_start,
-                slf.buffer_ptr as int + grant_state_token.value().prod_end));
+                slf.buffer_ptr as int + grant_state_token.value().cons_start,
+                slf.buffer_ptr as int + grant_state_token.value().cons_end));
 
             proof { bp = GhostBufferPermission { pool: pool_rest, token: grant_state_token}; }
         });
