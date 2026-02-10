@@ -10,22 +10,22 @@ use vstd::set_lib::*;
 
 verus! {
 pub struct ProducerState {
-    pub split: nat
+    pub divide: nat
 }
 
 impl ProducerState {
     pub open spec fn is_idle(&self) -> bool {
-        self.split == 0
+        self.divide == 0
     }
 }
 
 pub struct ConsumerState {
-    pub split: nat
+    pub divide: nat
 }
 
 impl ConsumerState {
     pub open spec fn is_idle(&self) -> bool {
-        self.split == 0
+        self.divide == 0
     }
 }
 
@@ -36,13 +36,13 @@ pub struct GrantState {
     pub cons_end: int,
 }
 
-tokenized_state_machine!(SplitPermExample {
+tokenized_state_machine!(DividePermExample {
     fields {
         #[sharding(constant)]
         pub length: nat,
 
         #[sharding(variable)]
-        pub split: nat,
+        pub divide: nat,
 
         #[sharding(constant)]
         pub base_addr: nat,
@@ -64,13 +64,13 @@ tokenized_state_machine!(SplitPermExample {
     }
 
     #[invariant]
-    pub fn valid_split(&self) -> bool {
-        0 <= self.split && self.split < self.length
+    pub fn valid_divide(&self) -> bool {
+        0 <= self.divide && self.divide < self.length
     }
 
     #[invariant]
-    pub fn valid_split_with_grant_state(&self) -> bool {
-        self.producer.split == self.split == self.grant_state.prod_end == self.grant_state.cons_start
+    pub fn valid_divide_with_grant_state(&self) -> bool {
+        self.producer.divide == self.divide == self.grant_state.prod_end == self.grant_state.cons_start
     }
 
     #[invariant]
@@ -80,8 +80,8 @@ tokenized_state_machine!(SplitPermExample {
 
     #[invariant]
     pub fn valid_consumer_end(&self) -> bool {
-        ||| self.split == 0 && self.grant_state.cons_end == 0
-        ||| self.split > 0 && self.grant_state.cons_end == self.length
+        ||| self.divide == 0 && self.grant_state.cons_end == 0
+        ||| self.divide > 0 && self.grant_state.cons_end == self.length
     }
 
     init! {
@@ -99,17 +99,17 @@ tokenized_state_machine!(SplitPermExample {
             );
 
             init length = length;
-            init split = 0;
+            init divide = 0;
 
             init base_addr = base_addr;
             init provenance = provenance;
             init buffer_dealloc = Some(buffer_dealloc);
             init producer = ProducerState {
-                split: 0,
+                divide: 0,
             };
 
             init consumer = ConsumerState {
-                split: 0,
+                divide: 0,
             };
 
             init grant_state = GrantState {
@@ -122,13 +122,13 @@ tokenized_state_machine!(SplitPermExample {
     }
 
     transition!{
-        do_split(at: nat) {
+        do_divide(at: nat) {
             require(at > 0 && at < pre.length);
 
-            update split = at;
+            update divide = at;
 
             update producer = ProducerState {
-                split: at,
+                divide: at,
             };
 
             update grant_state = GrantState {
@@ -141,11 +141,11 @@ tokenized_state_machine!(SplitPermExample {
     }
 
     transition!{
-        check_split() {
-            require(pre.producer.split == 0);
+        check_divide() {
+            require(pre.producer.divide == 0);
             assert(pre.grant_state.prod_start == 0);
-            assert(pre.grant_state.prod_end == pre.producer.split);
-            assert(pre.grant_state.cons_start == pre.producer.split);
+            assert(pre.grant_state.prod_end == pre.producer.divide);
+            assert(pre.grant_state.cons_start == pre.producer.divide);
             assert(pre.grant_state.cons_end == 0);
         }
     }
@@ -153,11 +153,11 @@ tokenized_state_machine!(SplitPermExample {
     #[inductive(initialize)]
     fn initialize_inductive(post: Self, length: nat, base_addr: nat, provenance: raw_ptr::Provenance, buffer_dealloc: raw_ptr::Dealloc) { }
 
-    #[inductive(do_split)]
-    fn do_split_inductive(pre: Self, post: Self, at: nat) {}
+    #[inductive(do_divide)]
+    fn do_divide_inductive(pre: Self, post: Self, at: nat) {}
 
-    #[inductive(check_split)]
-    fn check_split_inductive(pre: Self, post: Self) {}
+    #[inductive(check_divide)]
+    fn check_divide_inductive(pre: Self, post: Self) {}
 });
 
 pub tracked struct GhostStuff<Tok>
@@ -172,7 +172,7 @@ impl<Tok> GhostStuff<Tok>
 where
     Tok: UniqueValueToken<nat>,
 {
-    pub open spec fn wf(self, inst: SplitPermExample::Instance, cell: PAtomicUsize) -> bool {
+    pub open spec fn wf(self, inst: DividePermExample::Instance, cell: PAtomicUsize) -> bool {
         &&& self.perm@.patomic == cell.id()
         &&& self.token.instance_id() == inst.id()
         &&& self.perm@.value as nat == self.token.value()
@@ -182,12 +182,12 @@ where
 pub tracked struct GhostBufferPermission
 {
     pub tracked pool: PointsToRaw,
-    pub tracked token: SplitPermExample::grant_state,
+    pub tracked token: DividePermExample::grant_state,
 }
 
 impl GhostBufferPermission
 {
-    pub open spec fn wf(self, inst: SplitPermExample::Instance) -> bool {
+    pub open spec fn wf(self, inst: DividePermExample::Instance) -> bool {
         let ps = self.token.value().prod_start;
         let pe = self.token.value().prod_end;
         let cs = self.token.value().cons_start;
@@ -212,21 +212,21 @@ struct_with_invariants!{
     pub struct ExBuffer {
         length: usize,
         buffer_ptr: *mut u8,
-        split: PAtomicUsize,
+        divide: PAtomicUsize,
 
         buf_perm_inv: Tracked< Shared<AtomicInvariant<_, GhostBufferPermission, _>> >,
-        split_inv: Tracked< Shared<AtomicInvariant<_, GhostStuff<SplitPermExample::split>, _>> >,
+        divide_inv: Tracked< Shared<AtomicInvariant<_, GhostStuff<DividePermExample::divide>, _>> >,
 
-        instance: Tracked<SplitPermExample::Instance>,
-        producer: Tracked<Option<SplitPermExample::producer>>,
-        consumer: Tracked<Option<SplitPermExample::consumer>>,
+        instance: Tracked<DividePermExample::Instance>,
+        producer: Tracked<Option<DividePermExample::producer>>,
+        consumer: Tracked<Option<DividePermExample::consumer>>,
     }
 
     pub closed spec fn wf(&self) -> bool {
         predicate {
             &&& self.instance@.length() == self.length
             &&& self.instance@.length() <= usize::MAX
-            &&& self.split_inv@@.namespace() != self.buf_perm_inv@@.namespace()
+            &&& self.divide_inv@@.namespace() != self.buf_perm_inv@@.namespace()
             &&& self.instance@.base_addr() == self.buffer_ptr as nat 
         }
 
@@ -237,12 +237,23 @@ struct_with_invariants!{
             v.wf(instance@)
         }
 
-        invariant on split_inv with (instance, split)
-            specifically (self.split_inv@@)
-            is (v: GhostStuff<SplitPermExample::split>)
+        invariant on divide_inv with (instance, divide)
+            specifically (self.divide_inv@@)
+            is (v: GhostStuff<DividePermExample::divide>)
         {
-            v.wf(instance@, split)
+            v.wf(instance@, divide)
         }
+    }
+}
+
+impl ExBuffer {
+    pub closed spec fn is_splittable(&self) -> bool {
+        &&& self.producer@ is Some
+        &&& self.producer@->0.instance_id() == self.instance@.id()
+        &&& self.producer@->0.value().is_idle()
+        &&& self.consumer@ is Some
+        &&& self.consumer@->0.instance_id() == self.instance@.id()
+        &&& self.consumer@->0.value().is_idle()
     }
 }
 
@@ -262,11 +273,11 @@ impl ExBuffer
         let (buffer_ptr, Tracked(points_to_raw), Tracked(buffer_dealloc)) = allocate(length, 1);
         let tracked (
             Tracked(instance),
-            Tracked(split_token),
+            Tracked(divide_token),
             Tracked(producer_token),
             Tracked(consumer_token),
             Tracked(grant_state_token),
-        ) = SplitPermExample::Instance::initialize(
+        ) = DividePermExample::Instance::initialize(
             length as nat,
             buffer_ptr as nat,
             buffer_ptr@.provenance,
@@ -274,7 +285,7 @@ impl ExBuffer
             Some(buffer_dealloc),
         );
 
-        let tracked_inst: Tracked<SplitPermExample::Instance> = Tracked(instance.clone());
+        let tracked_inst: Tracked<DividePermExample::Instance> = Tracked(instance.clone());
         proof {
             assert(points_to_raw.is_range(buffer_ptr as int, length as int));
             assert(points_to_raw.dom() =~= Set::new(|i: int| buffer_ptr as int <= i && i < buffer_ptr as int + length as int));
@@ -287,33 +298,60 @@ impl ExBuffer
         let tracked buf_perm_inv = AtomicInvariant::new(tr_inst, ghost_buffer_perm, 0);
         let tracked buf_perm_inv = Shared::new(buf_perm_inv); // Shared は Ghost object を中に入れて、duplicate して &T を取り出すことができる。
 
-        let (split, Tracked(split_perm)) = PAtomicUsize::new(0);
-        let tracked gss = GhostStuff { perm: split_perm, token: split_token };
-        let tracked split_inv = AtomicInvariant::new((tr_inst, split), gss, 1);
-        let tracked split_inv = Shared::new(split_inv);
+        let (divide, Tracked(divide_perm)) = PAtomicUsize::new(0);
+        let tracked gss = GhostStuff { perm: divide_perm, token: divide_token };
+        let tracked divide_inv = AtomicInvariant::new((tr_inst, divide), gss, 1);
+        let tracked divide_inv = Shared::new(divide_inv);
 
         // Initialize the queue
         Self {
             length,
             buffer_ptr,
-            split,
+            divide,
             buf_perm_inv: Tracked(buf_perm_inv),
-            split_inv: Tracked(split_inv),
+            divide_inv: Tracked(divide_inv),
             instance: tr_inst,
             producer: Tracked(Some(producer_token)),
             consumer: Tracked(Some(consumer_token)),
         }
     }
 
-    fn split(self, at: usize)
+    fn try_split(self) -> (res: (Producer, Consumer))
         requires
             self.wf(),
-            self.producer@ is Some,
+            self.is_splittable(),
+        ensures
+            res.0.is_idle(),
+            res.1.is_idle(),
+    {
+        let tracked prod_token = self.producer.borrow_mut().tracked_take();
+        let tracked cons_token = self.consumer.borrow_mut().tracked_take();
+
+        (
+            Producer {
+                buffer_ptr: self.buffer_ptr,
+                buf_perm_inv: Tracked(self.buf_perm_inv@.clone()),
+                divide_inv: Tracked(self.divide_inv@.clone()),
+                instance: Tracked(self.instance@.clone()),
+                producer: Tracked(Some(prod_token)),
+            },
+            Consumer {
+                buffer_ptr: self.buffer_ptr,
+                buf_perm_inv: Tracked(self.buf_perm_inv@.clone()),
+                instance: Tracked(self.instance@.clone()),
+                consumer: Tracked(Some(cons_token)),
+            }
+        )
+    }
+}
+
+impl Producer {
+    fn divide(self, at: usize)
+        requires
             self.instance@.id() == self.producer@->0.instance_id(),
-            self.instance@.id() == self.consumer@->0.instance_id(),
+            self.producer@ is Some,
             self.producer@->0.value().is_idle(),
-            self.consumer@->0.value().is_idle(),
-            0 < at && at < self.length,
+            0 < at && at < self.instance@.length(),
     {
         let mut slf = self;
         let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
@@ -326,7 +364,7 @@ impl ExBuffer
             } = bp;
 
             proof {
-                slf.instance.borrow().check_split(&mut prod_token, &mut grant_state_token);
+                slf.instance.borrow().check_divide(&mut prod_token, &mut grant_state_token);
 
                 assert(grant_state_token.value().prod_start == 0);
                 assert(grant_state_token.value().prod_end == 0);
@@ -334,18 +372,18 @@ impl ExBuffer
                 assert(grant_state_token.value().cons_end == 0);
             }
 
-            open_atomic_invariant!(slf.split_inv.borrow().borrow() => s => {
-                let tracked GhostStuff { perm: mut split_perm, token: mut split_token } = s;
+            open_atomic_invariant!(slf.divide_inv.borrow().borrow() => s => {
+                let tracked GhostStuff { perm: mut divide_perm, token: mut divide_token } = s;
 
-                slf.split.store(Tracked(&mut split_perm), at);
-                let tracked ret = slf.instance.borrow().do_split(at as nat, &mut split_token, &mut prod_token, &mut grant_state_token);
-                assert(split_token.value() == at);
+                slf.divide.store(Tracked(&mut divide_perm), at);
+                let tracked ret = slf.instance.borrow().do_divide(at as nat, &mut divide_token, &mut prod_token, &mut grant_state_token);
+                assert(divide_token.value() == at);
                 assert(grant_state_token.value().prod_start == 0);
                 assert(grant_state_token.value().prod_end == at as int);
                 assert(grant_state_token.value().cons_start == at as int);
-                assert(grant_state_token.value().cons_end == slf.length);
+                assert(grant_state_token.value().cons_end == slf.instance@.length());
 
-                proof { s = GhostStuff { perm: split_perm, token: split_token }; }
+                proof { s = GhostStuff { perm: divide_perm, token: divide_token }; }
             });
 
             let tracked (points_to_raw_prod, mut pool_rest) = current_pool.split(set_int_range(
@@ -364,10 +402,35 @@ impl ExBuffer
 }
 
 pub struct Producer {
-    buf_ptr: *mut u8,
-    //buf_perm_inv: Tracked< Shared<AtomicInvariant<_, GhostBufferPermission, _>> >,
-    producer: Tracked<Option<SplitPermExample::producer>>,
+    buffer_ptr: *mut u8,
+    buf_perm_inv: Tracked< Shared<AtomicInvariant<_, GhostBufferPermission, _>> >,
+    instance: Tracked<DividePermExample::Instance>,
+    producer: Tracked<Option<DividePermExample::producer>>,
 }
+
+impl Producer {
+    pub closed spec fn is_idle(&self) -> bool {
+        &&& self.producer@ is Some
+        &&& self.producer@->0.instance_id() == self.instance@.id()
+        &&& self.producer@->0.value().is_idle()
+    }
+}
+
+pub struct Consumer {
+    buffer_ptr: *mut u8,
+    buf_perm_inv: Tracked< Shared<AtomicInvariant<_, GhostBufferPermission, _>> >,
+    instance: Tracked<DividePermExample::Instance>,
+    consumer: Tracked<Option<DividePermExample::consumer>>,
+}
+
+impl Consumer {
+    pub closed spec fn is_idle(&self) -> bool {
+        &&& self.consumer@ is Some
+        &&& self.consumer@->0.instance_id() == self.instance@.id()
+        &&& self.consumer@->0.value().is_idle()
+    }
+}
+
 
 fn main() {
     let ex_buffer = ExBuffer::new(10);
