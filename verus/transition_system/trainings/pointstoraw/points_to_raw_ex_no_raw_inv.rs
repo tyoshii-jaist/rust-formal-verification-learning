@@ -209,6 +209,43 @@ impl GhostBufferPermission
 }
 
 struct_with_invariants!{
+    pub struct SharedInv {
+        length: usize,
+        buffer_ptr: *mut u8,
+
+        buf_perm_inv: Tracked< Shared<AtomicInvariant<_, GhostBufferPermission, _>> >,
+        divide_inv: Tracked< Shared<AtomicInvariant<_, GhostStuff<DividePermExample::divide>, _>> >,
+
+        instance: Tracked<DividePermExample::Instance>,
+        producer: Tracked<Option<DividePermExample::producer>>,
+        consumer: Tracked<Option<DividePermExample::consumer>>,
+    }
+
+    pub closed spec fn wf(&self) -> bool {
+        predicate {
+            &&& self.instance@.length() == self.length
+            &&& self.instance@.length() <= usize::MAX
+            &&& self.divide_inv@@.namespace() != self.buf_perm_inv@@.namespace()
+            &&& self.instance@.base_addr() == self.buffer_ptr as nat 
+        }
+
+        invariant on buf_perm_inv with (instance)
+            specifically (self.buf_perm_inv@@)
+            is (v: GhostBufferPermission)
+        {
+            v.wf(instance@)
+        }
+
+        invariant on divide_inv with (instance, divide)
+            specifically (self.divide_inv@@)
+            is (v: GhostStuff<DividePermExample::divide>)
+        {
+            v.wf(instance@, divide)
+        }
+    }
+}
+
+struct_with_invariants!{
     pub struct ExBuffer {
         length: usize,
         buffer_ptr: *mut u8,
