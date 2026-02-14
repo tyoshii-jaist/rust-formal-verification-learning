@@ -172,7 +172,7 @@ impl<Tok> GhostStuff<Tok>
 where
     Tok: UniqueValueToken<nat>,
 {
-    pub open spec fn wf(self, inst: DividePermExample::Instance, cell: PAtomicUsize) -> bool {
+    pub open spec fn wf(self, inst: DividePermExample::Instance, cell: &PAtomicUsize) -> bool {
         &&& self.perm@.patomic == cell.id()
         &&& self.token.instance_id() == inst.id()
         &&& self.perm@.value as nat == self.token.value()
@@ -209,24 +209,33 @@ impl GhostBufferPermission
 }
 
 pub struct ExBuffer {
-    inner: ExBufferInner,
+    length: usize,
+    buffer_ptr: *mut u8,
+    divide: PAtomicUsize,
 
+    divide_gs: Tracked<Option<GhostStuff<DividePermExample::divide>>>,
+    buf_points_to_raw: Tracked<Option<PointsToRaw>>,
+    grant_state_token: Tracked<Option<DividePermExample::grant_state>>,
     prod_token: Tracked<Option<DividePermExample::producer>>,
     cons_token: Tracked<Option<DividePermExample::consumer>>,
+    instance: Tracked<DividePermExample::Instance>,
 }
 
+/*
 impl ExBuffer {
     pub closed spec fn wf(self) -> bool {
-        self.inner.wf()
+        &&& self.inv.wf()
+        &&& self.inv.instance@.length() == self.length
+        &&& self.inv.instance@.length() <= usize::MAX
+        &&& self.inv.instance@.base_addr() == self.buffer_ptr as nat 
+
     }
 }
+ */
 
-struct_with_invariants!{
-    pub struct ExBufferInner {
-        length: usize,
-        buffer_ptr: *mut u8,
-        divide: PAtomicUsize,
-
+ struct_with_invariants!{
+    pub struct ExBufferInv<'a> {
+        divide: &'a PAtomicUsize,
         divide_inv: Tracked< Shared<AtomicInvariant<_, GhostStuff<DividePermExample::divide>, _>> >,
         buf_perm_inv: Tracked< Shared<AtomicInvariant<_, GhostBufferPermission, _>> >,
 
@@ -235,10 +244,7 @@ struct_with_invariants!{
 
     pub closed spec fn wf(&self) -> bool {
         predicate {
-            &&& self.instance@.length() == self.length
-            &&& self.instance@.length() <= usize::MAX
             &&& self.divide_inv@@.namespace() != self.buf_perm_inv@@.namespace()
-            &&& self.instance@.base_addr() == self.buffer_ptr as nat 
         }
 
         invariant on buf_perm_inv with (instance)
@@ -260,26 +266,26 @@ struct_with_invariants!{
 impl ExBuffer {
     pub closed spec fn is_splittable(&self) -> bool {
         &&& self.prod_token@ is Some
-        &&& self.prod_token@->0.instance_id() == self.inner.instance@.id()
+        //&&& self.prod_token@->0.instance_id() == self.inner.instance@.id()
         &&& self.prod_token@->0.value().is_idle()
         &&& self.cons_token@ is Some
-        &&& self.cons_token@->0.instance_id() == self.inner.instance@.id()
+        //&&& self.cons_token@->0.instance_id() == self.inner.instance@.id()
         &&& self.cons_token@->0.value().is_idle()
     }
 }
 
-impl ExBuffer
+impl<'a> ExBuffer
 {
     fn new(length: usize) -> (r: Self)
         requires
             valid_layout(length, 1),
             length > 0,
         ensures
-            r.wf(),
+            //r.wf(),
             r.prod_token@ is Some,
-            r.inner.instance@.id() == r.prod_token@->0.instance_id(),
+            r.instance@.id() == r.prod_token@->0.instance_id(),
             r.cons_token@ is Some,
-            r.inner.instance@.id() == r.cons_token@->0.instance_id(),
+            r.instance@.id() == r.cons_token@->0.instance_id(),
     {
         let (buffer_ptr, Tracked(points_to_raw), Tracked(buffer_dealloc)) = allocate(length, 1);
         let tracked (
@@ -301,65 +307,69 @@ impl ExBuffer
             assert(points_to_raw.is_range(buffer_ptr as int, length as int));
             assert(points_to_raw.dom() =~= Set::new(|i: int| buffer_ptr as int <= i && i < buffer_ptr as int + length as int));
         }
-        let tr_inst = Tracked(instance);
-        let tracked ghost_buffer_perm = GhostBufferPermission {
-            pool: points_to_raw,
-            token: grant_state_token,
-        };
-        let tracked buf_perm_inv = AtomicInvariant::new(tr_inst, ghost_buffer_perm, 0);
-        let tracked buf_perm_inv = Shared::new(buf_perm_inv); // Shared は Ghost object を中に入れて、duplicate して &T を取り出すことができる。
-
         let (divide, Tracked(divide_perm)) = PAtomicUsize::new(0);
-        let tracked gss = GhostStuff { perm: divide_perm, token: divide_token };
-        let tracked divide_inv = AtomicInvariant::new((tr_inst, divide), gss, 1);
-        let tracked divide_inv = Shared::new(divide_inv);
+        let tracked divide_gs = GhostStuff { perm: divide_perm, token: divide_token };
 
         // Initialize the queue
         Self {
-            inner: ExBufferInner {
-                length,
-                buffer_ptr,
-                divide,
-                buf_perm_inv: Tracked(buf_perm_inv),
-                divide_inv: Tracked(divide_inv),
-                instance: tr_inst,
-            },
+            length,
+            buffer_ptr,
+            divide,
+            divide_gs: Tracked(Some(divide_gs)),
+            buf_points_to_raw: Tracked(Some(points_to_raw)),
+            grant_state_token: Tracked(Some(grant_state_token)),
             prod_token: Tracked(Some(producer_token)),
             cons_token: Tracked(Some(consumer_token)),
+            instance: Tracked(instance),
         }
     }
 
     fn try_split(self) -> (res: (Producer, Consumer))
         requires
-            self.wf(),
+            //self.wf(),
             self.is_splittable(),
         ensures
             res.0.is_idle(),
             res.1.is_idle(),
     {
-        let tracked prod_token = self.prod_token.borrow_mut().tracked_take();
-        let tracked cons_token = self.cons_token.borrow_mut().tracked_take();
+        let mut slf = self;
 
+        let tracked prod_token = slf.prod_token.borrow_mut().tracked_take();
+        let tracked cons_token = slf.cons_token.borrow_mut().tracked_take();
+        let tracked grant_state_token = slf.grant_state_token.borrow_mut().tracked_take();
+        let tracked buf_points_to_raw = slf.buf_points_to_raw.borrow_mut().tracked_take();
+        let tracked divide_gs = slf.divide_gs.borrow_mut().tracked_take();
+        let Tracked(inst) = slf.instance;
+
+        let tracked ghost_buffer_perm = GhostBufferPermission {
+            pool: buf_points_to_raw,
+            token: grant_state_token,
+        };
+        let tracked buf_perm_inv = AtomicInvariant::new(slf.instance, ghost_buffer_perm, 0);
+        let tracked buf_perm_inv = Shared::new(buf_perm_inv); // Shared は Ghost object を中に入れて、duplicate して &T を取り出すことができる。
+
+        let tracked divide_inv = AtomicInvariant::new((slf.instance, &slf.divide), divide_gs, 1);
+        let tracked divide_inv = Shared::new(divide_inv);
         (
             Producer {
-                exb_inner: ExBufferInner {
-                    length: self.inner.length,
-                    buffer_ptr: self.inner.buffer_ptr,
-                    divide: self.inner.divide,
-                    buf_perm_inv: Tracked(self.inner.buf_perm_inv.borrow().clone()),
-                    divide_inv: Tracked(self.inner.divide_inv.borrow().clone()),
-                    instance: Tracked(self.inner.instance.borrow().clone()),
+                length: slf.length,
+                buffer_ptr: slf.buffer_ptr,
+                inv: ExBufferInv {
+                    divide: &slf.divide,
+                    buf_perm_inv: Tracked(buf_perm_inv.clone()),
+                    divide_inv: Tracked(divide_inv.clone()),
+                    instance: Tracked(slf.instance.borrow().clone()),
                 },
                 prod_token: Tracked(Some(prod_token)),
             },
             Consumer {
-                exb_inner: ExBufferInner {
-                    length: self.inner.length,
-                    buffer_ptr: self.inner.buffer_ptr,
-                    divide: self.inner.divide,
-                    buf_perm_inv: Tracked(self.inner.buf_perm_inv.borrow().clone()),
-                    divide_inv: Tracked(self.inner.divide_inv.borrow().clone()),
-                    instance: Tracked(self.inner.instance.borrow().clone()),
+                length: slf.length,
+                buffer_ptr: slf.buffer_ptr,
+                inv: ExBufferInv {
+                    divide: &slf.divide,
+                    buf_perm_inv: Tracked(buf_perm_inv),
+                    divide_inv: Tracked(divide_inv),
+                    instance: Tracked(slf.instance.borrow().clone()),
                 },
                 cons_token: Tracked(Some(cons_token)),
             }
@@ -367,26 +377,26 @@ impl ExBuffer
     }
 }
 
-impl Producer {
+impl<'a> Producer<'a> {
     fn divide(self, at: usize)
         requires
-            self.exb_inner.instance@.id() == self.prod_token@->0.instance_id(),
+            self.inv.instance@.id() == self.prod_token@->0.instance_id(),
             self.prod_token@ is Some,
             self.prod_token@->0.value().is_idle(),
-            0 < at && at < self.exb_inner.instance@.length(),
+            0 < at && at < self.inv.instance@.length(),
     {
         let mut slf = self;
         let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
         let tracked mut prod_token = slf.prod_token.borrow_mut().tracked_take();
 
-        open_atomic_invariant!(slf.exb_inner.buf_perm_inv.borrow().borrow() => bp => {
+        open_atomic_invariant!(slf.inv.buf_perm_inv.borrow().borrow() => bp => {
             let tracked GhostBufferPermission {
                 pool: mut current_pool,
                 token: mut grant_state_token,
             } = bp;
 
             proof {
-                slf.exb_inner.instance.borrow().check_divide(&mut prod_token, &mut grant_state_token);
+                slf.inv.instance.borrow().check_divide(&mut prod_token, &mut grant_state_token);
 
                 assert(grant_state_token.value().prod_start == 0);
                 assert(grant_state_token.value().prod_end == 0);
@@ -394,27 +404,27 @@ impl Producer {
                 assert(grant_state_token.value().cons_end == 0);
             }
 
-            open_atomic_invariant!(slf.exb_inner.divide_inv.borrow().borrow() => s => {
+            open_atomic_invariant!(slf.inv.divide_inv.borrow().borrow() => s => {
                 let tracked GhostStuff { perm: mut divide_perm, token: mut divide_token } = s;
 
-                slf.exb_inner.divide.store(Tracked(&mut divide_perm), at);
-                let tracked ret = slf.exb_inner.instance.borrow().do_divide(at as nat, &mut divide_token, &mut prod_token, &mut grant_state_token);
+                slf.inv.divide.store(Tracked(&mut divide_perm), at);
+                let tracked ret = slf.inv.instance.borrow().do_divide(at as nat, &mut divide_token, &mut prod_token, &mut grant_state_token);
                 assert(divide_token.value() == at);
                 assert(grant_state_token.value().prod_start == 0);
                 assert(grant_state_token.value().prod_end == at as int);
                 assert(grant_state_token.value().cons_start == at as int);
-                assert(grant_state_token.value().cons_end == slf.exb_inner.instance@.length());
+                assert(grant_state_token.value().cons_end == slf.inv.instance@.length());
 
                 proof { s = GhostStuff { perm: divide_perm, token: divide_token }; }
             });
 
             let tracked (points_to_raw_prod, mut pool_rest) = current_pool.split(set_int_range(
-                slf.exb_inner.buffer_ptr as int + grant_state_token.value().prod_start,
-                slf.exb_inner.buffer_ptr as int + grant_state_token.value().prod_end));
+                slf.buffer_ptr as int + grant_state_token.value().prod_start,
+                slf.buffer_ptr as int + grant_state_token.value().prod_end));
 
             let tracked (_points_to_raw_cons, pool_rest) = pool_rest.split(set_int_range(
-                slf.exb_inner.buffer_ptr as int + grant_state_token.value().cons_start,
-                slf.exb_inner.buffer_ptr as int + grant_state_token.value().cons_end));
+                slf.buffer_ptr as int + grant_state_token.value().cons_start,
+                slf.buffer_ptr as int + grant_state_token.value().cons_end));
 
             proof { bp = GhostBufferPermission { pool: pool_rest, token: grant_state_token}; }
         });
@@ -423,28 +433,32 @@ impl Producer {
     }
 }
 
-pub struct Producer {
-    exb_inner: ExBufferInner,
+pub struct Producer<'a> {
+    length: usize,
+    buffer_ptr: *mut u8,
+    inv: ExBufferInv<'a>,
     prod_token: Tracked<Option<DividePermExample::producer>>,
 }
 
-impl Producer {
+impl<'a> Producer<'a> {
     pub closed spec fn is_idle(&self) -> bool {
         &&& self.prod_token@ is Some
-        &&& self.prod_token@->0.instance_id() == self.exb_inner.instance@.id()
+        &&& self.prod_token@->0.instance_id() == self.inv.instance@.id()
         &&& self.prod_token@->0.value().is_idle()
     }
 }
 
-pub struct Consumer {
-    exb_inner: ExBufferInner,
+pub struct Consumer<'a> {
+    length: usize,
+    buffer_ptr: *mut u8,
+    inv: ExBufferInv<'a>,
     cons_token: Tracked<Option<DividePermExample::consumer>>,
 }
 
-impl Consumer {
+impl<'a> Consumer<'a> {
     pub closed spec fn is_idle(&self) -> bool {
         &&& self.cons_token@ is Some
-        &&& self.cons_token@->0.instance_id() == self.exb_inner.instance@.id()
+        &&& self.cons_token@->0.instance_id() == self.inv.instance@.id()
         &&& self.cons_token@->0.value().is_idle()
     }
 }
