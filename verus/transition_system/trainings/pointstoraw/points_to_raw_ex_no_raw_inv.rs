@@ -274,7 +274,7 @@ impl ExBuffer {
     }
 }
 
-impl<'a> ExBuffer
+impl ExBuffer
 {
     fn new(length: usize) -> (r: Self)
         requires
@@ -324,52 +324,52 @@ impl<'a> ExBuffer
         }
     }
 
-    fn try_split(self) -> (res: (Producer, Consumer))
+    fn try_split<'a>(&'a mut self) -> (res: (Producer<'a>, Consumer<'a>))
         requires
             //self.wf(),
-            self.is_splittable(),
+            old(self).is_splittable(),
         ensures
             res.0.is_idle(),
             res.1.is_idle(),
     {
-        let mut slf = self;
+        //let mut slf = self;
 
-        let tracked prod_token = slf.prod_token.borrow_mut().tracked_take();
-        let tracked cons_token = slf.cons_token.borrow_mut().tracked_take();
-        let tracked grant_state_token = slf.grant_state_token.borrow_mut().tracked_take();
-        let tracked buf_points_to_raw = slf.buf_points_to_raw.borrow_mut().tracked_take();
-        let tracked divide_gs = slf.divide_gs.borrow_mut().tracked_take();
-        let Tracked(inst) = slf.instance;
+        let tracked prod_token = self.prod_token.borrow_mut().tracked_take();
+        let tracked cons_token = self.cons_token.borrow_mut().tracked_take();
+        let tracked grant_state_token = self.grant_state_token.borrow_mut().tracked_take();
+        let tracked buf_points_to_raw = self.buf_points_to_raw.borrow_mut().tracked_take();
+        let tracked divide_gs = self.divide_gs.borrow_mut().tracked_take();
+        let Tracked(inst) = self.instance;
 
         let tracked ghost_buffer_perm = GhostBufferPermission {
             pool: buf_points_to_raw,
             token: grant_state_token,
         };
-        let tracked buf_perm_inv = AtomicInvariant::new(slf.instance, ghost_buffer_perm, 0);
+        let tracked buf_perm_inv = AtomicInvariant::new(self.instance, ghost_buffer_perm, 0);
         let tracked buf_perm_inv = Shared::new(buf_perm_inv); // Shared は Ghost object を中に入れて、duplicate して &T を取り出すことができる。
 
-        let tracked divide_inv = AtomicInvariant::new((slf.instance, &slf.divide), divide_gs, 1);
+        let tracked divide_inv = AtomicInvariant::new((self.instance, &self.divide), divide_gs, 1);
         let tracked divide_inv = Shared::new(divide_inv);
         (
             Producer {
-                length: slf.length,
-                buffer_ptr: slf.buffer_ptr,
+                length: self.length,
+                buffer_ptr: self.buffer_ptr,
                 inv: ExBufferInv {
-                    divide: &slf.divide,
+                    divide: &self.divide,
                     buf_perm_inv: Tracked(buf_perm_inv.clone()),
                     divide_inv: Tracked(divide_inv.clone()),
-                    instance: Tracked(slf.instance.borrow().clone()),
+                    instance: Tracked(self.instance.borrow().clone()),
                 },
                 prod_token: Tracked(Some(prod_token)),
             },
             Consumer {
-                length: slf.length,
-                buffer_ptr: slf.buffer_ptr,
+                length: self.length,
+                buffer_ptr: self.buffer_ptr,
                 inv: ExBufferInv {
-                    divide: &slf.divide,
+                    divide: &self.divide,
                     buf_perm_inv: Tracked(buf_perm_inv),
                     divide_inv: Tracked(divide_inv),
-                    instance: Tracked(slf.instance.borrow().clone()),
+                    instance: Tracked(self.instance.borrow().clone()),
                 },
                 cons_token: Tracked(Some(cons_token)),
             }
