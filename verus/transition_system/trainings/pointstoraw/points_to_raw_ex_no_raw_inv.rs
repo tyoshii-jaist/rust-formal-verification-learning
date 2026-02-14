@@ -36,6 +36,12 @@ pub struct GrantState {
     pub cons_end: int,
 }
 
+impl GrantState {
+    pub open spec fn is_idle(&self) -> bool {
+        self.prod_start == self.prod_end == self.cons_start == self.cons_end == 0
+    }
+}
+
 tokenized_state_machine!(DividePermExample {
     fields {
         #[sharding(constant)]
@@ -221,17 +227,14 @@ pub struct ExBuffer {
     instance: Tracked<DividePermExample::Instance>,
 }
 
-/*
+
 impl ExBuffer {
     pub closed spec fn wf(self) -> bool {
-        &&& self.inv.wf()
-        &&& self.inv.instance@.length() == self.length
-        &&& self.inv.instance@.length() <= usize::MAX
-        &&& self.inv.instance@.base_addr() == self.buffer_ptr as nat 
-
+        &&& self.instance@.length() == self.length
+        &&& self.instance@.length() <= usize::MAX
+        &&& self.instance@.base_addr() == self.buffer_ptr as nat 
     }
 }
- */
 
  struct_with_invariants!{
     pub struct ExBufferInv<'a> {
@@ -266,11 +269,19 @@ impl ExBuffer {
 impl ExBuffer {
     pub closed spec fn is_splittable(&self) -> bool {
         &&& self.prod_token@ is Some
-        //&&& self.prod_token@->0.instance_id() == self.inner.instance@.id()
+        &&& self.prod_token@->0.instance_id() == self.instance@.id()
         &&& self.prod_token@->0.value().is_idle()
         &&& self.cons_token@ is Some
-        //&&& self.cons_token@->0.instance_id() == self.inner.instance@.id()
+        &&& self.cons_token@->0.instance_id() == self.instance@.id()
         &&& self.cons_token@->0.value().is_idle()
+        &&& self.grant_state_token@ is Some
+        &&& self.grant_state_token@->0.instance_id() == self.instance@.id()
+        &&& self.grant_state_token@->0.value().is_idle()
+        &&& self.buf_points_to_raw@ is Some
+        &&& self.buf_points_to_raw@->0.is_range(self.buffer_ptr as int, self.length as int)
+        &&& self.buf_points_to_raw@->0.dom() =~= Set::new(|i: int| self.buffer_ptr as int <= i && i < self.buffer_ptr as int + self.length as int)
+        &&& self.divide_gs@ is Some
+        &&& self.divide_gs@->0.wf(self.instance@, &self.divide)
     }
 }
 
@@ -281,11 +292,7 @@ impl ExBuffer
             valid_layout(length, 1),
             length > 0,
         ensures
-            //r.wf(),
-            r.prod_token@ is Some,
-            r.instance@.id() == r.prod_token@->0.instance_id(),
-            r.cons_token@ is Some,
-            r.instance@.id() == r.cons_token@->0.instance_id(),
+            r.is_splittable(),
     {
         let (buffer_ptr, Tracked(points_to_raw), Tracked(buffer_dealloc)) = allocate(length, 1);
         let tracked (
@@ -326,14 +333,12 @@ impl ExBuffer
 
     fn try_split<'a>(&'a mut self) -> (res: (Producer<'a>, Consumer<'a>))
         requires
-            //self.wf(),
+            old(self).wf(),
             old(self).is_splittable(),
         ensures
             res.0.is_idle(),
             res.1.is_idle(),
     {
-        //let mut slf = self;
-
         let tracked prod_token = self.prod_token.borrow_mut().tracked_take();
         let tracked cons_token = self.cons_token.borrow_mut().tracked_take();
         let tracked grant_state_token = self.grant_state_token.borrow_mut().tracked_take();
@@ -380,9 +385,7 @@ impl ExBuffer
 impl<'a> Producer<'a> {
     fn divide(self, at: usize)
         requires
-            self.inv.instance@.id() == self.prod_token@->0.instance_id(),
-            self.prod_token@ is Some,
-            self.prod_token@->0.value().is_idle(),
+            self.is_idle(),
             0 < at && at < self.inv.instance@.length(),
     {
         let mut slf = self;
@@ -441,10 +444,15 @@ pub struct Producer<'a> {
 }
 
 impl<'a> Producer<'a> {
-    pub closed spec fn is_idle(&self) -> bool {
+    pub closed spec fn wf(&self) -> bool {
         &&& self.prod_token@ is Some
         &&& self.prod_token@->0.instance_id() == self.inv.instance@.id()
+        &&& self.inv.wf()
+ 
+    }
+    pub closed spec fn is_idle(&self) -> bool {
         &&& self.prod_token@->0.value().is_idle()
+        &&& self.wf()
     }
 }
 
@@ -456,10 +464,15 @@ pub struct Consumer<'a> {
 }
 
 impl<'a> Consumer<'a> {
-    pub closed spec fn is_idle(&self) -> bool {
+    pub closed spec fn wf(&self) -> bool {
         &&& self.cons_token@ is Some
         &&& self.cons_token@->0.instance_id() == self.inv.instance@.id()
+        &&& self.inv.wf()
+ 
+    }
+    pub closed spec fn is_idle(&self) -> bool {
         &&& self.cons_token@->0.value().is_idle()
+        &&& self.wf()
     }
 }
 
