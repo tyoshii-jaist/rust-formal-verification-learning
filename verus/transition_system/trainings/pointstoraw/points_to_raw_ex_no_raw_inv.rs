@@ -390,8 +390,10 @@ impl<'a> Producer<'a> {
             r.prod_token@ is Some,
             r.prod_token@->0.instance_id() == self.shared.instance@.id(),
             r.buffer_ptr == self.buffer_ptr,
-            r.points_to_raw_token@.dom() =~= Set::new(|i: int|
+            r.points_to_raw_token@ is Some,
+            r.points_to_raw_token@->0.dom() =~= Set::new(|i: int|
                 i >= r.buffer_ptr as int && i < r.buffer_ptr as int + r.prod_token@->0.value().divide as int),
+            r.points_to_raw_token@->0.is_range(r.buffer_ptr as int, r.prod_token@->0.value().divide as int),
     {
         let mut slf = self;
         let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
@@ -457,7 +459,7 @@ impl<'a> Producer<'a> {
                 divide_inv: Tracked(slf.shared.divide_inv.borrow().clone()),
                 instance: Tracked(slf.shared.instance.borrow().clone()),
             },
-            points_to_raw_token: Tracked(prod_points_to_raw),
+            points_to_raw_token: Tracked(Some(prod_points_to_raw)),
             prod_token: Tracked(Some(prod_token)),
         }
     }
@@ -484,7 +486,7 @@ impl<'a> Producer<'a> {
 
 pub struct GrantP<'a> {
     buffer_ptr: *mut u8,
-    points_to_raw_token: Tracked<PointsToRaw>,
+    points_to_raw_token: Tracked<Option<PointsToRaw>>,
     shared: ExBufferShared<'a>,
     prod_token: Tracked<Option<DividePermExample::producer>>,
 }
@@ -514,6 +516,12 @@ fn main() {
     let mut ex_buffer = ExBuffer::new(10);
     let (prod, cons) = ex_buffer.try_split();
 
-    let grp = prod.divide(6);
+    let mut grp = prod.divide(6);
+
+    let tracked points_to_raw = grp.points_to_raw_token.borrow_mut().tracked_take();
+    assume(grp.buffer_ptr as int % align_of::<[u8; 6]>() as int == 0);
+    assume(size_of::<[u8; 6]>() as int == 6);
+    assume(points_to_raw.is_range(grp.buffer_ptr as int, 6));
+    let tracked points_to = points_to_raw.into_typed::<[u8; 6]>(grp.buffer_ptr as usize);
 }
 }
