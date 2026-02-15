@@ -378,10 +378,14 @@ impl ExBuffer
 }
 
 impl<'a> Producer<'a> {
-    fn divide(self, at: usize)
+    fn divide(self, at: usize) -> (r: GrantP<'a>)
         requires
             self.is_idle(),
             0 < at && at < self.shared.instance@.length(),
+        ensures
+            r.prod_token@ is Some,
+            r.prod_token@->0.instance_id() == self.shared.instance@.id(),
+            //r.points_to_raw_token@.is_range(0, r.prod_token@->0.value().divide as int),
     {
         let mut slf = self;
         let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
@@ -420,6 +424,10 @@ impl<'a> Producer<'a> {
                 slf.buffer_ptr as int + grant_state_token.value().prod_start,
                 slf.buffer_ptr as int + grant_state_token.value().prod_end));
 
+            proof {
+                prod_points_to_raw = Some(points_to_raw_prod);
+            }
+
             let tracked (_points_to_raw_cons, pool_rest) = pool_rest.split(set_int_range(
                 slf.buffer_ptr as int + grant_state_token.value().cons_start,
                 slf.buffer_ptr as int + grant_state_token.value().cons_end));
@@ -427,7 +435,25 @@ impl<'a> Producer<'a> {
             proof { bp = GhostBufferPermission { pool: pool_rest, token: grant_state_token}; }
         });
 
-        slf.prod_token = Tracked(Some(prod_token));
+        let tracked prod_points_to_raw = match prod_points_to_raw {
+            Some(token) => token,
+            None => {
+                assert(false);
+                proof_from_false()
+            }
+        };
+
+        GrantP {
+            buffer_ptr: slf.buffer_ptr,
+            shared: ExBufferShared {
+                divide: slf.shared.divide,
+                buf_perm_inv: Tracked(slf.shared.buf_perm_inv.borrow().clone()),
+                divide_inv: Tracked(slf.shared.divide_inv.borrow().clone()),
+                instance: Tracked(slf.shared.instance.borrow().clone()),
+            },
+            points_to_raw_token: Tracked(prod_points_to_raw),
+            prod_token: Tracked(Some(prod_token)),
+        }
     }
 }
 
@@ -452,8 +478,9 @@ impl<'a> Producer<'a> {
 
 pub struct GrantP<'a> {
     buffer_ptr: *mut u8,
-    token: Tracked<PointsToRaw>,
+    points_to_raw_token: Tracked<PointsToRaw>,
     shared: ExBufferShared<'a>,
+    prod_token: Tracked<Option<DividePermExample::producer>>,
 }
 
 pub struct Consumer<'a> {
