@@ -215,7 +215,6 @@ impl GhostBufferPermission
 }
 
 pub struct ExBuffer {
-    length: usize,
     buffer_ptr: *mut u8,
     divide: PAtomicUsize,
 
@@ -230,7 +229,6 @@ pub struct ExBuffer {
 
 impl ExBuffer {
     pub closed spec fn wf(self) -> bool {
-        &&& self.instance@.length() == self.length
         &&& self.instance@.length() <= usize::MAX
         &&& self.instance@.base_addr() == self.buffer_ptr as nat 
     }
@@ -278,8 +276,8 @@ impl ExBuffer {
         &&& self.grant_state_token@->0.instance_id() == self.instance@.id()
         &&& self.grant_state_token@->0.value().is_idle()
         &&& self.buf_points_to_raw@ is Some
-        &&& self.buf_points_to_raw@->0.is_range(self.buffer_ptr as int, self.length as int)
-        &&& self.buf_points_to_raw@->0.dom() =~= Set::new(|i: int| self.buffer_ptr as int <= i && i < self.buffer_ptr as int + self.length as int)
+        &&& self.buf_points_to_raw@->0.is_range(self.buffer_ptr as int, self.instance@.length() as int)
+        &&& self.buf_points_to_raw@->0.dom() =~= Set::new(|i: int| self.buffer_ptr as int <= i && i < self.buffer_ptr as int + self.instance@.length() as int)
         &&& self.divide_gs@ is Some
         &&& self.divide_gs@->0.wf(self.instance@, &self.divide)
     }
@@ -319,7 +317,6 @@ impl ExBuffer
 
         // Initialize the queue
         Self {
-            length,
             buffer_ptr,
             divide,
             divide_gs: Tracked(Some(divide_gs)),
@@ -357,7 +354,6 @@ impl ExBuffer
         let tracked divide_inv = Shared::new(divide_inv);
         (
             Producer {
-                length: self.length,
                 buffer_ptr: self.buffer_ptr,
                 shared: ExBufferShared {
                     divide: &self.divide,
@@ -368,7 +364,6 @@ impl ExBuffer
                 prod_token: Tracked(Some(prod_token)),
             },
             Consumer {
-                length: self.length,
                 buffer_ptr: self.buffer_ptr,
                 shared: ExBufferShared {
                     divide: &self.divide,
@@ -437,7 +432,6 @@ impl<'a> Producer<'a> {
 }
 
 pub struct Producer<'a> {
-    length: usize,
     buffer_ptr: *mut u8,
     shared: ExBufferShared<'a>,
     prod_token: Tracked<Option<DividePermExample::producer>>,
@@ -447,7 +441,6 @@ impl<'a> Producer<'a> {
     pub closed spec fn wf(&self) -> bool {
         &&& self.prod_token@ is Some
         &&& self.prod_token@->0.instance_id() == self.shared.instance@.id()
-        &&& self.length as int == self.shared.instance@.length()
         &&& self.buffer_ptr as int == self.shared.instance@.base_addr() 
         &&& self.shared.wf()
     }
@@ -457,8 +450,13 @@ impl<'a> Producer<'a> {
     }
 }
 
+pub struct GrantP<'a> {
+    buffer_ptr: *mut u8,
+    token: Tracked<PointsToRaw>,
+    shared: ExBufferShared<'a>,
+}
+
 pub struct Consumer<'a> {
-    length: usize,
     buffer_ptr: *mut u8,
     shared: ExBufferShared<'a>,
     cons_token: Tracked<Option<DividePermExample::consumer>>,
@@ -468,7 +466,6 @@ impl<'a> Consumer<'a> {
     pub closed spec fn wf(&self) -> bool {
         &&& self.cons_token@ is Some
         &&& self.cons_token@->0.instance_id() == self.shared.instance@.id()
-        &&& self.length as int == self.shared.instance@.length()
         &&& self.buffer_ptr as int == self.shared.instance@.base_addr()
         &&& self.shared.wf()
  
