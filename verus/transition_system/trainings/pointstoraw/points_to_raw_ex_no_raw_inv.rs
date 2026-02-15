@@ -166,6 +166,29 @@ tokenized_state_machine!(DividePermExample {
     fn check_divide_inductive(pre: Self, post: Self) {}
 });
 
+pub open spec fn whole_set(inst: DividePermExample::Instance) -> Set<int> {
+    set_int_range(inst.base_addr() as int, inst.base_addr() as int + inst.length() as int)
+}
+
+pub open spec fn prod_set(inst: DividePermExample::Instance, tok: DividePermExample::grant_state) -> Set<int> {
+    set_int_range(inst.base_addr() as int + tok.value().prod_start,
+                  inst.base_addr() as int + tok.value().prod_end)
+}
+
+pub open spec fn cons_set(inst: DividePermExample::Instance, tok: DividePermExample::grant_state) -> Set<int> {
+    set_int_range(inst.base_addr() as int + tok.value().cons_start,
+                  inst.base_addr() as int + tok.value().cons_end)
+}
+
+pub open spec fn pool_dom_ok(inst: DividePermExample::Instance, tok: DividePermExample::grant_state, pool: PointsToRaw) -> bool {
+    forall |a:int|
+        pool.dom().contains(a)
+        <==>
+        (whole_set(inst).contains(a)
+         && !prod_set(inst, tok).contains(a)
+         && !cons_set(inst, tok).contains(a))
+}
+
 pub tracked struct GhostStuff<Tok>
 where
     Tok: UniqueValueToken<nat>,
@@ -405,8 +428,24 @@ impl<'a> Producer<'a> {
                 assert(grant_state_token.value().prod_end == 0);
                 assert(grant_state_token.value().cons_start == 0);
                 assert(grant_state_token.value().cons_end == 0);
+            }
 
-                assume(current_pool.is_range(self.buffer_ptr as int, self.length as int));
+            proof {
+                assert(pool_dom_ok(slf.inv.instance@, grant_state_token, current_pool));
+                assert((at as int) < slf.inv.instance@.length());
+                assert(set_int_range(
+                slf.buffer_ptr as int,
+                slf.buffer_ptr as int + at as int).subset_of(whole_set(slf.inv.instance@)));
+                assert(forall |a:int|
+                    set_int_range(
+                slf.buffer_ptr as int + grant_state_token.value().prod_start,
+                slf.buffer_ptr as int + at as int).contains(a) ==> current_pool.dom().contains(a)
+                )by {
+                    // pool_dom_ok の <==> を使う
+                }
+                assert(set_int_range(
+                slf.buffer_ptr as int + grant_state_token.value().prod_start,
+                slf.buffer_ptr as int + grant_state_token.value().prod_end).subset_of(current_pool.dom()));
             }
 
             open_atomic_invariant!(slf.inv.divide_inv.borrow().borrow() => s => {
@@ -450,8 +489,8 @@ impl<'a> Producer<'a> {
         &&& self.prod_token@ is Some
         &&& self.prod_token@->0.instance_id() == self.inv.instance@.id()
         &&& self.length as int == self.inv.instance@.length()
+        &&& self.buffer_ptr as int == self.inv.instance@.base_addr() 
         &&& self.inv.wf()
- 
     }
     pub closed spec fn is_idle(&self) -> bool {
         &&& self.prod_token@->0.value().is_idle()
@@ -471,6 +510,7 @@ impl<'a> Consumer<'a> {
         &&& self.cons_token@ is Some
         &&& self.cons_token@->0.instance_id() == self.inv.instance@.id()
         &&& self.length as int == self.inv.instance@.length()
+        &&& self.buffer_ptr as int == self.inv.instance@.base_addr()
         &&& self.inv.wf()
  
     }
