@@ -385,7 +385,9 @@ impl<'a> Producer<'a> {
         ensures
             r.prod_token@ is Some,
             r.prod_token@->0.instance_id() == self.shared.instance@.id(),
-            //r.points_to_raw_token@.is_range(0, r.prod_token@->0.value().divide as int),
+            r.buffer_ptr == self.buffer_ptr,
+            r.points_to_raw_token@.dom() =~= Set::new(|i: int|
+                i >= r.buffer_ptr as int && i < r.buffer_ptr as int + r.prod_token@->0.value().divide as int),
     {
         let mut slf = self;
         let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
