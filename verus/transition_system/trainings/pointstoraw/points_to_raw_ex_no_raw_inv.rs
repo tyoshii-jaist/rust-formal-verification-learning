@@ -405,6 +405,8 @@ impl<'a> Producer<'a> {
                 assert(grant_state_token.value().prod_end == 0);
                 assert(grant_state_token.value().cons_start == 0);
                 assert(grant_state_token.value().cons_end == 0);
+
+                assume(current_pool.is_range(self.buffer_ptr as int, self.length as int));
             }
 
             open_atomic_invariant!(slf.inv.divide_inv.borrow().borrow() => s => {
@@ -447,6 +449,7 @@ impl<'a> Producer<'a> {
     pub closed spec fn wf(&self) -> bool {
         &&& self.prod_token@ is Some
         &&& self.prod_token@->0.instance_id() == self.inv.instance@.id()
+        &&& self.length as int == self.inv.instance@.length()
         &&& self.inv.wf()
  
     }
@@ -467,6 +470,7 @@ impl<'a> Consumer<'a> {
     pub closed spec fn wf(&self) -> bool {
         &&& self.cons_token@ is Some
         &&& self.cons_token@->0.instance_id() == self.inv.instance@.id()
+        &&& self.length as int == self.inv.instance@.length()
         &&& self.inv.wf()
  
     }
