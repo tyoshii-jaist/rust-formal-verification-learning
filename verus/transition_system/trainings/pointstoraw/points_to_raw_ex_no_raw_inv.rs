@@ -290,7 +290,9 @@ impl ExBuffer
             valid_layout(length, 1),
             length > 0,
         ensures
+            r.wf(),
             r.is_splittable(),
+            r.instance@.length() == length,
     {
         let (buffer_ptr, Tracked(points_to_raw), Tracked(buffer_dealloc)) = allocate(length, 1);
         let tracked (
@@ -335,6 +337,8 @@ impl ExBuffer
         ensures
             res.0.is_idle(),
             res.1.is_idle(),
+            res.0.shared.instance@.length() == old(self).instance@.length(),
+            res.1.shared.instance@.length() == old(self).instance@.length(),
     {
         let tracked prod_token = self.prod_token.borrow_mut().tracked_take();
         let tracked cons_token = self.cons_token.borrow_mut().tracked_take();
@@ -507,6 +511,9 @@ impl<'a> Consumer<'a> {
 
 
 fn main() {
-    let ex_buffer = ExBuffer::new(10);
+    let mut ex_buffer = ExBuffer::new(10);
+    let (prod, cons) = ex_buffer.try_split();
+
+    let grp = prod.divide(6);
 }
 }
