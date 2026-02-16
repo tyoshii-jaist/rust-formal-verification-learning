@@ -9,6 +9,9 @@ use vstd::tokens::UniqueValueToken;
 use vstd::set_lib::*;
 
 verus! {
+global layout u8 is size == 1, align == 1;
+
+
 pub struct ProducerState {
     pub divide: nat
 }
@@ -226,15 +229,7 @@ pub struct ExBuffer {
     instance: Tracked<DividePermExample::Instance>,
 }
 
-
-impl ExBuffer {
-    pub closed spec fn wf(self) -> bool {
-        &&& self.instance@.length() <= usize::MAX
-        &&& self.instance@.base_addr() == self.buffer_ptr as nat 
-    }
-}
-
- struct_with_invariants!{
+struct_with_invariants!{
     pub struct ExBufferShared<'a> {
         divide: &'a PAtomicUsize,
         divide_inv: Tracked< Shared<AtomicInvariant<_, GhostStuff<DividePermExample::divide>, _>> >,
@@ -265,6 +260,12 @@ impl ExBuffer {
 }
 
 impl ExBuffer {
+    pub closed spec fn wf(self) -> bool {
+        &&& self.instance@.length() <= usize::MAX
+        &&& self.instance@.base_addr() == self.buffer_ptr as nat
+        &&& self.buffer_ptr as int + self.instance@.length() <= usize::MAX + 1
+    }
+
     pub closed spec fn is_splittable(&self) -> bool {
         &&& self.prod_token@ is Some
         &&& self.prod_token@->0.instance_id() == self.instance@.id()
@@ -389,11 +390,13 @@ impl<'a> Producer<'a> {
         ensures
             r.prod_token@ is Some,
             r.prod_token@->0.instance_id() == self.shared.instance@.id(),
+            r.prod_token@->0.value().divide == at,
             r.buffer_ptr == self.buffer_ptr,
             r.points_to_raw_token@ is Some,
             r.points_to_raw_token@->0.dom() =~= Set::new(|i: int|
                 i >= r.buffer_ptr as int && i < r.buffer_ptr as int + r.prod_token@->0.value().divide as int),
             r.points_to_raw_token@->0.is_range(r.buffer_ptr as int, r.prod_token@->0.value().divide as int),
+            0 < r.prod_token@->0.value().divide && r.prod_token@->0.value().divide < self.shared.instance@.length(),
     {
         let mut slf = self;
         let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
@@ -475,7 +478,8 @@ impl<'a> Producer<'a> {
     pub closed spec fn wf(&self) -> bool {
         &&& self.prod_token@ is Some
         &&& self.prod_token@->0.instance_id() == self.shared.instance@.id()
-        &&& self.buffer_ptr as int == self.shared.instance@.base_addr() 
+        &&& self.buffer_ptr as int == self.shared.instance@.base_addr()
+        &&& self.buffer_ptr as int + self.shared.instance@.length() <= usize::MAX + 1
         &&& self.shared.wf()
     }
     pub closed spec fn is_idle(&self) -> bool {
@@ -513,15 +517,52 @@ impl<'a> Consumer<'a> {
 
 
 fn main() {
-    let mut ex_buffer = ExBuffer::new(10);
+    let size = 10;
+    let mut ex_buffer = ExBuffer::new(size);
     let (prod, cons) = ex_buffer.try_split();
 
-    let mut grp = prod.divide(6);
+    let divide_at = 6;
+    let mut grp = prod.divide(divide_at);
 
-    let tracked points_to_raw = grp.points_to_raw_token.borrow_mut().tracked_take();
-    assume(grp.buffer_ptr as int % align_of::<[u8; 6]>() as int == 0);
-    assume(size_of::<[u8; 6]>() as int == 6);
-    assume(points_to_raw.is_range(grp.buffer_ptr as int, 6));
-    let tracked points_to = points_to_raw.into_typed::<[u8; 6]>(grp.buffer_ptr as usize);
+    let tracked mut points_to_raw = grp.points_to_raw_token.borrow_mut().tracked_take();
+    assert(points_to_raw.is_range(grp.buffer_ptr as int, divide_at as int));
+
+    let tracked mut points_to_map = Map::<int, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
+    for idx in 0..divide_at
+        invariant
+            idx <= divide_at,
+            grp.buffer_ptr as int + divide_at <= usize::MAX + 1,
+            points_to_raw.is_range(grp.buffer_ptr as int + idx as int, divide_at - idx),
+            forall |i: int|
+                i >= grp.buffer_ptr as int && i < grp.buffer_ptr as int + idx as int
+                    <==> points_to_map.contains_key(i),
+            forall |i: int|
+                i >= grp.buffer_ptr as int && i < grp.buffer_ptr as int + idx as int
+                    ==> points_to_map.index(i as int).ptr() as int == i as int,
+            /*
+            forall |i: int|
+                i >= grp.buffer_ptr as int && i < grp.buffer_ptr as int + idx as int
+                    ==> points_to_map.index(i as int).ptr()@.provenance == buffer_perm.provenance(), 
+            grp.buffer_ptr @.provenance == buffer_perm.provenance(),
+            */
+        decreases
+            divide_at - idx,
+    {
+        proof {
+            let ghost range_base_addr = grp.buffer_ptr as int + idx as int;
+            let ghost range_end_addr = range_base_addr + 1;
+            
+            let tracked (top, rest) = points_to_raw.split(set_int_range(range_base_addr, range_end_addr as int));
+            assert(top.is_range(range_base_addr as usize as int, 1));
+
+            let tracked top_pointsto = top.into_typed::<u8>(range_base_addr as usize);
+            points_to_raw = rest;
+            points_to_map.tracked_insert(range_base_addr as int, top_pointsto);
+            assert(points_to_map.contains_key(range_base_addr as int));
+            assert(points_to_map.index(range_base_addr as int).ptr() as int == range_base_addr as nat);
+            //assert(top_pointsto.ptr()@.provenance == top.provenance());
+            //assert(top.provenance() == points_to_raw.provenance());
+        }
+    }
 }
 }
