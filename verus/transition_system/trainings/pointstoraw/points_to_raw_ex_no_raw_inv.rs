@@ -549,15 +549,17 @@ fn main() {
             divide_at - idx,
     {
         proof {
-            let ghost range_base_addr = grp.buffer_ptr as int + idx as int;
-            let ghost range_end_addr = range_base_addr + 1;
+            let range_base_addr = grp.buffer_ptr as usize + idx as usize;
             
-            let tracked (top, rest) = points_to_raw.split(set_int_range(range_base_addr, range_end_addr as int));
+            let tracked (top, rest) = points_to_raw.split(set_int_range(range_base_addr, range_base_addr + 1 as int));
             assert(top.is_range(range_base_addr as usize as int, 1));
 
-            let tracked top_pointsto = top.into_typed::<u8>(range_base_addr as usize);
+            let tracked mut top_pointsto = top.into_typed::<u8>(range_base_addr as usize);
             points_to_raw = rest;
             points_to_map.tracked_insert(range_base_addr as int, top_pointsto);
+            
+            let current_ptr = with_exposed_provenance(range_base_addr as usize, expose_provenance(grp.buffer_ptr));
+            ptr_mut_write(current_ptr, Tracked(&mut top_pointsto), 255);
             assert(points_to_map.contains_key(range_base_addr as int));
             assert(points_to_map.index(range_base_addr as int).ptr() as int == range_base_addr as nat);
             //assert(top_pointsto.ptr()@.provenance == top.provenance());
