@@ -527,19 +527,19 @@ fn main() {
     let tracked mut points_to_raw = grp.points_to_raw_token.borrow_mut().tracked_take();
     assert(points_to_raw.is_range(grp.buffer_ptr as int, divide_at as int));
 
-    let tracked mut points_to_map = Map::<int, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
+    //let tracked mut points_to_map = Map::<int, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
     for idx in 0..divide_at
         invariant
             idx <= divide_at,
             grp.buffer_ptr as int + divide_at <= usize::MAX + 1,
             points_to_raw.is_range(grp.buffer_ptr as int + idx as int, divide_at - idx),
+            /*
             forall |i: int|
                 i >= grp.buffer_ptr as int && i < grp.buffer_ptr as int + idx as int
                     <==> points_to_map.contains_key(i),
             forall |i: int|
                 i >= grp.buffer_ptr as int && i < grp.buffer_ptr as int + idx as int
                     ==> points_to_map.index(i as int).ptr() as int == i as int,
-            /*
             forall |i: int|
                 i >= grp.buffer_ptr as int && i < grp.buffer_ptr as int + idx as int
                     ==> points_to_map.index(i as int).ptr()@.provenance == buffer_perm.provenance(), 
@@ -548,23 +548,29 @@ fn main() {
         decreases
             divide_at - idx,
     {
-        proof {
-            let range_base_addr = grp.buffer_ptr as usize + idx as usize;
-            
-            let tracked (top, rest) = points_to_raw.split(set_int_range(range_base_addr, range_base_addr + 1 as int));
-            assert(top.is_range(range_base_addr as usize as int, 1));
+        let range_base_addr = grp.buffer_ptr as usize + idx as usize;
 
-            let tracked mut top_pointsto = top.into_typed::<u8>(range_base_addr as usize);
+        let tracked splitted = points_to_raw.split(set_int_range(range_base_addr as int, range_base_addr + 1 as int));
+        let tracked top = splitted.0;
+        let tracked rest = splitted.1;
+        assert(top.is_range(range_base_addr as usize as int, 1));
+    
+        let tracked mut top_pointsto = top.into_typed::<u8>(range_base_addr as usize);
+
+        proof {
             points_to_raw = rest;
-            points_to_map.tracked_insert(range_base_addr as int, top_pointsto);
-            
-            let current_ptr = with_exposed_provenance(range_base_addr as usize, expose_provenance(grp.buffer_ptr));
-            ptr_mut_write(current_ptr, Tracked(&mut top_pointsto), 255);
-            assert(points_to_map.contains_key(range_base_addr as int));
-            assert(points_to_map.index(range_base_addr as int).ptr() as int == range_base_addr as nat);
-            //assert(top_pointsto.ptr()@.provenance == top.provenance());
-            //assert(top.provenance() == points_to_raw.provenance());
+            //points_to_map.tracked_insert(range_base_addr as int, top_pointsto);
         }
+        
+        let current_ptr: *mut u8 = with_exposed_provenance(range_base_addr as usize, expose_provenance(grp.buffer_ptr));
+        assert(equal(top_pointsto.ptr().addr(), current_ptr as usize));
+        assert(equal(top_pointsto.ptr()@.provenance, current_ptr@.provenance));
+        assert(equal(top_pointsto.ptr(), current_ptr));
+        ptr_mut_write(current_ptr, Tracked(&mut top_pointsto), 255);
+        //assert(points_to_map.contains_key(range_base_addr as int));
+        //assert(points_to_map.index(range_base_addr as int).ptr() as int == range_base_addr as nat);
+        //assert(top_pointsto.ptr()@.provenance == top.provenance());
+        //assert(top.provenance() == points_to_raw.provenance());
     }
 }
 }
