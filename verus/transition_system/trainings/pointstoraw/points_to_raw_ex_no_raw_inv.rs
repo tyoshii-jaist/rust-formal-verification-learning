@@ -169,15 +169,18 @@ tokenized_state_machine!(DividePermExample {
     fn check_divide_inductive(pre: Self, post: Self) {}
 });
 
-pub tracked struct GhostStuff<Tok>
+pub tracked struct GhostStuff<Perm, Tok>
 where
     Tok: UniqueValueToken<nat>,
 {
-    pub tracked perm: PermissionUsize,
+    pub tracked perm: Perm,
     pub tracked token: Tok,
 }
 
-impl<Tok> GhostStuff<Tok>
+pub type GhostStuffUsize<Tok> = GhostStuff<PermissionUsize, Tok>;
+pub type GhostStuffBool<Tok>  = GhostStuff<PermissionBool,  Tok>;
+
+impl<Tok> GhostStuffUsize<Tok>
 where
     Tok: UniqueValueToken<nat>,
 {
@@ -223,7 +226,7 @@ pub struct ExBuffer {
     buffer_ptr: *mut u8,
     divide: PAtomicUsize,
 
-    divide_gs: Tracked<Option<GhostStuff<DividePermExample::divide>>>,
+    divide_gs: Tracked<Option<GhostStuffUsize<DividePermExample::divide>>>,
     buf_points_to_raw: Tracked<Option<PointsToRaw>>,
     grant_state_token: Tracked<Option<DividePermExample::grant_state>>,
     prod_token: Tracked<Option<DividePermExample::producer>>,
@@ -234,7 +237,7 @@ pub struct ExBuffer {
 struct_with_invariants!{
     pub struct ExBufferShared<'a> {
         divide: &'a PAtomicUsize,
-        divide_inv: Tracked< Shared<AtomicInvariant<_, GhostStuff<DividePermExample::divide>, _>> >,
+        divide_inv: Tracked< Shared<AtomicInvariant<_, GhostStuffUsize<DividePermExample::divide>, _>> >,
         buf_perm_inv: Tracked< Shared<AtomicInvariant<_, GhostBufferPermission, _>> >,
 
         instance: Tracked<DividePermExample::Instance>,
@@ -254,7 +257,7 @@ struct_with_invariants!{
 
         invariant on divide_inv with (instance, divide)
             specifically (self.divide_inv@@)
-            is (v: GhostStuff<DividePermExample::divide>)
+            is (v: GhostStuffUsize<DividePermExample::divide>)
         {
             v.wf(instance@, divide)
         }
@@ -320,7 +323,7 @@ impl ExBuffer
             assert(points_to_raw.dom() =~= Set::new(|i: int| buffer_ptr as int <= i && i < buffer_ptr as int + length as int));
         }
         let (divide, Tracked(divide_perm)) = PAtomicUsize::new(0);
-        let tracked divide_gs = GhostStuff { perm: divide_perm, token: divide_token };
+        let tracked divide_gs = GhostStuffUsize { perm: divide_perm, token: divide_token };
 
         // Initialize the queue
         Self {
@@ -423,7 +426,7 @@ impl<'a> Producer<'a> {
             }
 
             open_atomic_invariant!(slf.shared.divide_inv.borrow().borrow() => s => {
-                let tracked GhostStuff { perm: mut divide_perm, token: mut divide_token } = s;
+                let tracked GhostStuffUsize { perm: mut divide_perm, token: mut divide_token } = s;
 
                 slf.shared.divide.store(Tracked(&mut divide_perm), at);
                 let tracked ret = slf.shared.instance.borrow().do_divide(at as nat, &mut divide_token, &mut prod_token, &mut grant_state_token);
@@ -433,7 +436,7 @@ impl<'a> Producer<'a> {
                 assert(grant_state_token.value().cons_start == at as int);
                 assert(grant_state_token.value().cons_end == slf.shared.instance@.length());
 
-                proof { s = GhostStuff { perm: divide_perm, token: divide_token }; }
+                proof { s = GhostStuffUsize { perm: divide_perm, token: divide_token }; }
             });
 
             let tracked (points_to_raw_prod, mut pool_rest) = current_pool.split(set_int_range(
