@@ -207,7 +207,9 @@ impl GhostBufferPermission
         let cons_set = set_int_range(cs + inst.base_addr() as int, ce + inst.base_addr() as int);
 
         {
+            
             &&& self.token.instance_id() == inst.id()
+            &&& self.pool.provenance() == inst.provenance()
             &&& prod_set.disjoint(cons_set)
             &&& self.pool.dom()
               =~= Set::new(|i: int| whole_set.contains(i)
@@ -277,6 +279,8 @@ impl ExBuffer {
         &&& self.grant_state_token@->0.instance_id() == self.instance@.id()
         &&& self.grant_state_token@->0.value().is_idle()
         &&& self.buf_points_to_raw@ is Some
+        &&& self.buf_points_to_raw@->0.provenance() == self.instance@.provenance()
+        &&& self.buf_points_to_raw@->0.provenance() == self.buffer_ptr@.provenance
         &&& self.buf_points_to_raw@->0.is_range(self.buffer_ptr as int, self.instance@.length() as int)
         &&& self.buf_points_to_raw@->0.dom() =~= Set::new(|i: int| self.buffer_ptr as int <= i && i < self.buffer_ptr as int + self.instance@.length() as int)
         &&& self.divide_gs@ is Some
@@ -392,6 +396,7 @@ impl<'a> Producer<'a> {
             r.prod_token@->0.instance_id() == self.shared.instance@.id(),
             r.prod_token@->0.value().divide == at,
             r.buffer_ptr == self.buffer_ptr,
+            r.buffer_ptr@.provenance == r.points_to_raw_token@->0.provenance(),
             r.points_to_raw_token@ is Some,
             r.points_to_raw_token@->0.dom() =~= Set::new(|i: int|
                 i >= r.buffer_ptr as int && i < r.buffer_ptr as int + r.prod_token@->0.value().divide as int),
@@ -434,6 +439,7 @@ impl<'a> Producer<'a> {
             let tracked (points_to_raw_prod, mut pool_rest) = current_pool.split(set_int_range(
                 slf.buffer_ptr as int + grant_state_token.value().prod_start,
                 slf.buffer_ptr as int + grant_state_token.value().prod_end));
+            assert(points_to_raw_prod.provenance() == slf.buffer_ptr@.provenance);
 
             proof {
                 prod_points_to_raw = Some(points_to_raw_prod);
@@ -478,6 +484,7 @@ impl<'a> Producer<'a> {
     pub closed spec fn wf(&self) -> bool {
         &&& self.prod_token@ is Some
         &&& self.prod_token@->0.instance_id() == self.shared.instance@.id()
+        &&& self.buffer_ptr@.provenance == self.shared.instance@.provenance()
         &&& self.buffer_ptr as int == self.shared.instance@.base_addr()
         &&& self.buffer_ptr as int + self.shared.instance@.length() <= usize::MAX + 1
         &&& self.shared.wf()
@@ -505,6 +512,7 @@ impl<'a> Consumer<'a> {
     pub closed spec fn wf(&self) -> bool {
         &&& self.cons_token@ is Some
         &&& self.cons_token@->0.instance_id() == self.shared.instance@.id()
+        &&& self.buffer_ptr@.provenance == self.shared.instance@.provenance()
         &&& self.buffer_ptr as int == self.shared.instance@.base_addr()
         &&& self.shared.wf()
  
@@ -526,7 +534,9 @@ fn main() {
 
     let tracked mut points_to_raw = grp.points_to_raw_token.borrow_mut().tracked_take();
     assert(points_to_raw.is_range(grp.buffer_ptr as int, divide_at as int));
+    assert(points_to_raw.provenance() == grp.buffer_ptr@.provenance);
 
+    let current_ptr: *mut u8 = grp.buffer_ptr;
     //let tracked mut points_to_map = Map::<int, vstd::raw_ptr::PointsTo<u8>>::tracked_empty();
     for idx in 0..divide_at
         invariant
@@ -543,8 +553,8 @@ fn main() {
             forall |i: int|
                 i >= grp.buffer_ptr as int && i < grp.buffer_ptr as int + idx as int
                     ==> points_to_map.index(i as int).ptr()@.provenance == buffer_perm.provenance(), 
-            grp.buffer_ptr @.provenance == buffer_perm.provenance(),
             */
+            grp.buffer_ptr@.provenance == points_to_raw.provenance(),
         decreases
             divide_at - idx,
     {
@@ -563,6 +573,7 @@ fn main() {
         }
         
         let current_ptr: *mut u8 = with_exposed_provenance(range_base_addr as usize, expose_provenance(grp.buffer_ptr));
+        assert(current_ptr@.provenance == grp.buffer_ptr@.provenance);
         assert(equal(top_pointsto.ptr().addr(), current_ptr as usize));
         assert(equal(top_pointsto.ptr()@.provenance, current_ptr@.provenance));
         assert(equal(top_pointsto.ptr(), current_ptr));
