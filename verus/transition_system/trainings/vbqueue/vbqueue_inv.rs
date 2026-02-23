@@ -1327,21 +1327,24 @@ impl Producer {
                 self.producer@->0.value().read_obs is None);
         }
         let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
-        let is_write_in_progress =
-            atomic_with_ghost!(&self.vbq.write_in_progress => swap(true);
-                update prev -> next;
-                returning ret;
-                ghost write_in_progress_token => {
-                    if !ret {
-                        let _ = self.vbq.instance.borrow().start_grant(&mut write_in_progress_token, &mut prod_token);
-                        assert(write_in_progress_token.value() == true);
-                        assert(ret == false);
-                    } else {
-                        assert(write_in_progress_token.value() == true);
-                        assert(ret == true);
-                    };
-                }
-        );
+
+        let is_write_in_progress: bool;
+        open_atomic_invariant!(self.shared.write_in_progress_inv.borrow().borrow() => gs => {
+            let tracked GhostStuffBool { perm: mut write_in_progress_perm, token: mut write_in_progress_token } = gs;
+
+            is_write_in_progress = self.shared.write_in_progress.swap(Tracked(&mut write_in_progress_perm), true);
+
+            if !is_write_in_progress {
+                let _ = self.shared.instance.borrow().start_grant(&mut write_in_progress_token, &mut prod_token);
+                assert(write_in_progress_token.value() == true);
+                assert(is_write_in_progress == false);
+            } else {
+                assert(write_in_progress_token.value() == true);
+                assert(is_write_in_progress == true);
+            };
+
+            proof { gs = GhostStuffUsize { perm: mut write_in_progress_perm, token: mut write_in_progress_token }; }
+        });
 
         if is_write_in_progress {
             self.producer = Tracked(Some(prod_token));
