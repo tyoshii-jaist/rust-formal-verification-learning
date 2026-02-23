@@ -941,6 +941,7 @@ pub struct VBBuffer {
 
 struct_with_invariants!{
     pub struct VBBufferShared<'a> {
+        length: usize,
         write: &'a PAtomicUsize,
         read: &'a PAtomicUsize,
         last: &'a PAtomicUsize,
@@ -1048,7 +1049,7 @@ impl VBBuffer {
         &&& self.buffer_ptr as int + self.instance@.length() <= usize::MAX + 1
     }
 
-    pub closed spec fn is_splittable(&self) -> bool {
+    pub closed spec fn can_split(&self) -> bool {
         &&& self.prod_token@ is Some
         &&& self.prod_token@->0.instance_id() == self.instance@.id()
         &&& self.prod_token@->0.value().is_idle()
@@ -1088,7 +1089,7 @@ impl VBBuffer
             length > 0, // TODO: 元の BBQueue はこの制約は持っていない。0で使うことはないと思うが。
         ensures
             r.wf(),
-            r.is_splittable(),
+            r.can_split(),
     {
         let (buffer_ptr, Tracked(points_to_raw), Tracked(buffer_dealloc)) = allocate(length, 1);
         proof {
@@ -1169,7 +1170,7 @@ impl VBBuffer
     fn try_split<'a>(&'a mut self)  -> (res: Result<(Producer<'a>, Consumer<'a>),  &'static str>)
         requires
             old(self).wf(),
-            old(self).is_splittable(),
+            old(self).can_split(),
         ensures
             match res {
                 Ok((prod, cons)) => {
@@ -1227,6 +1228,7 @@ impl VBBuffer
             Producer {
                 buffer_ptr: self.buffer_ptr,
                 shared: VBBufferShared {
+                    length: self.length,
                     write: &self.write,
                     read: &self.read,
                     last: &self.last,
@@ -1253,6 +1255,7 @@ impl VBBuffer
             Consumer {
                 buffer_ptr: self.buffer_ptr,
                 shared: VBBufferShared {
+                    length: self.length,
                     write: &self.write,
                     read: &self.read,
                     last: &self.last,
@@ -1317,7 +1320,7 @@ impl Producer {
                 Ok(wgr) => {
                     &&& wgr.vbq.instance@.id() == self.vbq.instance@.id()
                     &&& wgr.producer@->0.instance_id() == old(self).producer@->0.instance_id()
-                    &&& wgr.commit_callable(sz as nat)
+                    &&& wgr.can_commit(sz as nat)
                 },
                 _ => true
             },
@@ -1351,21 +1354,27 @@ impl Producer {
             return Err("write in progress");
         }
 
-        let write = atomic_with_ghost!(&self.vbq.write => load();
-            returning ret;
-            ghost write_token => {
-                let _ = self.vbq.instance.borrow().load_write_at_grant(&write_token, &prod_token);
-            }
-        );
+        let write: usize;
+        open_atomic_invariant!(self.shared.write_inv.borrow().borrow() => gs => {
+            let tracked GhostStuffBool { perm: mut write_perm, token: mut write_token } = gs;
 
-        let read = atomic_with_ghost!(&self.vbq.read => load();
-            ghost read_token => {
-                let _ = self.vbq.instance.borrow().load_read_at_grant(&read_token, &mut prod_token);
-                assert(prod_token.value().write_in_progress == true);
-            }
-        );
+            write = self.shared.write.load(Tracked(&mut write_perm));
+            let _ = self.shared.instance.borrow().load_write_at_grant(&write_token, &prod_token);
 
-        let max = self.vbq.length as usize;
+            proof { gs = GhostStuffUsize { perm: mut write_perm, token: mut write_token }; }
+        });
+
+        let read: usize;
+        open_atomic_invariant!(self.shared.read_inv.borrow().borrow() => gs => {
+            let tracked GhostStuffBool { perm: mut read_perm, token: mut read_token } = gs;
+
+            read = self.shared.write.load(Tracked(&mut read_perm));
+            let _ = self.shared.instance.borrow().load_read_at_grant(&read_token, &mut prod_token);
+
+            proof { gs = GhostStuffUsize { perm: mut read_perm, token: mut read_token }; }
+        });
+
+        let max = self.shared.length;
         let already_inverted = write < read;
 
         let start: usize = if already_inverted {
@@ -1374,11 +1383,15 @@ impl Producer {
                 write
             } else {
                 // Inverted, no room is available
-                atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
-                    ghost write_in_progress_token => {
-                        let _ = self.vbq.instance.borrow().grant_fail(&mut write_in_progress_token, &mut prod_token);
-                    }
-                );
+                open_atomic_invariant!(self.shared.write_in_progress_inv.borrow().borrow() => gs => {
+                    let tracked GhostStuffBool { perm: mut write_in_progress_perm, token: mut write_in_progress_token } = gs;
+
+                    let _ = self.shared.write_in_progress.store(Tracked(&mut write_in_progress_perm), false);
+                    let _ = self.shared.instance.borrow().grant_fail(&mut write_in_progress_token, &mut prod_token);
+
+                    proof { gs = GhostStuffUsize { perm: mut write_in_progress_perm, token: mut write_in_progress_token }; }
+                });
+
                 return Err("Inverted, no room is available");
             }
         } else {
@@ -1396,13 +1409,15 @@ impl Producer {
                     0
                 } else {
                     // Not invertible, no space
-                    atomic_with_ghost!(&self.vbq.write_in_progress => store(false);
-                        ghost write_in_progress_token => {
-                            assert(prod_token.value().write_in_progress == true);
-                            let _ = self.vbq.instance.borrow().grant_fail(&mut write_in_progress_token, &mut prod_token);
-                            assert(write_in_progress_token.value() == false);
-                        }
-                    );
+                    open_atomic_invariant!(self.shared.write_in_progress_inv.borrow().borrow() => gs => {
+                        let tracked GhostStuffBool { perm: mut write_in_progress_perm, token: mut write_in_progress_token } = gs;
+
+                        let _ = self.shared.write_in_progress.store(Tracked(&mut write_in_progress_perm), false);
+                        let _ = self.shared.instance.borrow().grant_fail(&mut write_in_progress_token, &mut prod_token);
+
+                        proof { gs = GhostStuffUsize { perm: mut write_in_progress_perm, token: mut write_in_progress_token }; }
+                    });
+
                     return Err("Insufficient size");
                 }
             }
@@ -1416,66 +1431,96 @@ impl Producer {
         // assert(start + sz <= self.vbq.length);
 
         // Safe write, only viewed by this task
-        atomic_with_ghost!(&self.vbq.reserve => store(start + sz);
-            ghost reserve_token => {
-                let ghost new_reserve: nat = (start + sz) as nat;
-                assert(
-                    (start == write && write < read && write + sz < read) ||
-                    (start == write && !(write < read) && write + sz <= max) ||
-                    (start == 0 && !(write < read) && (write + sz > max && sz < read))
-                );
-                let tracked ret = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);
-                assert(reserve_token.value() == start + sz);
+        let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
+        open_atomic_invariant!(slf.shared.buf_perm_inv.borrow().borrow() => bp => {
+            let tracked GhostBufferPermission {
+                pool: mut current_pool,
+                token: mut grant_state_token,
+            } = bp;
+
+            /* ここら辺に pool に関するロジックが必要 */
+
+            open_atomic_invariant!(self.shared.reserve_inv.borrow().borrow() => gs => {
+                let tracked GhostStuffBool { perm: mut reserve_perm, token: mut reserve_token } = gs;
+
+                let _ = self.shared.write_in_progress.store(Tracked(&mut reserve_perm), start + sz);
+                let _ = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);
+
+                proof { gs = GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token }; }
+            });
+
+            /* ここら辺に pool に関するロジックが必要 */
+
+            let tracked (points_to_raw_prod, mut pool_rest) = current_pool.split(set_int_range(
+                self.buffer_ptr as int + grant_state_token.value().prod_start,
+                self.buffer_ptr as int + grant_state_token.value().prod_end));
+            proof {
+                prod_points_to_raw = Some(points_to_raw_prod);
             }
-        );
 
+            let tracked (_points_to_raw_cons, pool_rest) = pool_rest.split(set_int_range(
+                self.buffer_ptr as int + grant_state_token.value().cons_start,
+                self.buffer_ptr as int + grant_state_token.value().cons_end));
 
-        let mut granted_buf: Vec<u8> = Vec::new();
-        let end_offset = start + sz;
+            proof { bp = GhostBufferPermission { pool: pool_rest, token: grant_state_token}; }
+        });
 
-        for idx in start..end_offset
-            invariant
-                granted_buf.len() == idx - start,
-                idx <= end_offset,
-                granted_buf.len() == (idx - start),
-            decreases
-                end_offset - idx,
-        {
-            granted_buf.push(0); // dummy
-        }
+        let tracked prod_points_to_raw = match prod_points_to_raw {
+            Some(token) => token,
+            None => {
+                assert(false);
+                proof_from_false()
+            }
+        };
 
-        proof {
-            assert(granted_buf.len() == sz);
-        }
         Ok (
             GrantW {
-                buf: granted_buf,
-                vbq: self.vbq.clone(),
-                to_commit: sz,
-                producer: Tracked(Some(prod_token)),
+                buf: self.buffer_ptr,
+                points_to_raw_token: Tracked(Some(prod_points_to_raw)),
+                shared: VBBufferShared {
+                    length: self.shared.length,
+                    write: &self.shared.write,
+                    read: &self.shared.read,
+                    last: &self.shared.last,
+                    reserve: &self.shared.reserve,
+                    read_in_progress: &self.shared.read_in_progress,
+                    write_in_progress: &self.shared.write_in_progress,
+                    // already_split: &'a PAtomicBool,
+
+                    /* バッファ分割管理用不変条件 */
+                    buf_perm_inv: Tracked(self.shared.buf_perm_inv.clone()),
+
+                    /* Atomic変数用不変条件 */
+                    write_inv: Tracked(self.shared.write_inv.clone()),
+                    read_inv: Tracked(self.shared.read_inv.clone()),
+                    last_inv: Tracked(self.shared.last_inv.clone()),
+                    reserve_inv: Tracked(self.shared.reserve_inv.clone()),
+                    read_in_progress_inv: Tracked(self.shared.read_in_progress_inv.clone()),
+                    write_in_progress_inv: Tracked(self.shared.write_in_progress_inv.clone()),
+
+                    instance: Tracked(self.instance.borrow().clone()),
+                },
+                prod_token: Tracked(Some(prod_token)),
             }
         )
     }
 }
 
 struct GrantW {
-    buf: Vec<u8>,//Vec<*mut u8>,
-    vbq: Arc<VBBuffer>,
-    to_commit: usize,
-    producer: Tracked<Option<VBQueue::producer>>,
+    buffer_ptr: *mut u8,
+    points_to_raw_token: Tracked<Option<PointsToRaw>>,
+    shared: VBBufferShared<'a>,
+    prod_token: Tracked<Option<VBQueue::producer>>,
 }
 
 impl GrantW {
-    pub closed spec fn commit_callable(&self, sz: nat) -> bool {
-        &&& self.vbq.wf()
-        &&& self.buf.len() as nat == sz
+    pub closed spec fn can_commit(&self, sz: nat) -> bool {
         &&& self.producer@ is Some
         &&& self.producer@->0.instance_id() == self.vbq.instance@.id()
         &&& self.producer@->0.value().is_idle() || self.producer@->0.value().is_granted(sz)
     }
 
-    pub closed spec fn commit_called(&self) -> bool {
-        &&& self.vbq.wf()
+    pub closed spec fn is_commited(&self) -> bool {
         &&& self.producer@ is None
     }
 }
@@ -1483,10 +1528,10 @@ impl GrantW {
 impl GrantW {
     fn commit(&mut self, used: usize) -> (prod_token: Tracked<VBQueue::producer>)
         requires
-            old(self).commit_callable(old(self).buf.len() as nat),
+            old(self).can_commit(old(self).buf.len() as nat),
             used <= old(self).buf.len(),
         ensures
-            self.commit_called(),
+            self.is_commited(),
             prod_token@.instance_id() == old(self).producer@->0.instance_id(),
             prod_token@.instance_id() == self.vbq.instance@.id(),
             prod_token@.value().is_idle(),
