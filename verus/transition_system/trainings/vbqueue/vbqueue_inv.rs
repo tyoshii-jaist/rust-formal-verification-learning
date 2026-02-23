@@ -936,7 +936,7 @@ pub struct VBBuffer {
     grant_state_token: Tracked<Option<VBQueue::grant_state>>, // トークンの分割状態を管理
     prod_token: Tracked<Option<VBQueue::producer>>, // Prod用の状態遷移用APIトークン
     cons_token: Tracked<Option<VBQueue::consumer>>, // Cons用の状態遷移用APIトークン
-    instance: Tracked<DividePermExample::Instance>,
+    instance: Tracked<VBQueue::Instance>,
 }
 
 struct_with_invariants!{
@@ -947,7 +947,7 @@ struct_with_invariants!{
         reserve: &'a PAtomicUsize,
         read_in_progress: &'a PAtomicBool,
         write_in_progress: &'a PAtomicBool,
-        already_split: &'a PAtomicBool,
+        // already_split: &'a PAtomicBool,
 
         /* バッファ分割管理用不変条件 */
         buf_perm_inv: Tracked< Shared<AtomicInvariant<_, GhostBufferPermission, _>> >,
@@ -959,7 +959,7 @@ struct_with_invariants!{
         reserve_inv: Tracked< Shared<AtomicInvariant<_, GhostStuffUsize<VBQueue::reserve>, _>> >,
         read_in_progress_inv: Tracked< Shared<AtomicInvariant<_, GhostStuffBool<VBQueue::read_in_progress>, _>> >,
         write_in_progress_inv: Tracked< Shared<AtomicInvariant<_, GhostStuffBool<VBQueue::write_in_progress>, _>> >,
-        already_split_inv: Tracked< Shared<AtomicInvariant<_, GhostStuffBool<VBQueue::already_split>, _>> >,
+        // already_split_inv: Tracked< Shared<AtomicInvariant<_, GhostStuffBool<VBQueue::already_split>, _>> >,
 
         instance: Tracked<VBQueue::Instance>,
     }
@@ -1020,15 +1020,15 @@ struct_with_invariants!{
             with (instance, write_in_progress)
             specifically (self.write_in_progress_inv@@)
             is (v: GhostStuffUsize<VBQueue::write_in_progress>) {
-                v.wf(instance@, divide)
+                v.wf(instance@, write_in_progress)
         }
-        
+        /*
         invariant on already_split_inv
             with (instance, already_split)
             specifically (self.already_split_inv@@)
             is (v: GhostStuffUsize<VBQueue::already_split>) {
                 v.wf(instance@, already_split)
-        }
+        } */
     }
 }
 
@@ -1181,18 +1181,13 @@ impl VBBuffer
                 Err(_) => true
             },
     {
-        let mut slf = self;
-
-        let already_splitted =
-            atomic_with_ghost!(&slf.already_split => swap(true);
-                update prev -> next;
-                returning ret;
-                ghost already_split_token => {
-                    if !ret {
-                        let _ = slf.instance.borrow().try_split(&mut already_split_token);
-                    };
-                }
-        );
+        let tracked GhostStuffBool { perm: mut already_split_perm, token: mut already_split_token } = self.already_split_gs;
+        let already_splitted = self.already_split.swap(Tracked(&mut already_split_perm), true);
+        proof {
+            if !already_splitted {
+                let  = slf.instance.borrow().try_split(&mut already_split_token);
+            }
+        }
 
         if already_splitted {
             return Err("already splitted");
@@ -1203,30 +1198,83 @@ impl VBBuffer
 
         let tracked grant_state_token = self.grant_state_token.borrow_mut().tracked_take();
         let tracked buf_points_to_raw = self.buf_points_to_raw.borrow_mut().tracked_take();
-        let tracked divide_gs = self.divide_gs.borrow_mut().tracked_take();
+        let tracked write_gs = self.write_gs.borrow_mut().tracked_take();
+        let tracked read_gs = self.read_gs.borrow_mut().tracked_take();
+        let tracked last_gs = self.last_gs.borrow_mut().tracked_take();
+        let tracked reserve_gs = self.reserve_gs.borrow_mut().tracked_take();
+        let tracked read_in_progress_gs = self.read_in_progress_gs.borrow_mut().tracked_take();
+        let tracked write_in_progress_gs = self.write_in_progress_gs.borrow_mut().tracked_take();
         let Tracked(inst) = self.instance;
 
         let tracked ghost_buffer_perm = GhostBufferPermission {
             pool: buf_points_to_raw,
             token: grant_state_token,
         };
-        let tracked buf_perm_inv = AtomicInvariant::new(self.instance, ghost_buffer_perm, 0);
-        let tracked buf_perm_inv = Shared::new(buf_perm_inv); // Shared は Ghost object を中に入れて、duplicate して &T を取り出すことができる。
+        let tracked buf_perm_inv = Shared::new(AtomicInvariant::new(self.instance, ghost_buffer_perm, 0));
 
-        let tracked divide_inv = AtomicInvariant::new((self.instance, &self.divide), divide_gs, 1);
-        let tracked divide_inv = Shared::new(divide_inv);
+        let tracked write_inv = Shared::new(AtomicInvariant::new((self.instance, &self.write), write_gs, 1));
+        let tracked read_inv = Shared::new(AtomicInvariant::new((self.instance, &self.read), read_gs, 2));
+        let tracked last_inv = Shared::new(AtomicInvariant::new((self.instance, &self.last), last_gs, 3));
+        let tracked reserve_inv = Shared::new(AtomicInvariant::new((self.instance, &self.reserve), reserve_gs, 4));
+        let tracked read_in_progress_inv = Shared::new(
+            AtomicInvariant::new((self.instance, &self.read_in_progress), divide_gs, 5)
+        );
+        let tracked write_in_progress_inv = Shared::new(
+            AtomicInvariant::new((self.instance, &self.write_in_progress), write_in_progress_gs, 6)
+        );
 
-        // FIXME:元の実装は Arc は使っていない。
-        // また、buffer のゼロ化もしているが、こちらは今はやっていない。
-        let vbbuffer_arc = Arc::new(slf);
         Ok((
             Producer {
-                vbq: vbbuffer_arc.clone(),
-                producer: Tracked(Some(prod_token)),
+                buffer_ptr: self.buffer_ptr,
+                shared: VBBufferShared {
+                    write: &self.write,
+                    read: &self.read,
+                    last: &self.last,
+                    reserve: &self.reserve,
+                    read_in_progress: &self.read_in_progress,
+                    write_in_progress: &self.write_in_progress,
+                    // already_split: &'a PAtomicBool,
+
+                    /* バッファ分割管理用不変条件 */
+                    buf_perm_inv: Tracked(buf_perm_inv.clone()),
+
+                    /* Atomic変数用不変条件 */
+                    write_inv: Tracked(write_inv.clone()),
+                    read_inv: Tracked(read_inv.clone()),
+                    last_inv: Tracked(last_inv.clone()),
+                    reserve_inv: Tracked(reserve_inv.clone()),
+                    read_in_progress_inv: Tracked(read_in_progress_inv.clone()),
+                    write_in_progress_inv: Tracked(write_in_progress_inv.clone()),
+
+                    instance: Tracked(self.instance.borrow().clone()),
+                },
+                prod_token: Tracked(Some(prod_token)),
             },
             Consumer {
-                vbq: vbbuffer_arc.clone(),
-                consumer: Tracked(Some(cons_token)),
+                buffer_ptr: self.buffer_ptr,
+                shared: VBBufferShared {
+                    write: &self.write,
+                    read: &self.read,
+                    last: &self.last,
+                    reserve: &self.reserve,
+                    read_in_progress: &self.read_in_progress,
+                    write_in_progress: &self.write_in_progress,
+                    // already_split: &'a PAtomicBool,
+
+                    /* バッファ分割管理用不変条件 */
+                    buf_perm_inv: Tracked(buf_perm_inv),
+
+                    /* Atomic変数用不変条件 */
+                    write_inv: Tracked(write_inv),
+                    read_inv: Tracked(read_inv),
+                    last_inv: Tracked(last_inv),
+                    reserve_inv: Tracked(reserve_inv),
+                    read_in_progress_inv: Tracked(read_in_progress_inv),
+                    write_in_progress_inv: Tracked(write_in_progress_inv),
+
+                    instance: Tracked(self.instance.borrow().clone()),
+                },
+                cons_token: Tracked(Some(cons_token)),
             }
         ))
     }
@@ -1234,14 +1282,12 @@ impl VBBuffer
 
 pub struct Producer<'a> {
     buffer_ptr: *mut u8,
-    shared: VBufferShared<'a>,
+    shared: VBBufferShared<'a>,
     prod_token: Tracked<Option<VBQueue::producer>>,
 }
 
 impl<'a> Producer<'a> {
     pub closed spec fn wf(&self) -> bool {
-        &&& self.prod_token@ is Some
-        &&& self.prod_token@->0.instance_id() == self.shared.instance@.id()
         &&& self.buffer_ptr@.provenance == self.shared.instance@.provenance()
         &&& self.buffer_ptr as int == self.shared.instance@.base_addr()
         &&& self.buffer_ptr as int + self.shared.instance@.length() <= usize::MAX + 1
@@ -1249,14 +1295,14 @@ impl<'a> Producer<'a> {
     }
 
     pub closed spec fn is_idle(&self) -> bool {
+        &&& self.prod_token@ is Some
+        &&& self.prod_token@->0.instance_id() == self.shared.instance@.id()
         &&& self.prod_token@->0.value().is_idle()
         &&& self.wf()
     }
 
     pub closed spec fn is_granted(&self, sz: nat) -> bool {
-        &&& self.producer@ is Some
-        &&& self.producer@->0.instance_id() == self.vbq.instance@.id()
-        &&& self.producer@->0.value().is_granted(sz)
+        &&& self.producer@ is None
         &&& self.wf()
     }
 }
@@ -1264,7 +1310,6 @@ impl<'a> Producer<'a> {
 impl Producer {
     fn grant_exact(&mut self, sz: usize) -> (r: Result<GrantW, &'static str>)
         requires
-            old(self).wf(),
             old(self).is_idle(),
         ensures
             self.wf(),
@@ -1567,7 +1612,7 @@ impl GrantW {
 
 pub struct Consumer<'a> {
     buffer_ptr: *mut u8,
-    shared: VBufferShared<'a>,
+    shared: VBBufferShared<'a>,
     prod_token: Tracked<Option<VBQueue::producer>>,
 }
 
