@@ -1781,7 +1781,7 @@ impl Consumer {
         open_atomic_invariant!(self.shared.read_in_progress_inv.borrow().borrow() => gs => {
             let tracked GhostStuffBool { perm: mut read_in_progress_perm, token: mut read_in_progress_token } = gs;
 
-            is_write_in_progress = self.shared.read_in_progress.swap(Tracked(&mut read_in_progress_perm), true);
+            is_read_in_progress = self.shared.read_in_progress.swap(Tracked(&mut read_in_progress_perm), true);
 
             proof {
                 if !is_read_in_progress {
@@ -1986,12 +1986,20 @@ impl GrantR {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
         // wrapper structure
-        let is_read_in_progress =
-            atomic_with_ghost!(&self.vbq.read_in_progress => load();
-                ghost read_in_progress_token => {
+        let is_read_in_progress: bool;
+        open_atomic_invariant!(self.shared.read_in_progress_inv.borrow().borrow() => gs => {
+            let tracked GhostStuffBool { perm: mut read_in_progress_perm, token: mut read_in_progress_token } = gs;
+
+            is_read_in_progress = self.shared.read_in_progress.swap(Tracked(&mut read_in_progress_perm), true);
+
+            proof {
+                if !is_read_in_progress {
                     let _ = self.vbq.instance.borrow().start_release(&mut read_in_progress_token, &mut cons_token);
                 }
-        );
+            }
+
+            proof { gs = GhostStuffUsize { perm: mut read_in_progress_perm, token: mut read_in_progress_token }; }
+        });
 
         if !is_read_in_progress {
             return Tracked(cons_token);
@@ -2001,31 +2009,30 @@ impl GrantR {
         // debug_assert!(used <= self.buf.len());
 
         // This should be fine, purely incrementing
-        let _ = atomic_with_ghost!(&self.vbq.read => fetch_add(used);
-            update prev -> next;
-            returning ret;
-            ghost read_token => {                
-                self.vbq.instance.borrow().check_read_equality(&read_token, &cons_token);
-                self.vbq.instance.borrow().check_consumer_obs_in_range(&cons_token);
+        open_atomic_invariant!(self.shared.read_inv.borrow().borrow() => gs => {
+            let tracked GhostStuffBool { perm: mut read_perm, token: mut read_token } = gs;
+            write = self.shared.reserve.fetch_sub(Tracked(&mut read_perm), len - used);
 
-                assert(prev == cons_token.value().read);
-                assert(cons_token.value().grant_sz() == self.buf.len() as int);
-                assert(used <= self.buf.len());
-                assert(cons_token.value().grant_end() <= self.vbq.length);
-                assert(cons_token.value().grant_start() == prev);
-                assert(cons_token.value().grant_sz() == cons_token.value().grant_end() - cons_token.value().grant_start());
-                assert(prev + used <= cons_token.value().grant_end());
-                assert(prev + used <= usize::MAX as int);
-                let _ = self.vbq.instance.borrow().add_read_at_release(used as nat, &mut read_token, &mut cons_token);
-            }
-        );
+            proof {
+                let _ = self.shared.instance.borrow().check_read_equality(&read_token, &cons_token);
+                let _ = self.shared.instance.borrow().check_consumer_obs_in_range(&mut cons_token);
 
-        atomic_with_ghost!(&self.vbq.read_in_progress => store(false);
-            ghost read_in_progress_token => {
-                let _ = self.vbq.instance.borrow().end_release(&mut read_in_progress_token, &mut cons_token);
-                assert(read_in_progress_token.value() == false);
+                let _ = self.shared.instance.borrow().add_read_at_release(used as nat, &mut read_token, &mut cons_token);
             }
-        );
+
+            proof { gs = GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token }; }
+        });
+
+        open_atomic_invariant!(self.shared.read_in_progress_inv.borrow().borrow() => gs => {
+            let tracked GhostStuffBool { perm: mut read_in_progress_perm, token: mut read_in_progress_token } = gs;
+
+            let _ = self.shared.read_in_progress.store(Tracked(&mut read_in_progress_perm), false);
+            proof {
+                let _ = self.shared.instance.borrow().end_release(&mut read_in_progress_token, &mut cons_token);
+            }
+
+            proof { gs = GhostStuffUsize { perm: mut read_in_progress_perm, token: mut read_in_progress_token }; }
+        });
 
         return Tracked(cons_token);
     }
