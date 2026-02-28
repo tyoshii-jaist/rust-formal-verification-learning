@@ -1,9 +1,12 @@
 use state_machines_macros::tokenized_state_machine;
-use vstd::atomic_ghost::*;
-use vstd::raw_ptr::*;
 use vstd::{prelude::*, *};
+use vstd::atomic::*;
+use vstd::invariant::*;
 use vstd::layout::*;
-use std::sync::Arc;
+use vstd::raw_ptr::*;
+use vstd::set_lib::*;
+use vstd::shared::*;
+use vstd::tokens::UniqueValueToken;
 
 verus! {
 /*
@@ -143,6 +146,9 @@ tokenized_state_machine!{VBQueue {
         // Represents the local state of the single-consumer
         #[sharding(variable)]
         pub consumer: ConsumerState,
+
+        #[sharding(variable)]
+        pub grant_state: GrantState,
     }
 
     #[invariant]
@@ -309,7 +315,7 @@ tokenized_state_machine!{VBQueue {
     }
     
     #[inductive(initialize)]
-    fn initialize_inductive(post: Self, length: nat) {}
+    fn initialize_inductive(post: Self, length: nat, base_addr: nat, provenance: raw_ptr::Provenance, buffer_dealloc: raw_ptr::Dealloc) {}
 
     transition!{
         try_split() {
@@ -849,8 +855,6 @@ tokenized_state_machine!{VBQueue {
     共有する不変条件用の構造体
 */
 pub tracked struct GhostStuff<Perm, Tok>
-where
-    Tok: UniqueValueToken<nat>,
 {
     pub tracked perm: Perm,
     pub tracked token: Tok,
@@ -872,9 +876,9 @@ where
 
 impl<Tok> GhostStuffBool<Tok>
 where
-    Tok: UniqueValueToken<nat>,
+    Tok: UniqueValueToken<bool>,
 {
-    pub open spec fn wf(self, inst: VBQueue::Instance, cell: &PermissionBool) -> bool {
+    pub open spec fn wf(self, inst: VBQueue::Instance, cell: &PAtomicBool) -> bool {
         &&& self.perm@.patomic == cell.id()
         &&& self.token.instance_id() == inst.id()
         &&& self.perm@.value == self.token.value()
@@ -1013,14 +1017,14 @@ struct_with_invariants!{
         invariant on read_in_progress_inv
             with (instance, read_in_progress)
             specifically (self.read_in_progress_inv@@)
-            is (v: GhostStuffUsize<VBQueue::read_in_progress>) {
+            is (v: GhostStuffBool<VBQueue::read_in_progress>) {
                 v.wf(instance@, read_in_progress)
         }
 
         invariant on write_in_progress_inv
             with (instance, write_in_progress)
             specifically (self.write_in_progress_inv@@)
-            is (v: GhostStuffUsize<VBQueue::write_in_progress>) {
+            is (v: GhostStuffBool<VBQueue::write_in_progress>) {
                 v.wf(instance@, write_in_progress)
         }
         /*
@@ -1035,11 +1039,11 @@ struct_with_invariants!{
 
 impl VBBuffer {
     pub closed spec fn wf(self) -> bool {
-        &&& match self.producer@ {
+        &&& match self.prod_token@ {
                 Some(prod) => prod.instance_id() == self.instance@.id(),
                 None => true,
             }
-        &&& match self.consumer@ {
+        &&& match self.cons_token@ {
                 Some(cons) => cons.instance_id() == self.instance@.id(),
                 None => true,
             }
@@ -1132,13 +1136,13 @@ impl VBBuffer
         let tracked reserve_gs = GhostStuffUsize { perm: reserve_perm, token: reserve_token };
 
         let (read_in_progress, Tracked(read_in_progress_perm)) = PAtomicBool::new(false);
-        let tracked read_in_progress_gs = GhostStuffUsize { perm: read_in_progress_perm, token: read_in_progress_token };
+        let tracked read_in_progress_gs = GhostStuffBool { perm: read_in_progress_perm, token: read_in_progress_token };
 
         let (write_in_progress, Tracked(write_in_progress_perm)) = PAtomicBool::new(false);
-        let tracked write_in_progress_gs = GhostStuffUsize { perm: write_in_progress_perm, token: write_in_progress_token };
+        let tracked write_in_progress_gs = GhostStuffBool { perm: write_in_progress_perm, token: write_in_progress_token };
 
         let (already_split, Tracked(already_split_perm)) = PAtomicBool::new(false);
-        let tracked already_split_gs = GhostStuffUsize { perm: already_split_perm, token: already_split_token };
+        let tracked already_split_gs = GhostStuffBool { perm: already_split_perm, token: already_split_token };
 
         // Initialize the queue
         Self {
@@ -1174,10 +1178,10 @@ impl VBBuffer
         ensures
             match res {
                 Ok((prod, cons)) => {
-                    prod.is_idle(),
-                    cons.is_idle(),
-                    prod.shared.instance@.length() == old(self).instance@.length(),
-                    prod.shared.instance@.length() == old(self).instance@.length(),
+                    &&& prod.is_idle()
+                    &&& cons.is_idle()
+                    &&& prod.shared.instance@.length() == old(self).instance@.length()
+                    &&& prod.shared.instance@.length() == old(self).instance@.length()
                 }, 
                 Err(_) => true
             },
@@ -1186,7 +1190,7 @@ impl VBBuffer
         let already_splitted = self.already_split.swap(Tracked(&mut already_split_perm), true);
         proof {
             if !already_splitted {
-                let  = slf.instance.borrow().try_split(&mut already_split_token);
+                let _ = self.instance.borrow().try_split(&mut already_split_token);
             }
         }
 
@@ -1194,8 +1198,8 @@ impl VBBuffer
             return Err("already splitted");
         }
 
-        let tracked prod_token = slf.producer.borrow_mut().tracked_take();
-        let tracked cons_token = slf.consumer.borrow_mut().tracked_take();
+        let tracked prod_token = self.producer.borrow_mut().tracked_take();
+        let tracked cons_token = self.consumer.borrow_mut().tracked_take();
 
         let tracked grant_state_token = self.grant_state_token.borrow_mut().tracked_take();
         let tracked buf_points_to_raw = self.buf_points_to_raw.borrow_mut().tracked_take();
@@ -1218,7 +1222,7 @@ impl VBBuffer
         let tracked last_inv = Shared::new(AtomicInvariant::new((self.instance, &self.last), last_gs, 3));
         let tracked reserve_inv = Shared::new(AtomicInvariant::new((self.instance, &self.reserve), reserve_gs, 4));
         let tracked read_in_progress_inv = Shared::new(
-            AtomicInvariant::new((self.instance, &self.read_in_progress), divide_gs, 5)
+            AtomicInvariant::new((self.instance, &self.read_in_progress), read_in_progress_gs, 5)
         );
         let tracked write_in_progress_inv = Shared::new(
             AtomicInvariant::new((self.instance, &self.write_in_progress), write_in_progress_gs, 6)
@@ -1310,7 +1314,7 @@ impl<'a> Producer<'a> {
     }
 }
 
-impl Producer {
+impl<'a> Producer<'a> {
     fn grant_exact(&mut self, sz: usize) -> (r: Result<GrantW, &'static str>)
         requires
             old(self).is_idle(),
@@ -1348,7 +1352,7 @@ impl Producer {
                 };
             }
 
-            proof { gs = GhostStuffUsize { perm: mut write_in_progress_perm, token: mut write_in_progress_token }; }
+            proof { gs = GhostStuffBool { perm: write_in_progress_perm, token: write_in_progress_token }; }
         });
 
         if is_write_in_progress {
@@ -1358,26 +1362,26 @@ impl Producer {
 
         let write: usize;
         open_atomic_invariant!(self.shared.write_inv.borrow().borrow() => gs => {
-            let tracked GhostStuffBool { perm: mut write_perm, token: mut write_token } = gs;
+            let tracked GhostStuffUsize { perm: mut write_perm, token: mut write_token } = gs;
 
             write = self.shared.write.load(Tracked(&mut write_perm));
             proof {
                 let _ = self.shared.instance.borrow().load_write_at_grant(&write_token, &prod_token);
             }
 
-            proof { gs = GhostStuffUsize { perm: mut write_perm, token: mut write_token }; }
+            proof { gs = GhostStuffUsize { perm: write_perm, token: write_token }; }
         });
 
         let read: usize;
         open_atomic_invariant!(self.shared.read_inv.borrow().borrow() => gs => {
-            let tracked GhostStuffBool { perm: mut read_perm, token: mut read_token } = gs;
+            let tracked GhostStuffUsize { perm: mut read_perm, token: mut read_token } = gs;
 
             read = self.shared.read.load(Tracked(&mut read_perm));
             proof {
                 let _ = self.shared.instance.borrow().load_read_at_grant(&read_token, &mut prod_token);
             }
 
-            proof { gs = GhostStuffUsize { perm: mut read_perm, token: mut read_token }; }
+            proof { gs = GhostStuffUsize { perm: read_perm, token: read_token }; }
         });
 
         let max = self.shared.length;
@@ -1397,7 +1401,7 @@ impl Producer {
                         let _ = self.shared.instance.borrow().grant_fail(&mut write_in_progress_token, &mut prod_token);
                     }
 
-                    proof { gs = GhostStuffUsize { perm: mut write_in_progress_perm, token: mut write_in_progress_token }; }
+                    proof { gs = GhostStuffBool { perm: write_in_progress_perm, token: write_in_progress_token }; }
                 });
 
                 return Err("Inverted, no room is available");
@@ -1425,7 +1429,7 @@ impl Producer {
                             let _ = self.shared.instance.borrow().grant_fail(&mut write_in_progress_token, &mut prod_token);
                         }
 
-                        proof { gs = GhostStuffUsize { perm: mut write_in_progress_perm, token: mut write_in_progress_token }; }
+                        proof { gs = GhostStuffBool { perm: write_in_progress_perm, token: write_in_progress_token }; }
                     });
 
                     return Err("Insufficient size");
@@ -1442,7 +1446,7 @@ impl Producer {
 
         // Safe write, only viewed by this task
         let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
-        open_atomic_invariant!(slf.shared.buf_perm_inv.borrow().borrow() => bp => {
+        open_atomic_invariant!(self.shared.buf_perm_inv.borrow().borrow() => bp => {
             let tracked GhostBufferPermission {
                 pool: mut current_pool,
                 token: mut grant_state_token,
@@ -1451,13 +1455,13 @@ impl Producer {
             /* ここら辺に pool に関するロジックが必要 */
 
             open_atomic_invariant!(self.shared.reserve_inv.borrow().borrow() => gs => {
-                let tracked GhostStuffBool { perm: mut reserve_perm, token: mut reserve_token } = gs;
+                let tracked GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token } = gs;
                 let _ = self.shared.reserve.store(Tracked(&mut reserve_perm), start + sz);
                 proof {
                     let _ = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);
                 }
                 
-                proof { gs = GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token }; }
+                proof { gs = GhostStuffUsize { perm: reserve_perm, token: reserve_token }; }
             });
 
             /* ここら辺に pool に関するロジックが必要 */
@@ -1517,14 +1521,14 @@ impl Producer {
     }
 }
 
-struct GrantW {
+struct GrantW<'a> {
     buffer_ptr: *mut u8,
     shared: VBBufferShared<'a>,
     points_to_raw_token: Tracked<Option<PointsToRaw>>,
     prod_token: Tracked<Option<VBQueue::producer>>,
 }
 
-impl GrantW {
+impl<'a> GrantW<'a> {
     pub closed spec fn can_commit(&self, sz: nat) -> bool {
         &&& self.producer@ is Some
         &&& self.producer@->0.instance_id() == self.vbq.instance@.id()
@@ -1536,7 +1540,7 @@ impl GrantW {
     }
 }
 
-impl GrantW {
+impl<'a> GrantW<'a> {
     fn commit(&mut self, used: usize) -> (prod_token: Tracked<VBQueue::producer>)
         requires
             old(self).can_commit(old(self).buf.len() as nat),
@@ -1567,7 +1571,7 @@ impl GrantW {
                 };
             }
 
-            proof { gs = GhostStuffUsize { perm: mut write_in_progress_perm, token: mut write_in_progress_token }; }
+            proof { gs = GhostStuffBool { perm: write_in_progress_perm, token: write_in_progress_token }; }
         });
 
         if !is_write_in_progress {
@@ -1583,7 +1587,7 @@ impl GrantW {
 
         let write: usize;
         open_atomic_invariant!(self.shared.write_inv.borrow().borrow() => gs => {
-            let tracked GhostStuffBool { perm: mut write_perm, token: mut write_token } = gs;
+            let tracked GhostStuffUsize { perm: mut write_perm, token: mut write_token } = gs;
             write = self.shared.write.load(Tracked(&mut write_perm));
 
             proof {
@@ -1591,11 +1595,11 @@ impl GrantW {
                 let _ = self.shared.instance.borrow().load_write_at_commit(&write_token, &prod_token);
             }
 
-            proof { gs = GhostStuffUsize { perm: mut write_perm, token: mut write_token }; }
+            proof { gs = GhostStuffUsize { perm: write_perm, token: write_token }; }
         });
 
         open_atomic_invariant!(self.shared.reserve_inv.borrow().borrow() => gs => {
-            let tracked GhostStuffBool { perm: mut reserve_perm, token: mut reserve_token } = gs;
+            let tracked GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token } = gs;
             write = self.shared.reserve.fetch_sub(Tracked(&mut reserve_perm), len - used);
 
             proof {
@@ -1607,13 +1611,13 @@ impl GrantW {
                 let _ = self.shared.instance.borrow().sub_reserve_at_commit((len - used) as nat, &mut reserve_token, &mut prod_token);
             }
 
-            proof { gs = GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token }; }
+            proof { gs = GhostStuffUsize { perm: reserve_perm, token: reserve_token }; }
         });
 
         let max = self.vbq.length as usize;
         let last: usize;
         open_atomic_invariant!(self.shared.last.borrow().borrow() => gs => {
-            let tracked GhostStuffBool { perm: mut last_perm, token: mut last_token } = gs;
+            let tracked GhostStuffUsize { perm: mut last_perm, token: mut last_token } = gs;
 
             last = self.shared.last.load(Tracked(&mut last_perm));
             proof {
@@ -1621,36 +1625,36 @@ impl GrantW {
                 self.shared.instance.borrow().check_last_equality(&last_token, &prod_token);
             }
 
-            proof { gs = GhostStuffUsize { perm: mut last_perm, token: mut last_token }; }
+            proof { gs = GhostStuffUsize { perm: last_perm, token: last_token }; }
         });
 
 
         let new_write: usize;
         open_atomic_invariant!(self.shared.reserve.borrow().borrow() => gs => {
-            let tracked GhostStuffBool { perm: mut reserve_perm, token: mut reserve_token } = gs;
+            let tracked GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token } = gs;
 
             new_write = self.shared.reserve.load(Tracked(&mut reserve_perm));
             proof {
-                let _ = self.shared.instance.borrow().load_reserve_at_commit(&last_token, &mut prod_token);
+                let _ = self.shared.instance.borrow().load_reserve_at_commit(&reserve_token, &mut prod_token);
                 self.shared.instance.borrow().check_last_equality(&reserve_token, &prod_token);
                 assert(reserve_token.value() == prod_token.value().reserve);
             }
 
-            proof { gs = GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token }; }
+            proof { gs = GhostStuffUsize { perm: reserve_perm, token: reserve_token }; }
         });
 
         if (new_write < write) && (write != max) {
             // We have already wrapped, but we are skipping some bytes at the end of the ring.
             // Mark `last` where the write pointer used to be to hold the line here
             open_atomic_invariant!(self.shared.last_inv.borrow().borrow() => gs => {
-                let tracked GhostStuffBool { perm: mut last_perm, token: mut last_token } = gs;
+                let tracked GhostStuffUsize { perm: mut last_perm, token: mut last_token } = gs;
                 let _ = self.shared.last.store(Tracked(&mut last_perm), write);
                     
                 proof {
                     let _ = self.vbq.instance.borrow().update_last_by_write_at_commit(write as nat, &mut last_token, &mut prod_token);
                 }
                 
-                proof { gs = GhostStuffUsize { perm: mut last_perm, token: mut last_token }; }
+                proof { gs = GhostStuffUsize { perm: last_perm, token: last_token }; }
             });
         } else if new_write > last {
             // We're about to pass the last pointer, which was previously the artificial
@@ -1661,7 +1665,7 @@ impl GrantW {
             // the other thread will still be halted by the (about to be updated) write
             // value
             open_atomic_invariant!(self.shared.last_inv.borrow().borrow() => gs => {
-                let tracked GhostStuffBool { perm: mut last_perm, token: mut last_token } = gs;
+                let tracked GhostStuffUsize { perm: mut last_perm, token: mut last_token } = gs;
                 let _ = self.shared.last.store(Tracked(&mut last_perm), max);
                     
                 proof {
@@ -1669,7 +1673,7 @@ impl GrantW {
                     assert(prod_token.value().last == max as nat);
                 }
                 
-                proof { gs = GhostStuffUsize { perm: mut last_perm, token: mut last_token }; }
+                proof { gs = GhostStuffUsize { perm: last_perm, token: last_token }; }
             });
         }
         // else: If new_write == last, either:
@@ -1681,7 +1685,7 @@ impl GrantW {
         // Write must be updated AFTER last, otherwise read could think it was
         // time to invert early!
         let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
-        open_atomic_invariant!(slf.shared.buf_perm_inv.borrow().borrow() => bp => {
+        open_atomic_invariant!(self.shared.buf_perm_inv.borrow().borrow() => bp => {
             let tracked GhostBufferPermission {
                 pool: mut current_pool,
                 token: mut grant_state_token,
@@ -1690,14 +1694,14 @@ impl GrantW {
             /* ここら辺に pool に関するロジックが必要 */
 
             open_atomic_invariant!(self.shared.write_inv.borrow().borrow() => gs => {
-                let tracked GhostStuffBool { perm: mut write_perm, token: mut write_token } = gs;
+                let tracked GhostStuffUsize { perm: mut write_perm, token: mut write_token } = gs;
                 let _ = self.shared.write.store(Tracked(&mut write_perm), new_write);
                 proof {
                     let _ = self.shared.instance.borrow().check_write_equality(&write_token, &prod_token);
                     let _ = self.shared.instance.borrow().store_write_at_commit(new_write as nat, &mut write_token, &mut prod_token);
                 }
                 
-                proof { gs = GhostStuffUsize { perm: mut write_perm, token: mut write_token }; }
+                proof { gs = GhostStuffUsize { perm: write_perm, token: write_token }; }
             });
 
             /* ここら辺に pool に関するロジックが必要 */
@@ -1726,7 +1730,7 @@ impl GrantW {
                 assert(write_in_progress_token.value() == false);
             }
 
-            proof { gs = GhostStuffUsize { perm: mut write_in_progress_perm, token: mut write_in_progress_token }; }
+            proof { gs = GhostStuffBool { perm: write_in_progress_perm, token: write_in_progress_token }; }
         });
 
         return Tracked(prod_token);
@@ -1759,7 +1763,7 @@ impl<'a> Consumer<'a> {
     }
 }
 
-impl Consumer {
+impl<'a> Consumer<'a> {
     fn read(&mut self) ->  (r: Result<GrantR, &'static str>)
         requires
             old(self).wf(),
@@ -1794,41 +1798,41 @@ impl Consumer {
                 };
             }
 
-            proof { gs = GhostStuffUsize { perm: mut read_in_progress_perm, token: mut read_in_progress_token }; }
+            proof { gs = GhostStuffBool { perm: read_in_progress_perm, token: read_in_progress_token }; }
         });
 
         if is_read_in_progress {
-            self.cons_token = Traced(Some(cons_token));
+            self.cons_token = Tracked(Some(cons_token));
             return Err("read in progress");
         }
 
         let write: usize;
         open_atomic_invariant!(self.shared.write_inv.borrow().borrow() => gs => {
-            let tracked GhostStuffBool { perm: mut write_perm, token: mut write_token } = gs;
+            let tracked GhostStuffUsize { perm: mut write_perm, token: mut write_token } = gs;
 
             write = self.shared.write.load(Tracked(&mut write_perm));
             proof {
                 let _ = self.shared.instance.borrow().load_write_at_read(&write_token, &cons_token);
             }
 
-            proof { gs = GhostStuffUsize { perm: mut write_perm, token: mut write_token }; }
+            proof { gs = GhostStuffUsize { perm: write_perm, token: write_token }; }
         });
 
         let last: usize;
         open_atomic_invariant!(self.shared.last.borrow().borrow() => gs => {
-            let tracked GhostStuffBool { perm: mut last_perm, token: mut last_token } = gs;
+            let tracked GhostStuffUsize { perm: mut last_perm, token: mut last_token } = gs;
 
             last = self.shared.last.load(Tracked(&mut last_perm));
             proof {
                 let _ = self.shared.instance.borrow().load_last_at_read(&last_token, &mut cons_token);
             }
 
-            proof { gs = GhostStuffUsize { perm: mut last_perm, token: mut last_token }; }
+            proof { gs = GhostStuffUsize { perm: last_perm, token: last_token }; }
         });
 
-        let mut read: usize
+        let mut read: usize;
         open_atomic_invariant!(self.shared.read_inv.borrow().borrow() => gs => {
-            let tracked GhostStuffBool { perm: mut read_perm, token: mut read_token } = gs;
+            let tracked GhostStuffUsize { perm: mut read_perm, token: mut read_token } = gs;
 
             read = self.shared.read.load(Tracked(&mut read_perm));
             proof {
@@ -1837,7 +1841,7 @@ impl Consumer {
                 assert(write < read_token.value() ==> read_token.value() <= last);
             }
 
-            proof { gs = GhostStuffUsize { perm: mut read_perm, token: mut read_token }; }
+            proof { gs = GhostStuffUsize { perm: read_perm, token: read_token }; }
         });
 
         // Resolve the inverted case or end of read
@@ -1852,13 +1856,13 @@ impl Consumer {
             //   grant could move Last to the prior write position
             // MOVING READ BACKWARDS!
             open_atomic_invariant!(self.shared.read_inv.borrow().borrow() => gs => {
-                let tracked GhostStuffBool { perm: mut read_perm, token: mut read_token } = gs;
+                let tracked GhostStuffUsize { perm: mut read_perm, token: mut read_token } = gs;
                 // TODO: ここでも permission の変更が必要?
                 // ここで read が wrap する。
                 // read == last の状態で、かつ、write < read なので、inverted 状態になる。    
                 read = self.shared.read.store(Tracked(&mut read_perm), 0);
                 proof {
-                    let _ = self.shared.instance.borrow().check_read_equality(&read_token, &mut prod_token);
+                    let _ = self.shared.instance.borrow().check_read_equality(&read_token, &mut cons_token);
                     let _ = self.shared.instance.borrow().wrap_read(&mut read_token, &mut cons_token);
                     // ↑をまたぐと
                     // read == 0 になるので not inverted に切り替わる
@@ -1866,7 +1870,7 @@ impl Consumer {
                     // read == 0 read_obs == 9 write == 9 で last は 10 のとき、not inverted 判断になる。
                 }
 
-                proof { gs = GhostStuffUsize { perm: mut read_perm, token: mut read_token }; }
+                proof { gs = GhostStuffUsize { perm: read_perm, token: read_token }; }
             });
         }
 
@@ -1887,7 +1891,7 @@ impl Consumer {
                     let _ = self.shared.instance.borrow().read_fail(&mut read_in_progress_token, &mut cons_token);
                 }
 
-                proof { gs = GhostStuffUsize { perm: mut read_in_progress_perm, token: mut read_in_progress_token }; }
+                proof { gs = GhostStuffBool { perm: read_in_progress_perm, token: read_in_progress_token }; }
             });
             return Err("Insufficient size");
         }
@@ -1938,21 +1942,21 @@ impl Consumer {
 
                     instance: Tracked(self.instance.borrow().clone()),
                 },
-                points_to_raw_token: Tracked(Some(cons_points_to_raw)),
+                points_to_raw_token: Tracked(None),//Tracked(Some(cons_points_to_raw)),
                 consumer: Tracked(Some(cons_token)),
             }
         )
     }
 }
 
-struct GrantR {
+struct GrantR<'a> {
     buffer_ptr: *mut u8,
     shared: VBBufferShared<'a>,
     points_to_raw_token: Tracked<Option<PointsToRaw>>,
     cons_token: Tracked<Option<VBQueue::consumer>>,
 }
 
-impl GrantR {
+impl<'a> GrantR<'a> {
     pub closed spec fn releasable(&self, sz: nat) -> bool {
         &&& self.vbq.wf()
         &&& self.buf.len() as nat == sz
@@ -1967,7 +1971,7 @@ impl GrantR {
     }
 }
 
-impl GrantR {
+impl<'a> GrantR<'a> {
     fn release(&mut self,
         used: usize
     ) -> (cons_token: Tracked<VBQueue::consumer>)
@@ -1998,7 +2002,7 @@ impl GrantR {
                 }
             }
 
-            proof { gs = GhostStuffUsize { perm: mut read_in_progress_perm, token: mut read_in_progress_token }; }
+            proof { gs = GhostStuffBool { perm: read_in_progress_perm, token: read_in_progress_token }; }
         });
 
         if !is_read_in_progress {
@@ -2010,8 +2014,8 @@ impl GrantR {
 
         // This should be fine, purely incrementing
         open_atomic_invariant!(self.shared.read_inv.borrow().borrow() => gs => {
-            let tracked GhostStuffBool { perm: mut read_perm, token: mut read_token } = gs;
-            write = self.shared.reserve.fetch_sub(Tracked(&mut read_perm), len - used);
+            let tracked GhostStuffUsize { perm: mut read_perm, token: mut read_token } = gs;
+            let _ = self.shared.read.fetch_add(Tracked(&mut read_perm), used);
 
             proof {
                 let _ = self.shared.instance.borrow().check_read_equality(&read_token, &cons_token);
@@ -2020,7 +2024,7 @@ impl GrantR {
                 let _ = self.shared.instance.borrow().add_read_at_release(used as nat, &mut read_token, &mut cons_token);
             }
 
-            proof { gs = GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token }; }
+            proof { gs = GhostStuffUsize { perm: read_perm, token: read_token }; }
         });
 
         open_atomic_invariant!(self.shared.read_in_progress_inv.borrow().borrow() => gs => {
@@ -2031,7 +2035,7 @@ impl GrantR {
                 let _ = self.shared.instance.borrow().end_release(&mut read_in_progress_token, &mut cons_token);
             }
 
-            proof { gs = GhostStuffUsize { perm: mut read_in_progress_perm, token: mut read_in_progress_token }; }
+            proof { gs = GhostStuffBool { perm: read_in_progress_perm, token: read_in_progress_token }; }
         });
 
         return Tracked(cons_token);
