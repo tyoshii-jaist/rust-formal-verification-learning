@@ -1535,6 +1535,7 @@ struct GrantW<'a> {
 impl<'a> GrantW<'a> {
     pub closed spec fn can_commit(&self, sz: nat) -> bool {
         &&& self.prod_token@ is Some
+        &&& self.sz as nat == sz
         &&& self.prod_token@->0.instance_id() == self.shared.instance@.id()
         &&& self.prod_token@->0.value().is_idle() || self.prod_token@->0.value().is_granted(sz)
         &&& self.shared.wf()
@@ -1773,7 +1774,7 @@ impl<'a> Consumer<'a> {
                 Ok(rgr) => {
                     &&& rgr.shared.instance@.id() == self.shared.instance@.id()
                     &&& rgr.cons_token@->0.instance_id() == old(self).cons_token@->0.instance_id()
-                    &&& rgr.releasable(rgr.sz as nat)
+                    &&& rgr.can_release(rgr.sz as nat)
                 },
                 _ => true,
             },
@@ -1943,7 +1944,7 @@ struct GrantR<'a> {
 }
 
 impl<'a> GrantR<'a> {
-    pub closed spec fn releasable(&self, sz: nat) -> bool {
+    pub closed spec fn can_release(&self, sz: nat) -> bool {
         &&& self.shared.wf()
         &&& self.sz as nat == sz
         &&& self.cons_token@ is Some
@@ -1963,7 +1964,7 @@ impl<'a> GrantR<'a> {
     ) -> (cons_token: Tracked<VBQueue::consumer>)
         requires
             used <= old(self).sz,
-            old(self).releasable(old(self).sz as nat),
+            old(self).can_release(old(self).sz as nat),
         ensures
             self.shared.wf(),
             self.released(),
@@ -1983,9 +1984,7 @@ impl<'a> GrantR<'a> {
             is_read_in_progress = self.shared.read_in_progress.swap(Tracked(&mut read_in_progress_perm), true);
 
             proof {
-                if !is_read_in_progress {
-                    let _ = self.shared.instance.borrow().start_release(&mut read_in_progress_token, &mut cons_token);
-                }
+                let _ = self.shared.instance.borrow().start_release(&mut read_in_progress_token, &mut cons_token);
             }
 
             proof { gs = GhostStuffBool { perm: read_in_progress_perm, token: read_in_progress_token }; }
