@@ -1147,6 +1147,7 @@ impl VBBuffer
         // Initialize the queue
         Self {
             length,
+            buffer_ptr,
             write,
             read,
             last,
@@ -1186,7 +1187,8 @@ impl VBBuffer
                 Err(_) => true
             },
     {
-        let tracked GhostStuffBool { perm: mut already_split_perm, token: mut already_split_token } = self.already_split_gs;
+        let tracked already_split_gs = self.already_split_gs.borrow_mut().tracked_take();
+        let tracked GhostStuffBool { perm: mut already_split_perm, token: mut already_split_token } = already_split_gs;
         let already_splitted = self.already_split.swap(Tracked(&mut already_split_perm), true);
         proof {
             if !already_splitted {
@@ -1198,8 +1200,8 @@ impl VBBuffer
             return Err("already splitted");
         }
 
-        let tracked prod_token = self.producer.borrow_mut().tracked_take();
-        let tracked cons_token = self.consumer.borrow_mut().tracked_take();
+        let tracked prod_token = self.prod_token.borrow_mut().tracked_take();
+        let tracked cons_token = self.cons_token.borrow_mut().tracked_take();
 
         let tracked grant_state_token = self.grant_state_token.borrow_mut().tracked_take();
         let tracked buf_points_to_raw = self.buf_points_to_raw.borrow_mut().tracked_take();
@@ -1309,7 +1311,7 @@ impl<'a> Producer<'a> {
     }
 
     pub closed spec fn is_granted(&self, sz: nat) -> bool {
-        &&& self.producer@ is None
+        &&& self.prod_token@ is None
         &&& self.wf()
     }
 }
@@ -1322,18 +1324,18 @@ impl<'a> Producer<'a> {
             self.wf(),
             match r {
                 Ok(wgr) => {
-                    &&& wgr.vbq.instance@.id() == self.vbq.instance@.id()
-                    &&& wgr.producer@->0.instance_id() == old(self).producer@->0.instance_id()
+                    &&& wgr.shared.instance@.id() == self.shared.instance@.id()
+                    &&& wgr.prod_token@->0.instance_id() == old(self).prod_token@->0.instance_id()
                     &&& wgr.can_commit(sz as nat)
                 },
                 _ => true
             },
     {
         proof{
-            assert(self.producer@->0.value().write_in_progress == false ==> 
-                self.producer@->0.value().read_obs is None);
+            assert(self.prod_token@->0.value().write_in_progress == false ==> 
+                self.prod_token@->0.value().read_obs is None);
         }
-        let tracked mut prod_token = self.producer.borrow_mut().tracked_take();
+        let tracked mut prod_token = self.prod_token.borrow_mut().tracked_take();
 
         let is_write_in_progress: bool;
         open_atomic_invariant!(self.shared.write_in_progress_inv.borrow().borrow() => gs => {
@@ -1442,7 +1444,7 @@ impl<'a> Producer<'a> {
             (start == write && !(write < read) && write + sz <= max) ||
             (start == 0 && !(write < read) && (write + sz > max && sz < read))
         );
-        // assert(start + sz <= self.vbq.length);
+        // assert(start + sz <= self.shared.length);
 
         // Safe write, only viewed by this task
         let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
@@ -1458,7 +1460,7 @@ impl<'a> Producer<'a> {
                 let tracked GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token } = gs;
                 let _ = self.shared.reserve.store(Tracked(&mut reserve_perm), start + sz);
                 proof {
-                    let _ = self.vbq.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);
+                    let _ = self.shared.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token);
                 }
                 
                 proof { gs = GhostStuffUsize { perm: reserve_perm, token: reserve_token }; }
@@ -1490,7 +1492,8 @@ impl<'a> Producer<'a> {
 
         Ok (
             GrantW {
-                buf: self.buffer_ptr,
+                buffer_ptr: self.buffer_ptr,
+                sz,
                 shared: VBBufferShared {
                     length: self.shared.length,
                     write: &self.shared.write,
@@ -1502,17 +1505,17 @@ impl<'a> Producer<'a> {
                     // already_split: &'a PAtomicBool,
 
                     /* バッファ分割管理用不変条件 */
-                    buf_perm_inv: Tracked(self.shared.buf_perm_inv.clone()),
+                    buf_perm_inv: Tracked(self.shared.buf_perm_inv.borrow().clone()),
 
                     /* Atomic変数用不変条件 */
-                    write_inv: Tracked(self.shared.write_inv.clone()),
-                    read_inv: Tracked(self.shared.read_inv.clone()),
-                    last_inv: Tracked(self.shared.last_inv.clone()),
-                    reserve_inv: Tracked(self.shared.reserve_inv.clone()),
-                    read_in_progress_inv: Tracked(self.shared.read_in_progress_inv.clone()),
-                    write_in_progress_inv: Tracked(self.shared.write_in_progress_inv.clone()),
+                    write_inv: Tracked(self.shared.write_inv.borrow().clone()),
+                    read_inv: Tracked(self.shared.read_inv.borrow().clone()),
+                    last_inv: Tracked(self.shared.last_inv.borrow().clone()),
+                    reserve_inv: Tracked(self.shared.reserve_inv.borrow().clone()),
+                    read_in_progress_inv: Tracked(self.shared.read_in_progress_inv.borrow().clone()),
+                    write_in_progress_inv: Tracked(self.shared.write_in_progress_inv.borrow().clone()),
 
-                    instance: Tracked(self.instance.borrow().clone()),
+                    instance: Tracked(self.shared.instance.borrow().clone()),
                 },
                 points_to_raw_token: Tracked(Some(prod_points_to_raw)),
                 prod_token: Tracked(Some(prod_token)),
@@ -1523,6 +1526,7 @@ impl<'a> Producer<'a> {
 
 struct GrantW<'a> {
     buffer_ptr: *mut u8,
+    sz: usize,
     shared: VBBufferShared<'a>,
     points_to_raw_token: Tracked<Option<PointsToRaw>>,
     prod_token: Tracked<Option<VBQueue::producer>>,
@@ -1530,31 +1534,31 @@ struct GrantW<'a> {
 
 impl<'a> GrantW<'a> {
     pub closed spec fn can_commit(&self, sz: nat) -> bool {
-        &&& self.producer@ is Some
-        &&& self.producer@->0.instance_id() == self.vbq.instance@.id()
-        &&& self.producer@->0.value().is_idle() || self.producer@->0.value().is_granted(sz)
+        &&& self.prod_token@ is Some
+        &&& self.prod_token@->0.instance_id() == self.shared.instance@.id()
+        &&& self.prod_token@->0.value().is_idle() || self.prod_token@->0.value().is_granted(sz)
     }
 
     pub closed spec fn is_commited(&self) -> bool {
-        &&& self.producer@ is None
+        &&& self.prod_token@ is None
     }
 }
 
 impl<'a> GrantW<'a> {
     fn commit(&mut self, used: usize) -> (prod_token: Tracked<VBQueue::producer>)
         requires
-            old(self).can_commit(old(self).buf.len() as nat),
-            used <= old(self).buf.len(),
+            old(self).can_commit(old(self).sz as nat),
+            used <= old(self).sz,
         ensures
             self.is_commited(),
-            prod_token@.instance_id() == old(self).producer@->0.instance_id(),
-            prod_token@.instance_id() == self.vbq.instance@.id(),
+            prod_token@.instance_id() == old(self).prod_token@->0.instance_id(),
+            prod_token@.instance_id() == self.shared.instance@.id(),
             prod_token@.value().is_idle(),
     {
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
         // wrapper structure
-        let tracked prod_token = self.producer.borrow_mut().tracked_take();
+        let tracked prod_token = self.prod_token.borrow_mut().tracked_take();
 
         let is_write_in_progress: bool;
         open_atomic_invariant!(self.shared.write_in_progress_inv.borrow().borrow() => gs => {
@@ -1563,7 +1567,7 @@ impl<'a> GrantW<'a> {
             is_write_in_progress = self.shared.write_in_progress.load(Tracked(&mut write_in_progress_perm));
                     
             proof {
-                let _ = self.shared.instance.borrow().start_commit(self.buf.len() as nat, &mut write_in_progress_token, &prod_token);
+                let _ = self.shared.instance.borrow().start_commit(self.sz as nat, &mut write_in_progress_token, &prod_token);
                 self.shared.instance.borrow().check_write_in_progress_equality(&write_in_progress_token, &prod_token);
 
                 if !is_write_in_progress {
@@ -1582,7 +1586,7 @@ impl<'a> GrantW<'a> {
         // be careful writing to LAST
 
         // Saturate the grant commit
-        let len = self.buf.len();
+        let len = self.sz;
         let used = if len <= used { len } else { used }; // min の代用。
 
         let write: usize;
@@ -1600,7 +1604,7 @@ impl<'a> GrantW<'a> {
 
         open_atomic_invariant!(self.shared.reserve_inv.borrow().borrow() => gs => {
             let tracked GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token } = gs;
-            write = self.shared.reserve.fetch_sub(Tracked(&mut reserve_perm), len - used);
+            self.shared.reserve.fetch_sub(Tracked(&mut reserve_perm), len - used);
 
             proof {
                 self.shared.instance.borrow().check_reserve_equality(&reserve_token, &prod_token);
@@ -1614,9 +1618,9 @@ impl<'a> GrantW<'a> {
             proof { gs = GhostStuffUsize { perm: reserve_perm, token: reserve_token }; }
         });
 
-        let max = self.vbq.length as usize;
+        let max = self.shared.length as usize;
         let last: usize;
-        open_atomic_invariant!(self.shared.last.borrow().borrow() => gs => {
+        open_atomic_invariant!(self.shared.last_inv.borrow().borrow() => gs => {
             let tracked GhostStuffUsize { perm: mut last_perm, token: mut last_token } = gs;
 
             last = self.shared.last.load(Tracked(&mut last_perm));
@@ -1630,13 +1634,12 @@ impl<'a> GrantW<'a> {
 
 
         let new_write: usize;
-        open_atomic_invariant!(self.shared.reserve.borrow().borrow() => gs => {
+        open_atomic_invariant!(self.shared.reserve_inv.borrow().borrow() => gs => {
             let tracked GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token } = gs;
 
             new_write = self.shared.reserve.load(Tracked(&mut reserve_perm));
             proof {
                 let _ = self.shared.instance.borrow().load_reserve_at_commit(&reserve_token, &mut prod_token);
-                self.shared.instance.borrow().check_last_equality(&reserve_token, &prod_token);
                 assert(reserve_token.value() == prod_token.value().reserve);
             }
 
@@ -1651,7 +1654,8 @@ impl<'a> GrantW<'a> {
                 let _ = self.shared.last.store(Tracked(&mut last_perm), write);
                     
                 proof {
-                    let _ = self.vbq.instance.borrow().update_last_by_write_at_commit(write as nat, &mut last_token, &mut prod_token);
+                    let _ = self.shared.instance.borrow().check_last_equality(&last_token, &prod_token);
+                    let _ = self.shared.instance.borrow().update_last_by_write_at_commit(write as nat, &mut last_token, &mut prod_token);
                 }
                 
                 proof { gs = GhostStuffUsize { perm: last_perm, token: last_token }; }
@@ -1669,7 +1673,7 @@ impl<'a> GrantW<'a> {
                 let _ = self.shared.last.store(Tracked(&mut last_perm), max);
                     
                 proof {
-                    let _ = self.vbq.instance.borrow().update_last_by_max_at_commit(&mut last_token, &mut prod_token);
+                    let _ = self.shared.instance.borrow().update_last_by_max_at_commit(&mut last_token, &mut prod_token);
                     assert(prod_token.value().last == max as nat);
                 }
                 
@@ -1724,7 +1728,7 @@ impl<'a> GrantW<'a> {
         open_atomic_invariant!(self.shared.write_in_progress_inv.borrow().borrow() => gs => {
             let tracked GhostStuffBool { perm: mut write_in_progress_perm, token: mut write_in_progress_token } = gs;
 
-            is_write_in_progress = self.shared.write_in_progress.store(Tracked(&mut write_in_progress_perm), false);
+            self.shared.write_in_progress.store(Tracked(&mut write_in_progress_perm), false);
 
             proof {
                 assert(write_in_progress_token.value() == false);
@@ -1734,11 +1738,6 @@ impl<'a> GrantW<'a> {
         });
 
         return Tracked(prod_token);
-    }
-
-    /// Configures the amount of bytes to be commited on drop.
-    pub fn to_commit(&mut self, amt: usize) {
-        self.to_commit = self.buf.len().min(amt);
     }
 }
 
@@ -1772,14 +1771,14 @@ impl<'a> Consumer<'a> {
             self.wf(),
             match r {
                 Ok(rgr) => {
-                    &&& rgr.vbq.instance@.id() == self.vbq.instance@.id()
-                    &&& rgr.consumer@->0.instance_id() == old(self).consumer@->0.instance_id()
-                    &&& rgr.releasable(rgr.buf.len() as nat)
+                    &&& rgr.shared.instance@.id() == self.shared.instance@.id()
+                    &&& rgr.cons_token@->0.instance_id() == old(self).cons_token@->0.instance_id()
+                    &&& rgr.releasable(rgr.sz as nat)
                 },
                 _ => true,
             },
     {
-        let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
+        let tracked mut cons_token = self.cons_token.borrow_mut().tracked_take();
 
         let is_read_in_progress: bool;
         open_atomic_invariant!(self.shared.read_in_progress_inv.borrow().borrow() => gs => {
@@ -1812,14 +1811,14 @@ impl<'a> Consumer<'a> {
 
             write = self.shared.write.load(Tracked(&mut write_perm));
             proof {
-                let _ = self.shared.instance.borrow().load_write_at_read(&write_token, &cons_token);
+                let _ = self.shared.instance.borrow().load_write_at_read(&write_token, &mut cons_token);
             }
 
             proof { gs = GhostStuffUsize { perm: write_perm, token: write_token }; }
         });
 
         let last: usize;
-        open_atomic_invariant!(self.shared.last.borrow().borrow() => gs => {
+        open_atomic_invariant!(self.shared.last_inv.borrow().borrow() => gs => {
             let tracked GhostStuffUsize { perm: mut last_perm, token: mut last_token } = gs;
 
             last = self.shared.last.load(Tracked(&mut last_perm));
@@ -1860,7 +1859,7 @@ impl<'a> Consumer<'a> {
                 // TODO: ここでも permission の変更が必要?
                 // ここで read が wrap する。
                 // read == last の状態で、かつ、write < read なので、inverted 状態になる。    
-                read = self.shared.read.store(Tracked(&mut read_perm), 0);
+                self.shared.read.store(Tracked(&mut read_perm), 0);
                 proof {
                     let _ = self.shared.instance.borrow().check_read_equality(&read_token, &mut cons_token);
                     let _ = self.shared.instance.borrow().wrap_read(&mut read_token, &mut cons_token);
@@ -1886,7 +1885,7 @@ impl<'a> Consumer<'a> {
             open_atomic_invariant!(self.shared.read_in_progress_inv.borrow().borrow() => gs => {
                 let tracked GhostStuffBool { perm: mut read_in_progress_perm, token: mut read_in_progress_token } = gs;
 
-                let _ = self.shared.read_in_progress.store(Tracked(&mut read_in_progress_perm), false);
+                self.shared.read_in_progress.store(Tracked(&mut read_in_progress_perm), false);
                 proof {
                     let _ = self.shared.instance.borrow().read_fail(&mut read_in_progress_token, &mut cons_token);
                 }
@@ -1900,25 +1899,11 @@ impl<'a> Consumer<'a> {
         // are all `#[repr(Transparent)]
         //let start_of_buf_ptr = inner.buf.get().cast::<u8>();
         //let grant_slice = unsafe { from_raw_parts_mut(start_of_buf_ptr.offset(read as isize), sz) };
-        let mut granted_buf: Vec<u8> = Vec::new();
 
-        for idx in read..(read + sz)
-            invariant
-                granted_buf.len() == idx - read,
-                idx <= (read + sz),
-                granted_buf.len() == (idx - read),
-            decreases
-                (read + sz) - idx,
-        {
-            granted_buf.push(0);
-        }
-        assert(granted_buf.len() == sz);
-        assert(cons_token.value().grant_sz() == sz);
-        assert(cons_token.value().read == cons_token.value().grant_start());
-        assert(cons_token.value().read + sz == cons_token.value().grant_end());
         Ok(
             GrantR {
-                buf: self.buffer_ptr,
+                buffer_ptr: self.buffer_ptr, // FIXME! add offset
+                sz,
                 shared: VBBufferShared {
                     length: self.shared.length,
                     write: &self.shared.write,
@@ -1930,20 +1915,20 @@ impl<'a> Consumer<'a> {
                     // already_split: &'a PAtomicBool,
 
                     /* バッファ分割管理用不変条件 */
-                    buf_perm_inv: Tracked(self.shared.buf_perm_inv.clone()),
+                    buf_perm_inv: Tracked(self.shared.buf_perm_inv.borrow().clone()),
 
                     /* Atomic変数用不変条件 */
-                    write_inv: Tracked(self.shared.write_inv.clone()),
-                    read_inv: Tracked(self.shared.read_inv.clone()),
-                    last_inv: Tracked(self.shared.last_inv.clone()),
-                    reserve_inv: Tracked(self.shared.reserve_inv.clone()),
-                    read_in_progress_inv: Tracked(self.shared.read_in_progress_inv.clone()),
-                    write_in_progress_inv: Tracked(self.shared.write_in_progress_inv.clone()),
+                    write_inv: Tracked(self.shared.write_inv.borrow().clone()),
+                    read_inv: Tracked(self.shared.read_inv.borrow().clone()),
+                    last_inv: Tracked(self.shared.last_inv.borrow().clone()),
+                    reserve_inv: Tracked(self.shared.reserve_inv.borrow().clone()),
+                    read_in_progress_inv: Tracked(self.shared.read_in_progress_inv.borrow().clone()),
+                    write_in_progress_inv: Tracked(self.shared.write_in_progress_inv.borrow().clone()),
 
-                    instance: Tracked(self.instance.borrow().clone()),
+                    instance: Tracked(self.shared.instance.borrow().clone()),
                 },
                 points_to_raw_token: Tracked(None),//Tracked(Some(cons_points_to_raw)),
-                consumer: Tracked(Some(cons_token)),
+                cons_token: Tracked(Some(cons_token)),
             }
         )
     }
@@ -1951,6 +1936,7 @@ impl<'a> Consumer<'a> {
 
 struct GrantR<'a> {
     buffer_ptr: *mut u8,
+    sz: usize,
     shared: VBBufferShared<'a>,
     points_to_raw_token: Tracked<Option<PointsToRaw>>,
     cons_token: Tracked<Option<VBQueue::consumer>>,
@@ -1958,16 +1944,16 @@ struct GrantR<'a> {
 
 impl<'a> GrantR<'a> {
     pub closed spec fn releasable(&self, sz: nat) -> bool {
-        &&& self.vbq.wf()
-        &&& self.buf.len() as nat == sz
-        &&& self.consumer@ is Some
-        &&& self.consumer@->0.instance_id() == self.vbq.instance@.id()
-        &&& self.consumer@->0.value().is_idle() || self.consumer@->0.value().is_granted(sz)
+        &&& self.shared.wf()
+        &&& self.sz as nat == sz
+        &&& self.cons_token@ is Some
+        &&& self.cons_token@->0.instance_id() == self.shared.instance@.id()
+        &&& self.cons_token@->0.value().is_idle() || self.cons_token@->0.value().is_granted(sz)
     }
 
     pub closed spec fn released(&self) -> bool {
-        &&& self.vbq.wf()
-        &&& self.consumer@ is None
+        &&& self.shared.wf()
+        &&& self.cons_token@ is None
     }
 }
 
@@ -1976,16 +1962,16 @@ impl<'a> GrantR<'a> {
         used: usize
     ) -> (cons_token: Tracked<VBQueue::consumer>)
         requires
-            used <= old(self).buf.len(),
-            old(self).releasable(old(self).buf.len() as nat),
+            used <= old(self).sz,
+            old(self).releasable(old(self).sz as nat),
         ensures
-            self.vbq.wf(),
+            self.shared.wf(),
             self.released(),
-            cons_token@.instance_id() == old(self).consumer@->0.instance_id(),
-            cons_token@.instance_id() == self.vbq.instance@.id(),
+            cons_token@.instance_id() == old(self).cons_token@->0.instance_id(),
+            cons_token@.instance_id() == self.shared.instance@.id(),
             cons_token@.value().is_idle(),
     {
-        let tracked mut cons_token = self.consumer.borrow_mut().tracked_take();
+        let tracked mut cons_token = self.cons_token.borrow_mut().tracked_take();
 
         // If there is no grant in progress, return early. This
         // generally means we are dropping the grant within a
@@ -1998,7 +1984,7 @@ impl<'a> GrantR<'a> {
 
             proof {
                 if !is_read_in_progress {
-                    let _ = self.vbq.instance.borrow().start_release(&mut read_in_progress_token, &mut cons_token);
+                    let _ = self.shared.instance.borrow().start_release(&mut read_in_progress_token, &mut cons_token);
                 }
             }
 
@@ -2040,15 +2026,10 @@ impl<'a> GrantR<'a> {
 
         return Tracked(cons_token);
     }
-
-    /// Configures the amount of bytes to be released on drop.
-    pub fn to_release(&mut self, amt: usize) {
-        self.to_release = self.buf.len().min(amt);
-    }
 }
 
 fn main() {
-    let vbuf = VBBuffer::new(6);
+    let mut vbuf = VBBuffer::new(6);
     let (mut prod, mut cons) = match vbuf.try_split() {
         Ok((p, c)) => (p, c),
         Err(_) => return,
@@ -2060,21 +2041,19 @@ fn main() {
             Ok(w) => w,
             Err(_) => return,
         };
-        if wgr.buf.len() != 5 { return; }
         let Tracked(prod_token) = wgr.commit(5);
-        assert(prod_token.instance_id() == wgr.vbq.instance@.id());
-        assert(prod_token.instance_id() == prod.vbq.instance@.id());
+        assert(prod_token.instance_id() == wgr.shared.instance@.id());
+        assert(prod_token.instance_id() == prod.shared.instance@.id());
         assert(prod_token.value().is_idle());
 
-        prod.producer = Tracked(Some(prod_token));
+        prod.prod_token = Tracked(Some(prod_token));
 
         let mut rgr = match cons.read() {
             Ok(r) => r,
             Err(_) => return,
         };
-        if rgr.buf.len() != 5 { return; }
         let Tracked(cons_token) = rgr.release(5);
-        cons.consumer = Tracked(Some(cons_token));
+        cons.cons_token = Tracked(Some(cons_token));
     }
 
     // ---- phase 2: wrap with "skip end chunk" (write=5, read=5, sz=4 -> start=0) ----
@@ -2084,18 +2063,16 @@ fn main() {
             Ok(w) => w,
             Err(_) => return,
         };
-        if wgr.buf.len() != 4 { return; }
         let Tracked(prod_token) = wgr.commit(4);
 
-        prod.producer = Tracked(Some(prod_token));
+        prod.prod_token = Tracked(Some(prod_token));
 
         let mut rgr = match cons.read() {
             Ok(r) => r,
             Err(_) => return,
         };
-        if rgr.buf.len() != 4 { return; }
         let Tracked(cons_token) = rgr.release(4);
-        cons.consumer = Tracked(Some(cons_token));
+        cons.cons_token = Tracked(Some(cons_token));
     }
 
     // ---- phase 3: unlock last back to max (last was 5, now new_write should become 6) ----
@@ -2104,18 +2081,16 @@ fn main() {
             Ok(w) => w,
             Err(_) => return,
         };
-        if wgr.buf.len() != 2 { return; }
         let Tracked(prod_token) = wgr.commit(2);
 
-        prod.producer = Tracked(Some(prod_token));
+        prod.prod_token = Tracked(Some(prod_token));
 
         let mut rgr = match cons.read() {
             Ok(r) => r,
             Err(_) => return,
         };
-        if rgr.buf.len() != 2 { return; }
         let Tracked(cons_token) = rgr.release(2);
-        cons.consumer = Tracked(Some(cons_token));
+        cons.cons_token = Tracked(Some(cons_token));
     }
 
     // ---- phase 4: wrap when old write == max (write=6, read=6, sz=1 -> start=0) ----
@@ -2125,18 +2100,16 @@ fn main() {
             Ok(w) => w,
             Err(_) => return,
         };
-        if wgr.buf.len() != 1 { return; }
         let Tracked(prod_token) = wgr.commit(1);
 
-        prod.producer = Tracked(Some(prod_token));
+        prod.prod_token = Tracked(Some(prod_token));
 
         let mut rgr = match cons.read() {
             Ok(r) => r,
             Err(_) => return,
         };
-        if rgr.buf.len() != 1 { return; }
         let Tracked(cons_token) = rgr.release(1);
-        cons.consumer = Tracked(Some(cons_token));
+        cons.cons_token = Tracked(Some(cons_token));
     }
 
     // ---- phase 5: empty read should fail ----
