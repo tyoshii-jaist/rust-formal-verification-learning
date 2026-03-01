@@ -1750,14 +1750,13 @@ pub struct Consumer<'a> {
 
 impl<'a> Consumer<'a> {
     pub closed spec fn wf(&self) -> bool {
-        &&& self.cons_token@ is Some
-        &&& self.cons_token@->0.instance_id() == self.shared.instance@.id()
         &&& self.buffer_ptr@.provenance == self.shared.instance@.provenance()
         &&& self.buffer_ptr as int == self.shared.instance@.base_addr()
         &&& self.shared.wf()
- 
     }
     pub closed spec fn is_idle(&self) -> bool {
+        &&& self.cons_token@ is Some
+        &&& self.cons_token@->0.instance_id() == self.shared.instance@.id()
         &&& self.cons_token@->0.value().is_idle()
         &&& self.wf()
     }
@@ -2042,6 +2041,7 @@ fn main() {
             Ok(w) => w,
             Err(_) => return,
         };
+        if wgr.sz != 5 { return; }
         let Tracked(prod_token) = wgr.commit(5);
         assert(prod_token.instance_id() == wgr.shared.instance@.id());
         assert(prod_token.instance_id() == prod.shared.instance@.id());
@@ -2053,6 +2053,7 @@ fn main() {
             Ok(r) => r,
             Err(_) => return,
         };
+        if rgr.sz != 5 { return; }
         let Tracked(cons_token) = rgr.release(5);
         cons.cons_token = Tracked(Some(cons_token));
     }
@@ -2064,6 +2065,7 @@ fn main() {
             Ok(w) => w,
             Err(_) => return,
         };
+        if wgr.sz != 4 { return; }
         let Tracked(prod_token) = wgr.commit(4);
 
         prod.prod_token = Tracked(Some(prod_token));
@@ -2072,6 +2074,7 @@ fn main() {
             Ok(r) => r,
             Err(_) => return,
         };
+        if rgr.sz != 4 { return; }
         let Tracked(cons_token) = rgr.release(4);
         cons.cons_token = Tracked(Some(cons_token));
     }
@@ -2082,6 +2085,7 @@ fn main() {
             Ok(w) => w,
             Err(_) => return,
         };
+        if wgr.sz != 2 { return; }
         let Tracked(prod_token) = wgr.commit(2);
 
         prod.prod_token = Tracked(Some(prod_token));
@@ -2090,6 +2094,7 @@ fn main() {
             Ok(r) => r,
             Err(_) => return,
         };
+        if rgr.sz != 2 { return; }
         let Tracked(cons_token) = rgr.release(2);
         cons.cons_token = Tracked(Some(cons_token));
     }
@@ -2101,6 +2106,7 @@ fn main() {
             Ok(w) => w,
             Err(_) => return,
         };
+        if wgr.sz != 1 { return; }
         let Tracked(prod_token) = wgr.commit(1);
 
         prod.prod_token = Tracked(Some(prod_token));
@@ -2109,6 +2115,7 @@ fn main() {
             Ok(r) => r,
             Err(_) => return,
         };
+        if rgr.sz != 1 { return; }
         let Tracked(cons_token) = rgr.release(1);
         cons.cons_token = Tracked(Some(cons_token));
     }
