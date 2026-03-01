@@ -1129,7 +1129,7 @@ impl VBBuffer
         let (read, Tracked(read_perm)) = PAtomicUsize::new(0);
         let tracked read_gs = GhostStuffUsize { perm: read_perm, token: read_token };
 
-        let (last, Tracked(last_perm)) = PAtomicUsize::new(0);
+        let (last, Tracked(last_perm)) = PAtomicUsize::new(length);
         let tracked last_gs = GhostStuffUsize { perm: last_perm, token: last_token };
 
         let (reserve, Tracked(reserve_perm)) = PAtomicUsize::new(0);
@@ -1537,6 +1537,7 @@ impl<'a> GrantW<'a> {
         &&& self.prod_token@ is Some
         &&& self.prod_token@->0.instance_id() == self.shared.instance@.id()
         &&& self.prod_token@->0.value().is_idle() || self.prod_token@->0.value().is_granted(sz)
+        &&& self.shared.wf()
     }
 
     pub closed spec fn is_commited(&self) -> bool {
