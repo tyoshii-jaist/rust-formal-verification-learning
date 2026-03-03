@@ -1981,10 +1981,10 @@ impl<'a> GrantR<'a> {
         open_atomic_invariant!(self.shared.read_in_progress_inv.borrow().borrow() => gs => {
             let tracked GhostStuffBool { perm: mut read_in_progress_perm, token: mut read_in_progress_token } = gs;
 
-            is_read_in_progress = self.shared.read_in_progress.swap(Tracked(&mut read_in_progress_perm), true);
+            is_read_in_progress = self.shared.read_in_progress.load(Tracked(&mut read_in_progress_perm));
 
             proof {
-                let _ = self.shared.instance.borrow().start_release(&mut read_in_progress_token, &mut cons_token);
+                let _ = self.shared.instance.borrow().start_release(&read_in_progress_token, &cons_token);
             }
 
             proof { gs = GhostStuffBool { perm: read_in_progress_perm, token: read_in_progress_token }; }
