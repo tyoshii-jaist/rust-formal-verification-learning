@@ -272,6 +272,27 @@ tokenized_state_machine!{VBQueue {
         &&& self.consumer.grant_end() == self.grant_state.cons_end
     }
 
+    #[invariant]
+    pub fn valid_grant_prod_bounds(&self) -> bool {
+        &&& self.grant_state.prod_start <= self.grant_state.prod_end
+        &&& self.grant_state.prod_end <= self.length
+    }
+
+    #[invariant]
+    pub fn valid_grant_cons_bounds(&self) -> bool {
+        &&& self.grant_state.cons_start <= self.grant_state.cons_end
+        &&& self.grant_state.cons_end <= self.length
+    }
+
+    #[invariant]
+    pub fn valid_grant_disjoint(&self) -> bool {
+        // prod region [prod_start, prod_end) and cons region [cons_start, cons_end) are disjoint
+        ||| self.grant_state.prod_start == self.grant_state.prod_end
+        ||| self.grant_state.cons_start == self.grant_state.cons_end
+        ||| self.grant_state.prod_end <= self.grant_state.cons_start
+        ||| self.grant_state.cons_end <= self.grant_state.prod_start
+    }
+
     init! {
         initialize(
             length: nat,
@@ -815,6 +836,63 @@ tokenized_state_machine!{VBQueue {
         }
     }
 
+    // Extract grant_state bounds and disjointness from invariants
+    transition!{
+        check_grant_bounds_disjoint() {
+            assert(pre.grant_state.prod_start <= pre.grant_state.prod_end);
+            assert(pre.grant_state.prod_end <= pre.length);
+            assert(pre.grant_state.cons_start <= pre.grant_state.cons_end);
+            assert(pre.grant_state.cons_end <= pre.length);
+            assert(
+                pre.grant_state.prod_start == pre.grant_state.prod_end
+                || pre.grant_state.cons_start == pre.grant_state.cons_end
+                || pre.grant_state.prod_end <= pre.grant_state.cons_start
+                || pre.grant_state.cons_end <= pre.grant_state.prod_start
+            );
+        }
+    }
+
+    // Extract that producer's prod range is empty when idle (write == reserve)
+    transition!{
+        check_grant_prod_idle() {
+            require(pre.producer.write == pre.producer.reserve);
+            assert(pre.grant_state.prod_start == pre.grant_state.prod_end);
+        }
+    }
+
+    // Extract that consumer's cons range is empty when idle
+    transition!{
+        check_grant_cons_idle() {
+            require(pre.consumer.write_obs is None);
+            require(pre.consumer.last_obs is None);
+            assert(pre.grant_state.cons_start == pre.grant_state.cons_end);
+        }
+    }
+
+    // Extract that consumer's cons range is empty when last_obs is None
+    transition!{
+        check_grant_cons_no_last() {
+            require(pre.consumer.last_obs is None);
+            assert(pre.grant_state.cons_start == pre.grant_state.cons_end);
+        }
+    }
+
+    // Extract relationship between producer token and grant_state
+    transition!{
+        check_grant_prod_eq() {
+            assert(pre.grant_state.prod_start == pre.producer.grant_start());
+            assert(pre.grant_state.prod_end == pre.producer.grant_end());
+        }
+    }
+
+    // Extract relationship between consumer token and grant_state
+    transition!{
+        check_grant_cons_eq() {
+            assert(pre.grant_state.cons_start == pre.consumer.grant_start());
+            assert(pre.grant_state.cons_end == pre.consumer.grant_end());
+        }
+    }
+
     #[inductive(try_split)]
     fn try_split_inductive(pre: Self, post: Self) { }
     
@@ -833,6 +911,19 @@ tokenized_state_machine!{VBQueue {
 
     #[inductive(do_reserve)]
     fn do_reserve_inductive(pre: Self, post: Self, start: nat, sz: nat) {
+        // prod_start = start, prod_end = start + sz
+        // From require: start + sz <= length (follows from the three disjunctive cases)
+        let read_obs = pre.producer.read_obs->Some_0;
+        if start == pre.producer.write && pre.producer.write < read_obs && pre.producer.write + sz < read_obs {
+            assert(start + sz < read_obs);
+            assert(read_obs <= pre.length);
+        } else if start == pre.producer.write && !(pre.producer.write < read_obs) && pre.producer.write + sz <= pre.length {
+            assert(start + sz <= pre.length);
+        } else {
+            assert(start == 0);
+            assert(sz < read_obs);
+            assert(read_obs <= pre.length);
+        }
     }
     
     #[inductive(grant_fail)]
@@ -847,7 +938,16 @@ tokenized_state_machine!{VBQueue {
     
 
     #[inductive(sub_reserve_at_commit)]
-    fn sub_reserve_at_commit_inductive(pre: Self, post: Self, commited: nat) { }
+    fn sub_reserve_at_commit_inductive(pre: Self, post: Self, commited: nat) {
+        // prod_end = new_reserve = reserve - commited
+        // prod_start unchanged
+        // Need: prod_start <= new_reserve <= length
+        let new_reserve = (pre.producer.reserve - commited) as nat;
+        let grant_start = if pre.producer.write <= pre.producer.reserve { pre.producer.write } else { 0 as nat };
+        assert(pre.producer.reserve - grant_start >= commited);
+        assert(grant_start == pre.grant_state.prod_start);
+        assert(new_reserve >= grant_start);
+    }
     
     #[inductive(load_last_at_commit)]
     fn load_last_at_commit_inductive(pre: Self, post: Self) { }
@@ -878,13 +978,30 @@ tokenized_state_machine!{VBQueue {
     fn load_write_at_read_inductive(pre: Self, post: Self) { }
     
     #[inductive(load_last_at_read)]
-    fn load_last_at_read_inductive(pre: Self, post: Self) { }
+    fn load_last_at_read_inductive(pre: Self, post: Self) {
+        // cons_start = read (unchanged), cons_end = write_obs or last
+        // Need: cons_start <= cons_end <= length
+        let write_obs = pre.consumer.write_obs->Some_0;
+        if pre.consumer.read <= write_obs {
+            // not inverted: cons_end = write_obs
+            assert(pre.consumer.read <= write_obs);
+            assert(write_obs <= pre.length);
+        } else {
+            // inverted: cons_end = last
+            assert(pre.consumer.read <= pre.last);
+            assert(pre.last <= pre.length);
+        }
+    }
     
     #[inductive(load_read_at_read)]
     fn load_read_at_read_inductive(pre: Self, post: Self) { }
     
     #[inductive(wrap_read)]
-    fn wrap_read_inductive(pre: Self, post: Self) { }
+    fn wrap_read_inductive(pre: Self, post: Self) {
+        // cons_start = 0, cons_end = write_obs
+        let write_obs = pre.consumer.write_obs->Some_0;
+        assert(write_obs <= pre.length);
+    }
     
     #[inductive(read_fail)]
     fn read_fail_inductive(pre: Self, post: Self) { }
@@ -893,7 +1010,20 @@ tokenized_state_machine!{VBQueue {
     fn start_release_inductive(pre: Self, post: Self) { }
     
     #[inductive(add_read_at_release)]
-    fn add_read_at_release_inductive(pre: Self, post: Self, used: nat) { }
+    fn add_read_at_release_inductive(pre: Self, post: Self, used: nat) {
+        // cons_start = read + used
+        // cons_end depends on whether read+used <= write_obs
+        let write_obs = pre.consumer.write_obs->Some_0;
+        let last_obs = pre.consumer.last_obs->Some_0;
+        if pre.read + used <= write_obs {
+            assert(post.grant_state.cons_end == write_obs);
+            assert(pre.read + used <= write_obs);
+        } else {
+            assert(post.grant_state.cons_end == last_obs);
+            assert(write_obs < pre.read + used);
+            assert(pre.read + used <= last_obs);
+        }
+    }
     
     #[inductive(end_release)]
     fn end_release_inductive(pre: Self, post: Self) { }
@@ -920,7 +1050,25 @@ tokenized_state_machine!{VBQueue {
     fn check_read_in_progress_equality_inductive(pre: Self, post: Self) { }
 
     #[inductive(check_read_is_le_last_in_inverted)]
-    fn check_read_is_le_last_in_inverted_inductive(pre: Self, post: Self) { }    
+    fn check_read_is_le_last_in_inverted_inductive(pre: Self, post: Self) { }
+
+    #[inductive(check_grant_bounds_disjoint)]
+    fn check_grant_bounds_disjoint_inductive(pre: Self, post: Self) { }
+
+    #[inductive(check_grant_prod_idle)]
+    fn check_grant_prod_idle_inductive(pre: Self, post: Self) { }
+
+    #[inductive(check_grant_cons_idle)]
+    fn check_grant_cons_idle_inductive(pre: Self, post: Self) { }
+
+    #[inductive(check_grant_cons_no_last)]
+    fn check_grant_cons_no_last_inductive(pre: Self, post: Self) { }
+
+    #[inductive(check_grant_prod_eq)]
+    fn check_grant_prod_eq_inductive(pre: Self, post: Self) { }
+
+    #[inductive(check_grant_cons_eq)]
+    fn check_grant_cons_eq_inductive(pre: Self, post: Self) { }
 }}
 
 /*
@@ -976,7 +1124,6 @@ impl GhostBufferPermission
         let cons_set = set_int_range(cs + inst.base_addr() as int, ce + inst.base_addr() as int);
 
         {
-            
             &&& self.grant_state_token.instance_id() == inst.id()
             &&& self.pool.provenance() == inst.provenance()
             &&& prod_set.disjoint(cons_set)
@@ -1047,6 +1194,8 @@ struct_with_invariants!{
             &&& self.read_inv@@.namespace() != self.buf_perm_inv@@.namespace()
             &&& self.last_inv@@.namespace() != self.buf_perm_inv@@.namespace()
             &&& self.reserve_inv@@.namespace() != self.buf_perm_inv@@.namespace()
+            &&& self.read_in_progress_inv@@.namespace() != self.buf_perm_inv@@.namespace()
+            &&& self.write_in_progress_inv@@.namespace() != self.buf_perm_inv@@.namespace()
             &&& self.instance@.length() == self.length
             &&& self.instance@.length() <= usize::MAX
         }
@@ -1526,7 +1675,24 @@ impl<'a> Producer<'a> {
                 grant_state_token: mut grant_state_token,
             } = bp;
 
-            /* ここら辺に pool に関するロジックが必要 */
+            // Save ghost snapshots BEFORE mutation
+            let ghost base = self.buffer_ptr as int;
+            let ghost len = self.shared.instance@.length() as int;
+            let ghost old_ps = grant_state_token.value().prod_start;
+            let ghost old_pe = grant_state_token.value().prod_end;
+            let ghost old_cs = grant_state_token.value().cons_start;
+            let ghost old_ce = grant_state_token.value().cons_end;
+            let ghost pool_dom_snapshot = current_pool.dom();
+
+            // From bp.wf(inst): pool.dom() equals whole_set minus prod_set minus cons_set
+            // Producer is idle before grant → prod_start == prod_end → prod_set is empty
+            proof {
+                self.shared.instance.borrow().check_grant_prod_idle(&prod_token, &grant_state_token);
+                assert(old_ps == old_pe); // now proven via check transition
+                // So pool.dom() = whole_set \ cons_set
+                assert forall |i: int| pool_dom_snapshot.contains(i) <==>
+                    (base <= i && i < base + len && !(base + old_cs <= i && i < base + old_ce)) by {};
+            }
 
             open_atomic_invariant!(self.shared.reserve_inv.borrow().borrow() => gs => {
                 let tracked GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token } = gs;
@@ -1534,23 +1700,111 @@ impl<'a> Producer<'a> {
                 proof {
                     let _ = self.shared.instance.borrow().do_reserve(start as nat, sz as nat, &mut reserve_token, &mut prod_token, &mut grant_state_token);
                 }
-                
+
                 proof { gs = GhostStuffUsize { perm: reserve_perm, token: reserve_token }; }
             });
 
-            /* ここら辺に pool に関するロジックが必要 */
+            // After do_reserve:
+            // - pool hasn't changed, pool.dom() == pool_dom_snapshot
+            // - grant_state_token mutated: new prod = [start, start+sz), cons unchanged
+            // - From state machine invariant valid_grant_disjoint:
+            //   new prod and cons are disjoint as intervals
+            proof {
+                // Extract bounds and disjointness from state machine invariants
+                self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                let new_ps = grant_state_token.value().prod_start;
+                let new_pe = grant_state_token.value().prod_end;
+                let new_cs = grant_state_token.value().cons_start;
+                let new_ce = grant_state_token.value().cons_end;
+                // cons is unchanged by do_reserve
+                assert(new_cs == old_cs);
+                assert(new_ce == old_ce);
 
-            let tracked (points_to_raw_prod, mut pool_rest) = current_pool.split(set_int_range(
+                // Prove subset: new_prod_range ⊆ pool_dom_snapshot
+                assert(set_int_range(base + new_ps, base + new_pe).subset_of(current_pool.dom())) by {
+                    assert forall |i: int| set_int_range(base + new_ps, base + new_pe).contains(i)
+                        implies current_pool.dom().contains(i) by {
+                        // i is in [base+new_ps, base+new_pe)
+                        // Need: base <= i < base+len AND NOT in cons_set
+                        assert(base + new_ps <= i && i < base + new_pe);
+                        assert(new_ps <= new_pe && new_pe <= len as nat);
+                        assert(base <= i && i < base + len);
+                        // Not in cons_set: from disjointness [new_ps, new_pe) ∩ [new_cs, new_ce) = {}
+                        if new_ps == new_pe {
+                            assert(false); // empty prod range, impossible since i is in it
+                        } else if new_cs == new_ce {
+                            // cons is empty, trivially not in cons_set
+                            assert(!(base + old_cs <= i && i < base + old_ce));
+                        } else if new_pe <= new_cs {
+                            assert(i < base + new_pe);
+                            assert(base + new_pe <= base + new_cs);
+                            assert(i < base + new_cs);
+                            assert(i < base + old_cs);
+                            assert(!(base + old_cs <= i && i < base + old_ce));
+                        } else {
+                            // new_ce <= new_ps
+                            assert(new_ce <= new_ps);
+                            assert(i >= base + new_ps);
+                            assert(i >= base + new_ce);
+                            assert(i >= base + old_ce);
+                            assert(!(base + old_cs <= i && i < base + old_ce));
+                        }
+                    };
+                };
+            }
+            let tracked (points_to_raw_prod, pool_rest) = current_pool.split(set_int_range(
                 self.buffer_ptr as int + grant_state_token.value().prod_start,
                 self.buffer_ptr as int + grant_state_token.value().prod_end));
             proof {
+                // Establish domain property in terms of prod_token for can_commit
+                assert(points_to_raw_prod.dom() =~= set_int_range(
+                    self.buffer_ptr as int + prod_token.value().grant_start(),
+                    self.buffer_ptr as int + prod_token.value().grant_end()));
                 prod_points_to_raw = Some(points_to_raw_prod);
             }
 
-            let tracked (_points_to_raw_cons, pool_rest) = pool_rest.split(set_int_range(
-                self.buffer_ptr as int + grant_state_token.value().cons_start,
-                self.buffer_ptr as int + grant_state_token.value().cons_end));
+            // Prove bp.wf(inst) for restored invariant
+            proof {
+                let inst = self.shared.instance@;
+                let new_ps = grant_state_token.value().prod_start;
+                let new_pe = grant_state_token.value().prod_end;
+                let new_cs = grant_state_token.value().cons_start;
+                let new_ce = grant_state_token.value().cons_end;
+                let whole_set = set_int_range(base, base + len);
+                let new_prod_set = set_int_range(new_ps + base, new_pe + base);
+                let new_cons_set = set_int_range(new_cs + base, new_ce + base);
 
+                // pool_rest.dom() = pool_dom_snapshot \ new_prod_set
+                // = (whole_set \ old_cons_set) \ new_prod_set
+                // = whole_set \ new_cons_set \ new_prod_set  (since old_cons == new_cons)
+                assert(pool_rest.dom() =~= Set::new(|i: int|
+                    whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i))) by {
+                    assert forall |i: int| pool_rest.dom().contains(i) <==>
+                        (whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i)) by {
+                        // pool_rest = pool \ new_prod_set
+                        // pool = whole_set \ old_cons_set (since old_prod was empty)
+                        // old_cons_set == new_cons_set
+                    };
+                };
+                // Disjointness
+                assert(new_prod_set.disjoint(new_cons_set)) by {
+                    assert forall |i: int| !(new_prod_set.contains(i) && new_cons_set.contains(i)) by {
+                        if new_ps == new_pe || new_cs == new_ce {
+                        } else if new_pe <= new_cs {
+                            if new_prod_set.contains(i) {
+                                assert(i < base + new_pe);
+                                assert(i < base + new_cs);
+                            }
+                        } else {
+                            assert(new_ce <= new_ps);
+                            if new_cons_set.contains(i) {
+                                assert(i < base + new_ce);
+                                assert(i < base + new_ps);
+                            }
+                        }
+                    };
+                };
+            }
             proof { bp = GhostBufferPermission { pool: pool_rest, grant_state_token}; }
         });
 
@@ -1611,6 +1865,15 @@ impl<'a> GrantW<'a> {
         &&& self.prod_token@->0.instance_id() == self.shared.instance@.id()
         &&& self.prod_token@->0.value().is_idle() || self.prod_token@->0.value().is_granted(sz)
         &&& self.shared.wf()
+        // Pool management properties
+        &&& self.points_to_raw_token@ is Some
+        &&& self.points_to_raw_token@->0.provenance() == self.shared.instance@.provenance()
+        &&& self.points_to_raw_token@->0.dom() =~= set_int_range(
+            self.buffer_ptr as int + self.prod_token@->0.value().grant_start(),
+            self.buffer_ptr as int + self.prod_token@->0.value().grant_end())
+        &&& self.buffer_ptr as int == self.shared.instance@.base_addr()
+        &&& self.buffer_ptr@.provenance == self.shared.instance@.provenance()
+        &&& self.buffer_ptr as int + self.shared.instance@.length() <= usize::MAX + 1
     }
 
     pub closed spec fn is_commited(&self) -> bool {
@@ -1676,44 +1939,151 @@ impl<'a> GrantW<'a> {
             proof { gs = GhostStuffUsize { perm: write_perm, token: write_token }; }
         });
 
-        let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
+        // Take out the GrantW's prod PointsToRaw for pool management
+        let tracked mut full_prod_ptr = self.points_to_raw_token.borrow_mut().tracked_take();
+
         open_atomic_invariant!(self.shared.buf_perm_inv.borrow().borrow() => bp => {
             let tracked GhostBufferPermission {
                 pool: mut current_pool,
                 grant_state_token: mut grant_state_token,
             } = bp;
 
-            /* ここら辺に pool に関するロジックが必要 */
+            // Save ghost snapshots BEFORE mutation
+            let ghost base = self.buffer_ptr as int;
+            let ghost buf_len = self.shared.instance@.length() as int;
+            let ghost old_ps = grant_state_token.value().prod_start;
+            let ghost old_pe = grant_state_token.value().prod_end;
+            let ghost old_cs = grant_state_token.value().cons_start;
+            let ghost old_ce = grant_state_token.value().cons_end;
+            // Save full_prod_ptr domain and old pool domain BEFORE mutation
+            proof {
+                self.shared.instance.borrow().check_grant_prod_eq(&prod_token, &grant_state_token);
+                // Establish full_prod_ptr.dom() in terms of grant_state values
+                assert(full_prod_ptr.dom() =~= set_int_range(base + old_ps, base + old_pe));
+                // Save old pool domain characterization (from bp.wf(inst))
+                assert forall |i: int| current_pool.dom().contains(i) <==>
+                    (base <= i && i < base + buf_len
+                     && !(base + old_ps <= i && i < base + old_pe)
+                     && !(base + old_cs <= i && i < base + old_ce)) by {};
+            }
+
             open_atomic_invariant!(self.shared.reserve_inv.borrow().borrow() => gs => {
                 let tracked GhostStuffUsize { perm: mut reserve_perm, token: mut reserve_token } = gs;
-                self.shared.reserve.fetch_sub(Tracked(&mut reserve_perm), len - used);
 
+                // Proof BEFORE fetch_sub to satisfy precondition
                 proof {
                     self.shared.instance.borrow().check_reserve_equality(&reserve_token, &prod_token);
                     assert(prod_token.value().grant_sz() == len as int);
                     assert(prod_token.value().reserve >= len as int);
                     assert(prod_token.value().reserve == reserve_token.value());
-                    assert(usize::MIN as int <= prod_token.value().reserve - (len - used));
+                    assert(usize::MIN as int <= reserve_perm@.value - (len - used));
+                }
+                self.shared.reserve.fetch_sub(Tracked(&mut reserve_perm), len - used);
+                proof {
                     let _ = self.shared.instance.borrow().sub_reserve_at_commit((len - used) as nat, &mut reserve_token, &mut prod_token, &mut grant_state_token);
                 }
 
                 proof { gs = GhostStuffUsize { perm: reserve_perm, token: reserve_token }; }
             });
 
-            /* ここら辺に pool に関するロジックが必要 */
-
-            let tracked (points_to_raw_prod, mut pool_rest) = current_pool.split(set_int_range(
+            // After sub_reserve: prod_start unchanged, prod_end shrinks (new_pe <= old_pe)
+            // full_prod_ptr.dom() = [base+old_ps, base+old_pe)
+            // New prod region = [base+new_ps, base+new_pe) where new_ps == old_ps, new_pe <= old_pe
+            proof {
+                self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                let new_ps = grant_state_token.value().prod_start;
+                let new_pe = grant_state_token.value().prod_end;
+                // sub_reserve_at_commit preserves prod_start and changes prod_end
+                assert(new_ps == old_ps);
+                assert(new_pe <= old_pe);
+                assert(set_int_range(base + new_ps, base + new_pe).subset_of(full_prod_ptr.dom())) by {
+                    assert forall |i: int| set_int_range(base + new_ps, base + new_pe).contains(i)
+                        implies full_prod_ptr.dom().contains(i) by {
+                        // i in [base+new_ps, base+new_pe) ⊆ [base+old_ps, base+old_pe) = full_prod_ptr.dom()
+                        assert(base + old_ps <= i && i < base + new_pe);
+                        assert(new_pe <= old_pe);
+                        assert(i < base + old_pe);
+                    };
+                };
+            }
+            let tracked (kept, returned) = full_prod_ptr.split(set_int_range(
                 self.buffer_ptr as int + grant_state_token.value().prod_start,
                 self.buffer_ptr as int + grant_state_token.value().prod_end));
+            proof { full_prod_ptr = kept; }
             proof {
-                prod_points_to_raw = Some(points_to_raw_prod);
+                // Establish full_prod_ptr.dom() in terms of prod_token (persists outside invariant block)
+                self.shared.instance.borrow().check_grant_prod_eq(&prod_token, &grant_state_token);
+                assert(full_prod_ptr.dom() =~= set_int_range(
+                    self.buffer_ptr as int + prod_token.value().grant_start(),
+                    self.buffer_ptr as int + prod_token.value().grant_end()));
             }
+            let tracked current_pool = current_pool.join(returned);
 
-            let tracked (_points_to_raw_cons, pool_rest) = pool_rest.split(set_int_range(
-                self.buffer_ptr as int + grant_state_token.value().cons_start,
-                self.buffer_ptr as int + grant_state_token.value().cons_end));
+            // Prove bp.wf(inst) for restored invariant
+            proof {
+                let new_ps = grant_state_token.value().prod_start;
+                let new_pe = grant_state_token.value().prod_end;
+                let new_cs = grant_state_token.value().cons_start;
+                let new_ce = grant_state_token.value().cons_end;
+                let whole_set = set_int_range(base, base + buf_len);
+                let new_prod_set = set_int_range(new_ps + base, new_pe + base);
+                let new_cons_set = set_int_range(new_cs + base, new_ce + base);
 
-            proof { bp = GhostBufferPermission { pool: pool_rest, grant_state_token}; }
+                // sub_reserve doesn't change cons
+                assert(new_cs == old_cs);
+                assert(new_ce == old_ce);
+
+                // returned.dom() = full_prod_ptr_old_dom \ new_prod_range
+                // = [base+old_ps, base+old_pe) \ [base+new_ps, base+new_pe)
+                // Since new_ps == old_ps: = [base+new_pe, base+old_pe)
+                // current_pool = old_pool.join(returned)
+                // old_pool.dom() = whole \ old_prod \ old_cons
+                // So current_pool.dom() = (whole \ old_prod \ old_cons) ∪ [base+new_pe, base+old_pe)
+                //   = whole \ [base+old_ps, base+new_pe) \ old_cons
+                //   = whole \ new_prod \ new_cons (since old_cons == new_cons)
+                assert(current_pool.dom() =~= Set::new(|i: int|
+                    whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i))) by {
+                    assert forall |i: int| current_pool.dom().contains(i) <==>
+                        (whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i)) by {
+                        // current_pool.dom() = old_pool.dom() ∪ returned.dom()
+                        if current_pool.dom().contains(i) {
+                            // i is in old_pool or returned
+                            if !(base + new_pe <= i && i < base + old_pe) {
+                                // i is in old_pool: whole and not old_prod and not old_cons
+                                // not old_prod means not in [base+old_ps, base+old_pe)
+                                // new_prod = [base+old_ps, base+new_pe) ⊆ [base+old_ps, base+old_pe) = old_prod
+                                // So not in old_prod → not in new_prod
+                            } else {
+                                // i is in returned: [base+new_pe, base+old_pe)
+                                // i >= base+new_pe, so not in [base+old_ps, base+new_pe) = new_prod ✓
+                                // i was in old_prod = [base+old_ps, base+old_pe), from disjointness: not in old_cons
+                                assert(base + old_ps <= i && i < base + old_pe);
+                                // Not in old_cons = new_cons
+                                assert(!(base + old_cs <= i && i < base + old_ce));
+                            }
+                        }
+                    };
+                };
+                // Disjointness
+                assert(new_prod_set.disjoint(new_cons_set)) by {
+                    assert forall |i: int| !(new_prod_set.contains(i) && new_cons_set.contains(i)) by {
+                        if new_ps == new_pe || new_cs == new_ce {
+                        } else if new_pe <= new_cs {
+                            if new_prod_set.contains(i) {
+                                assert(i < base + new_pe);
+                                assert(i < base + new_cs);
+                            }
+                        } else {
+                            assert(new_ce <= new_ps);
+                            if new_cons_set.contains(i) {
+                                assert(i < base + new_ce);
+                                assert(i < base + new_ps);
+                            }
+                        }
+                    };
+                };
+            }
+            proof { bp = GhostBufferPermission { pool: current_pool, grant_state_token}; }
         });
 
         let max = self.shared.length as usize;
@@ -1786,14 +2156,32 @@ impl<'a> GrantW<'a> {
 
         // Write must be updated AFTER last, otherwise read could think it was
         // time to invert early!
-        let tracked mut prod_points_to_raw: Option<PointsToRaw> = None;
         open_atomic_invariant!(self.shared.buf_perm_inv.borrow().borrow() => bp => {
             let tracked GhostBufferPermission {
                 pool: mut current_pool,
                 grant_state_token: mut grant_state_token,
             } = bp;
 
-            /* ここら辺に pool に関するロジックが必要 */
+            // Save ghost snapshots BEFORE mutation
+            let ghost base = self.buffer_ptr as int;
+            let ghost buf_len2 = self.shared.instance@.length() as int;
+            let ghost old_ps = grant_state_token.value().prod_start;
+            let ghost old_pe = grant_state_token.value().prod_end;
+            let ghost old_cs = grant_state_token.value().cons_start;
+            let ghost old_ce = grant_state_token.value().cons_end;
+
+            // Establish old bounds, disjointness, and full_prod_ptr.dom() before mutation
+            proof {
+                self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                self.shared.instance.borrow().check_grant_prod_eq(&prod_token, &grant_state_token);
+                // Connect full_prod_ptr.dom() to current grant state via prod_token
+                assert(full_prod_ptr.dom() =~= set_int_range(base + old_ps, base + old_pe));
+                // Save old pool domain characterization
+                assert forall |i: int| current_pool.dom().contains(i) <==>
+                    (base <= i && i < base + buf_len2
+                     && !(base + old_ps <= i && i < base + old_pe)
+                     && !(base + old_cs <= i && i < base + old_ce)) by {};
+            }
 
             open_atomic_invariant!(self.shared.write_inv.borrow().borrow() => gs => {
                 let tracked GhostStuffUsize { perm: mut write_perm, token: mut write_token } = gs;
@@ -1802,34 +2190,88 @@ impl<'a> GrantW<'a> {
                     let _ = self.shared.instance.borrow().check_write_equality(&write_token, &prod_token);
                     let _ = self.shared.instance.borrow().store_write_at_commit(new_write as nat, &mut write_token, &mut prod_token, &mut grant_state_token);
                 }
-                
+
                 proof { gs = GhostStuffUsize { perm: write_perm, token: write_token }; }
             });
 
-            /* ここら辺に pool に関するロジックが必要 */
+            // After store_write_at_commit: prod_start = new_write = reserve = prod_end (prod_set = {})
+            // full_prod_ptr covers [base+old_ps, base+old_pe) (the remaining after sub_reserve)
+            // Join back into pool
+            let tracked current_pool = current_pool.join(full_prod_ptr);
 
-            let tracked (points_to_raw_prod, mut pool_rest) = current_pool.split(set_int_range(
-                self.buffer_ptr as int + grant_state_token.value().prod_start,
-                self.buffer_ptr as int + grant_state_token.value().prod_end));
+            // Prove bp.wf(inst)
             proof {
-                prod_points_to_raw = Some(points_to_raw_prod);
+                self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                self.shared.instance.borrow().check_grant_prod_eq(&prod_token, &grant_state_token);
+                // After store_write: write == reserve, so grant_start() == grant_end()
+                // check_grant_prod_eq gives: prod_start == producer.grant_start(), prod_end == producer.grant_end()
+                // Since producer.write == producer.reserve (both == new_write), grant_start == grant_end
+                let new_ps = grant_state_token.value().prod_start;
+                let new_pe = grant_state_token.value().prod_end;
+                let new_cs = grant_state_token.value().cons_start;
+                let new_ce = grant_state_token.value().cons_end;
+                let whole_set = set_int_range(base, base + buf_len2);
+                let new_prod_set = set_int_range(new_ps + base, new_pe + base);
+                let new_cons_set = set_int_range(new_cs + base, new_ce + base);
+
+                assert(new_cs == old_cs);
+                assert(new_ce == old_ce);
+                assert(new_ps == new_pe); // prod is now empty (grant_start == grant_end since write == reserve)
+
+                // current_pool = old_pool + full_prod_ptr
+                // old_pool.dom() = whole_set \ [base+old_ps, base+old_pe) \ [base+old_cs, base+old_ce)
+                // full_prod_ptr.dom() = [base+old_ps, base+old_pe)
+                // current_pool.dom() = whole_set \ [base+old_cs, base+old_ce)
+                // = whole_set \ {} \ new_cons_set  (since new_prod_set is empty as ps == pe)
+                // current_pool = old_pool.join(full_prod_ptr)
+                // full_prod_ptr.dom() = [base+old_ps, base+old_pe)
+                // old_pool.dom() = whole_set \ old_prod \ old_cons
+                // current_pool.dom() = whole_set \ old_cons (since join adds back the old prod region)
+                // Since new_prod_set is empty and new_cons == old_cons:
+                assert(current_pool.dom() =~= Set::new(|i: int|
+                    whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i))) by {
+                    assert forall |i: int| current_pool.dom().contains(i) <==>
+                        (whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i)) by {
+                        if current_pool.dom().contains(i) {
+                            // → direction: i is in old_pool or in full_prod_ptr
+                            if full_prod_ptr.dom().contains(i) {
+                                // i was in full_prod_ptr = [base+old_ps, base+old_pe)
+                                // whole_set: from bounds (old_ps >= 0, old_pe <= buf_len2)
+                                // not in old_cons: from disjointness of old_prod and old_cons
+                            } else {
+                                // i was in old_pool: whole_set and not old_cons
+                            }
+                        } else {
+                            // ← direction: show not (whole(i) && !new_cons(i))
+                            // If whole(i) && !old_cons(i):
+                            //   if !old_prod(i): old_pool(i) from formula → pool_joined(i). Contradiction.
+                            //   if old_prod(i): full_prod_ptr(i) → pool_joined(i). Contradiction.
+                            if (whole_set.contains(i) && !(base + old_cs <= i && i < base + old_ce)) {
+                                if !(base + old_ps <= i && i < base + old_pe) {
+                                    // from old pool formula: i ∈ old_pool → i ∈ joined pool
+                                } else {
+                                    // i ∈ [old_ps, old_pe) = full_prod_ptr.dom() → i ∈ joined pool
+                                    assert(full_prod_ptr.dom().contains(i));
+                                }
+                            }
+                        }
+                    };
+                };
+                assert(new_prod_set.disjoint(new_cons_set)) by {
+                    assert forall |i: int| !(new_prod_set.contains(i) && new_cons_set.contains(i)) by {};
+                };
             }
-
-            let tracked (_points_to_raw_cons, pool_rest) = pool_rest.split(set_int_range(
-                self.buffer_ptr as int + grant_state_token.value().cons_start,
-                self.buffer_ptr as int + grant_state_token.value().cons_end));
-
-            proof { bp = GhostBufferPermission { pool: pool_rest, grant_state_token}; }
+            proof { bp = GhostBufferPermission { pool: current_pool, grant_state_token}; }
         });
 
-        // Allow subsequent grants
+        // Allow subsequent grants — end_commit sets write_in_progress=false, read_obs=None
         open_atomic_invariant!(self.shared.write_in_progress_inv.borrow().borrow() => gs => {
             let tracked GhostStuffBool { perm: mut write_in_progress_perm, token: mut write_in_progress_token } = gs;
 
             self.shared.write_in_progress.store(Tracked(&mut write_in_progress_perm), false);
 
             proof {
-                assert(write_in_progress_token.value() == false);
+                let _ = self.shared.instance.borrow().end_commit(&mut write_in_progress_token, &mut prod_token);
             }
 
             proof { gs = GhostStuffBool { perm: write_in_progress_perm, token: write_in_progress_token }; }
@@ -1849,6 +2291,7 @@ impl<'a> Consumer<'a> {
     pub closed spec fn wf(&self) -> bool {
         &&& self.buffer_ptr@.provenance == self.shared.instance@.provenance()
         &&& self.buffer_ptr as int == self.shared.instance@.base_addr()
+        &&& self.buffer_ptr as int + self.shared.instance@.length() <= usize::MAX + 1
         &&& self.shared.wf()
     }
     pub closed spec fn is_idle(&self) -> bool {
@@ -1902,6 +2345,8 @@ impl<'a> Consumer<'a> {
             return Err("read in progress");
         }
 
+        let tracked mut cons_points_to_raw: Option<PointsToRaw> = None;
+
         let write: usize;
         open_atomic_invariant!(self.shared.write_inv.borrow().borrow() => gs => {
             let tracked GhostStuffUsize { perm: mut write_perm, token: mut write_token } = gs;
@@ -1921,7 +2366,25 @@ impl<'a> Consumer<'a> {
                 grant_state_token: mut grant_state_token,
             } = bp;
 
-            /* ここら辺に pool に関するロジックが必要 */
+            // Save ghost snapshots BEFORE mutation
+            let ghost base = self.buffer_ptr as int;
+            let ghost len = self.shared.instance@.length() as int;
+            let ghost old_ps = grant_state_token.value().prod_start;
+            let ghost old_pe = grant_state_token.value().prod_end;
+            let ghost old_cs = grant_state_token.value().cons_start;
+            let ghost old_ce = grant_state_token.value().cons_end;
+
+            // Before load_last_at_read: last_obs is None → cons_start == cons_end
+            proof {
+                self.shared.instance.borrow().check_grant_cons_no_last(&cons_token, &grant_state_token);
+                self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                assert(old_cs == old_ce);
+                // Save old pool domain: pool = whole_set \ prod_set (since cons empty)
+                assert forall |i: int| current_pool.dom().contains(i) <==>
+                    (base <= i && i < base + len
+                     && !(base + old_ps <= i && i < base + old_pe)) by {};
+            }
+
             open_atomic_invariant!(self.shared.last_inv.borrow().borrow() => gs => {
                 let tracked GhostStuffUsize { perm: mut last_perm, token: mut last_token } = gs;
 
@@ -1933,7 +2396,96 @@ impl<'a> Consumer<'a> {
                 proof { gs = GhostStuffUsize { perm: last_perm, token: last_token }; }
             });
 
-            proof { bp = GhostBufferPermission { pool: current_pool, grant_state_token}; }
+            // After load_last_at_read: cons expanded from empty to [cons_start, cons_end)
+            // prod unchanged
+            proof {
+                self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                let new_ps = grant_state_token.value().prod_start;
+                let new_pe = grant_state_token.value().prod_end;
+                let new_cs = grant_state_token.value().cons_start;
+                let new_ce = grant_state_token.value().cons_end;
+                // load_last_at_read doesn't change prod
+                assert(new_ps == old_ps);
+                assert(new_pe == old_pe);
+
+                // Prove subset: new_cons_range ⊆ current_pool.dom()
+                // pool.dom() = whole_set \ prod_set \ {} = whole_set \ prod_set (old cons was empty)
+                assert(set_int_range(base + new_cs, base + new_ce).subset_of(current_pool.dom())) by {
+                    assert forall |i: int| set_int_range(base + new_cs, base + new_ce).contains(i)
+                        implies current_pool.dom().contains(i) by {
+                        assert(base + new_cs <= i && i < base + new_ce);
+                        assert(new_cs <= new_ce && new_ce <= len as nat);
+                        assert(base <= i && i < base + len);
+                        // Not in prod_set: from disjointness
+                        if new_ps == new_pe || new_cs == new_ce {
+                        } else if new_pe <= new_cs {
+                            if new_ps + base <= i && i < new_pe + base {
+                                assert(i < base + new_pe);
+                                assert(i < base + new_cs);
+                                assert(false);
+                            }
+                        } else {
+                            assert(new_ce <= new_ps);
+                            if new_ps + base <= i && i < new_pe + base {
+                                assert(i >= base + new_ps);
+                                assert(i >= base + new_ce);
+                                assert(false);
+                            }
+                        }
+                        // Not in old cons_set (which was empty)
+                        assert(!(base + old_cs <= i && i < base + old_ce));
+                    };
+                };
+            }
+            let tracked (cons_part, pool_rest) = current_pool.split(set_int_range(
+                self.buffer_ptr as int + grant_state_token.value().cons_start,
+                self.buffer_ptr as int + grant_state_token.value().cons_end));
+            proof {
+                self.shared.instance.borrow().check_grant_cons_eq(&cons_token, &grant_state_token);
+                assert(cons_part.dom() =~= set_int_range(
+                    self.buffer_ptr as int + cons_token.value().grant_start(),
+                    self.buffer_ptr as int + cons_token.value().grant_end()));
+                cons_points_to_raw = Some(cons_part);
+            }
+
+            // Prove bp.wf(inst) for restored invariant
+            proof {
+                let new_ps = grant_state_token.value().prod_start;
+                let new_pe = grant_state_token.value().prod_end;
+                let new_cs = grant_state_token.value().cons_start;
+                let new_ce = grant_state_token.value().cons_end;
+                let whole_set = set_int_range(base, base + len);
+                let new_prod_set = set_int_range(new_ps + base, new_pe + base);
+                let new_cons_set = set_int_range(new_cs + base, new_ce + base);
+
+                // prod unchanged by load_last_at_read
+                assert(new_ps == old_ps);
+                assert(new_pe == old_pe);
+                // pool_rest = current_pool \ new_cons_range
+                // current_pool.dom() = whole \ prod (old cons was empty, saved before mutation)
+                // pool_rest.dom() = whole \ prod \ new_cons
+                assert(pool_rest.dom() =~= Set::new(|i: int|
+                    whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i))) by {
+                    assert forall |i: int| pool_rest.dom().contains(i) <==>
+                        (whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i)) by {
+                        // pool_rest = current_pool \ new_cons_set
+                        // current_pool.dom() = whole \ old_prod (from saved formula, old_cons empty)
+                        // new_prod == old_prod
+                    };
+                };
+                assert(new_prod_set.disjoint(new_cons_set)) by {
+                    assert forall |i: int| !(new_prod_set.contains(i) && new_cons_set.contains(i)) by {
+                        if new_ps == new_pe || new_cs == new_ce {
+                        } else if new_pe <= new_cs {
+                            if new_prod_set.contains(i) { assert(i < base + new_pe); assert(i < base + new_cs); }
+                        } else {
+                            assert(new_ce <= new_ps);
+                            if new_cons_set.contains(i) { assert(i < base + new_ce); assert(i < base + new_ps); }
+                        }
+                    };
+                };
+            }
+            proof { bp = GhostBufferPermission { pool: pool_rest, grant_state_token}; }
         });
 
         let mut read: usize;
@@ -1967,26 +2519,148 @@ impl<'a> Consumer<'a> {
                     grant_state_token: mut grant_state_token,
                 } = bp;
 
-                /* ここら辺に pool に関するロジックが必要 */
+                // Save ghost snapshots BEFORE mutation
+                let ghost base = self.buffer_ptr as int;
+                let ghost len = self.shared.instance@.length() as int;
+                let ghost old_ps = grant_state_token.value().prod_start;
+                let ghost old_pe = grant_state_token.value().prod_end;
+                let ghost old_cs = grant_state_token.value().cons_start;
+                let ghost old_ce = grant_state_token.value().cons_end;
+
+                // Establish old bounds, disjointness, and cons_ptr.dom() before join/mutation
+                proof {
+                    self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                    self.shared.instance.borrow().check_grant_cons_eq(&cons_token, &grant_state_token);
+                    // Save old pool domain characterization (from bp.wf)
+                    assert forall |i: int| current_pool.dom().contains(i) <==>
+                        (base <= i && i < base + len
+                         && !(base + old_ps <= i && i < base + old_pe)
+                         && !(base + old_cs <= i && i < base + old_ce)) by {};
+                }
+
+                // Return old cons region back to pool before wrap
+                let tracked old_cons_ptr = match cons_points_to_raw {
+                    Some(ptr) => ptr,
+                    None => { assert(false); proof_from_false() }
+                };
+                proof {
+                    cons_points_to_raw = None;
+                    // Connect old_cons_ptr.dom() to old_cs/old_ce via cons_token bridge
+                    assert(old_cons_ptr.dom() =~= set_int_range(base + old_cs, base + old_ce));
+                }
+                // After join: pool now has old cons region back
+                let tracked mut current_pool = current_pool.join(old_cons_ptr);
+                // Save joined pool domain BEFORE wrap_read mutation
+                proof {
+                    assert forall |i: int| current_pool.dom().contains(i) <==>
+                        (base <= i && i < base + len
+                         && !(base + old_ps <= i && i < base + old_pe)) by {
+                        if current_pool.dom().contains(i) {
+                            if old_cons_ptr.dom().contains(i) {
+                                // in old_cons: within whole from bounds, not in prod from disjointness
+                            }
+                            // else: in old pool, already satisfies formula
+                        } else {
+                            // ← direction: if whole(i) && !prod(i), then either in old pool or old cons
+                            if base <= i && i < base + len && !(base + old_ps <= i && i < base + old_pe) {
+                                if base + old_cs <= i && i < base + old_ce {
+                                    assert(old_cons_ptr.dom().contains(i));
+                                }
+                                // else: in old pool (from saved formula)
+                            }
+                        }
+                    };
+                }
+
                 open_atomic_invariant!(self.shared.read_inv.borrow().borrow() => gs => {
                     let tracked GhostStuffUsize { perm: mut read_perm, token: mut read_token } = gs;
-                    // TODO: ここでも permission の変更が必要?
-                    // ここで read が wrap する。
-                    // read == last の状態で、かつ、write < read なので、inverted 状態になる。    
                     self.shared.read.store(Tracked(&mut read_perm), 0);
                     proof {
                         let _ = self.shared.instance.borrow().check_read_equality(&read_token, &mut cons_token);
                         let _ = self.shared.instance.borrow().wrap_read(&mut read_token, &mut cons_token, &mut grant_state_token);
-                        // ↑をまたぐと
-                        // read == 0 になるので not inverted に切り替わる
-                        // この瞬間に producer はまだ inverted
-                        // read == 0 read_obs == 9 write == 9 で last は 10 のとき、not inverted 判断になる。
                     }
 
                     proof { gs = GhostStuffUsize { perm: read_perm, token: read_token }; }
                 });
 
-                proof { bp = GhostBufferPermission { pool: current_pool, grant_state_token}; }
+                // After wrap_read: cons = [0, write_obs), prod unchanged
+                proof {
+                    self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                    let new_ps = grant_state_token.value().prod_start;
+                    let new_pe = grant_state_token.value().prod_end;
+                    let new_cs = grant_state_token.value().cons_start;
+                    let new_ce = grant_state_token.value().cons_end;
+                    // wrap_read doesn't change prod
+                    assert(new_ps == old_ps);
+                    assert(new_pe == old_pe);
+
+                    // Prove subset: new_cons_range ⊆ current_pool.dom()
+                    // current_pool.dom() = whole_set \ prod_set (after joining old cons back)
+                    assert(set_int_range(base + new_cs, base + new_ce).subset_of(current_pool.dom())) by {
+                        assert forall |i: int| set_int_range(base + new_cs, base + new_ce).contains(i)
+                            implies current_pool.dom().contains(i) by {
+                            assert(base + new_cs <= i && i < base + new_ce);
+                            assert(new_cs <= new_ce && new_ce <= len as nat);
+                            assert(base <= i && i < base + len);
+                            // Not in prod_set: from disjointness
+                            if new_ps == new_pe || new_cs == new_ce {
+                            } else if new_pe <= new_cs {
+                                if old_ps + base <= i && i < old_pe + base {
+                                    assert(i < base + new_pe);
+                                    assert(i < base + new_cs);
+                                    assert(false);
+                                }
+                            } else {
+                                assert(new_ce <= new_ps);
+                                if old_ps + base <= i && i < old_pe + base {
+                                    assert(i >= base + new_ps);
+                                    assert(i >= base + new_ce);
+                                    assert(false);
+                                }
+                            }
+                            // Not in old cons (which was merged back, so we're fine)
+                        };
+                    };
+                }
+                let tracked (cons_part, pool_rest) = current_pool.split(set_int_range(
+                    self.buffer_ptr as int + grant_state_token.value().cons_start,
+                    self.buffer_ptr as int + grant_state_token.value().cons_end));
+                proof {
+                    self.shared.instance.borrow().check_grant_cons_eq(&cons_token, &grant_state_token);
+                    assert(cons_part.dom() =~= set_int_range(
+                        self.buffer_ptr as int + cons_token.value().grant_start(),
+                        self.buffer_ptr as int + cons_token.value().grant_end()));
+                    cons_points_to_raw = Some(cons_part);
+                }
+
+                // Prove bp.wf(inst)
+                proof {
+                    let new_ps = grant_state_token.value().prod_start;
+                    let new_pe = grant_state_token.value().prod_end;
+                    let new_cs = grant_state_token.value().cons_start;
+                    let new_ce = grant_state_token.value().cons_end;
+                    let whole_set = set_int_range(base, base + len);
+                    let new_prod_set = set_int_range(new_ps + base, new_pe + base);
+                    let new_cons_set = set_int_range(new_cs + base, new_ce + base);
+
+                    assert(pool_rest.dom() =~= Set::new(|i: int|
+                        whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i))) by {
+                        assert forall |i: int| pool_rest.dom().contains(i) <==>
+                            (whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i)) by {};
+                    };
+                    assert(new_prod_set.disjoint(new_cons_set)) by {
+                        assert forall |i: int| !(new_prod_set.contains(i) && new_cons_set.contains(i)) by {
+                            if new_ps == new_pe || new_cs == new_ce {
+                            } else if new_pe <= new_cs {
+                                if new_prod_set.contains(i) { assert(i < base + new_pe); assert(i < base + new_cs); }
+                            } else {
+                                assert(new_ce <= new_ps);
+                                if new_cons_set.contains(i) { assert(i < base + new_ce); assert(i < base + new_ps); }
+                            }
+                        };
+                    };
+                }
+                proof { bp = GhostBufferPermission { pool: pool_rest, grant_state_token}; }
             });
         }
 
@@ -2005,7 +2679,54 @@ impl<'a> Consumer<'a> {
                     grant_state_token: mut grant_state_token,
                 } = bp;
 
-                /* ここら辺に pool に関するロジックが必要 */
+                // Save ghost snapshots BEFORE mutation
+                let ghost base = self.buffer_ptr as int;
+                let ghost len = self.shared.instance@.length() as int;
+                let ghost old_ps = grant_state_token.value().prod_start;
+                let ghost old_pe = grant_state_token.value().prod_end;
+                let ghost old_cs = grant_state_token.value().cons_start;
+                let ghost old_ce = grant_state_token.value().cons_end;
+
+                // Establish old bounds, disjointness, and cons_ptr connection
+                proof {
+                    self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                    self.shared.instance.borrow().check_grant_cons_eq(&cons_token, &grant_state_token);
+                    assert forall |i: int| current_pool.dom().contains(i) <==>
+                        (base <= i && i < base + len
+                         && !(base + old_ps <= i && i < base + old_pe)
+                         && !(base + old_cs <= i && i < base + old_ce)) by {};
+                }
+
+                // Return cons PointsToRaw back to pool (read_fail resets cons to empty)
+                let tracked cons_ptr = match cons_points_to_raw {
+                    Some(ptr) => ptr,
+                    None => { assert(false); proof_from_false() }
+                };
+                proof {
+                    cons_points_to_raw = None;
+                    assert(cons_ptr.dom() =~= set_int_range(base + old_cs, base + old_ce));
+                }
+                let tracked mut current_pool = current_pool.join(cons_ptr);
+
+                // Save joined pool domain BEFORE read_fail mutation
+                proof {
+                    assert forall |i: int| current_pool.dom().contains(i) <==>
+                        (base <= i && i < base + len
+                         && !(base + old_ps <= i && i < base + old_pe)) by {
+                        if current_pool.dom().contains(i) {
+                            if cons_ptr.dom().contains(i) {
+                                // in cons: within whole from bounds, not in prod from disjointness
+                            }
+                        } else {
+                            if base <= i && i < base + len && !(base + old_ps <= i && i < base + old_pe) {
+                                if base + old_cs <= i && i < base + old_ce {
+                                    assert(cons_ptr.dom().contains(i));
+                                }
+                            }
+                        }
+                    };
+                }
+
                 open_atomic_invariant!(self.shared.read_in_progress_inv.borrow().borrow() => gs => {
                     let tracked GhostStuffBool { perm: mut read_in_progress_perm, token: mut read_in_progress_token } = gs;
 
@@ -2017,6 +2738,38 @@ impl<'a> Consumer<'a> {
                     proof { gs = GhostStuffBool { perm: read_in_progress_perm, token: read_in_progress_token }; }
                 });
 
+                // After read_fail: cons_start == cons_end == read (cons empty), prod unchanged
+                proof {
+                    self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                    let new_ps = grant_state_token.value().prod_start;
+                    let new_pe = grant_state_token.value().prod_end;
+                    let new_cs = grant_state_token.value().cons_start;
+                    let new_ce = grant_state_token.value().cons_end;
+                    let whole_set = set_int_range(base, base + len);
+                    let new_prod_set = set_int_range(new_ps + base, new_pe + base);
+                    let new_cons_set = set_int_range(new_cs + base, new_ce + base);
+
+                    // read_fail doesn't change prod
+                    assert(new_ps == old_ps);
+                    assert(new_pe == old_pe);
+                    // cons is now empty
+                    assert(new_cs == new_ce);
+
+                    // current_pool = old_pool + cons_ptr
+                    // = (whole_set \ prod_set \ old_cons_set) ∪ old_cons_set
+                    // = whole_set \ prod_set
+                    // Need: whole_set \ prod_set = whole_set \ prod_set \ {} (new cons empty)
+                    assert(current_pool.dom() =~= Set::new(|i: int|
+                        whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i))) by {
+                        assert forall |i: int| current_pool.dom().contains(i) <==>
+                            (whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i)) by {
+                            // new_cons_set is empty since new_cs == new_ce
+                        };
+                    };
+                    assert(new_prod_set.disjoint(new_cons_set)) by {
+                        assert forall |i: int| !(new_prod_set.contains(i) && new_cons_set.contains(i)) by {};
+                    };
+                }
                 proof { bp = GhostBufferPermission { pool: current_pool, grant_state_token}; }
             });
             return Err("Insufficient size");
@@ -2026,6 +2779,19 @@ impl<'a> Consumer<'a> {
         // are all `#[repr(Transparent)]
         //let start_of_buf_ptr = inner.buf.get().cast::<u8>();
         //let grant_slice = unsafe { from_raw_parts_mut(start_of_buf_ptr.offset(read as isize), sz) };
+
+        // Verify can_release preconditions before returning
+        proof {
+            let cpr = cons_points_to_raw;
+            assert(cpr is Some);
+            assert(cpr->0.provenance() == self.shared.instance@.provenance());
+            assert(cpr->0.dom() =~= set_int_range(
+                self.buffer_ptr as int + cons_token.value().grant_start(),
+                self.buffer_ptr as int + cons_token.value().grant_end()));
+            assert(self.buffer_ptr as int == self.shared.instance@.base_addr());
+            assert(self.buffer_ptr@.provenance == self.shared.instance@.provenance());
+            assert(self.buffer_ptr as int + self.shared.instance@.length() <= usize::MAX + 1);
+        }
 
         Ok(
             GrantR {
@@ -2054,7 +2820,7 @@ impl<'a> Consumer<'a> {
 
                     instance: Tracked(self.shared.instance.borrow().clone()),
                 },
-                points_to_raw_token: Tracked(None),//Tracked(Some(cons_points_to_raw)),
+                points_to_raw_token: Tracked(cons_points_to_raw),
                 cons_token: Tracked(Some(cons_token)),
             }
         )
@@ -2076,6 +2842,15 @@ impl<'a> GrantR<'a> {
         &&& self.cons_token@ is Some
         &&& self.cons_token@->0.instance_id() == self.shared.instance@.id()
         &&& self.cons_token@->0.value().is_idle() || self.cons_token@->0.value().is_granted(sz)
+        // Pool management properties
+        &&& self.points_to_raw_token@ is Some
+        &&& self.points_to_raw_token@->0.provenance() == self.shared.instance@.provenance()
+        &&& self.points_to_raw_token@->0.dom() =~= set_int_range(
+            self.buffer_ptr as int + self.cons_token@->0.value().grant_start(),
+            self.buffer_ptr as int + self.cons_token@->0.value().grant_end())
+        &&& self.buffer_ptr as int == self.shared.instance@.base_addr()
+        &&& self.buffer_ptr@.provenance == self.shared.instance@.provenance()
+        &&& self.buffer_ptr as int + self.shared.instance@.length() <= usize::MAX + 1
     }
 
     pub closed spec fn released(&self) -> bool {
@@ -2120,31 +2895,117 @@ impl<'a> GrantR<'a> {
             return Tracked(cons_token);
         }
 
-        // This should always be checked by the public interfaces
-        // debug_assert!(used <= self.buf.len());
+        // Take out the GrantR's cons PointsToRaw for pool management
+        let tracked mut full_cons_ptr = self.points_to_raw_token.borrow_mut().tracked_take();
 
-        // This should be fine, purely incrementing
         open_atomic_invariant!(self.shared.buf_perm_inv.borrow().borrow() => bp => {
             let tracked GhostBufferPermission {
                 pool: mut current_pool,
                 grant_state_token: mut grant_state_token,
             } = bp;
 
-            /* ここら辺に pool に関するロジックが必要 */
+            // Save ghost snapshots BEFORE mutation
+            let ghost base = self.buffer_ptr as int;
+            let ghost len = self.shared.instance@.length() as int;
+            let ghost old_ps = grant_state_token.value().prod_start;
+            let ghost old_pe = grant_state_token.value().prod_end;
+            let ghost old_cs = grant_state_token.value().cons_start;
+            let ghost old_ce = grant_state_token.value().cons_end;
+            // full_cons_ptr.dom() = [base+old_cons_start, base+old_cons_end) from can_release
+            proof {
+                self.shared.instance.borrow().check_grant_cons_eq(&cons_token, &grant_state_token);
+            }
+
             open_atomic_invariant!(self.shared.read_inv.borrow().borrow() => gs => {
                 let tracked GhostStuffUsize { perm: mut read_perm, token: mut read_token } = gs;
-                let _ = self.shared.read.fetch_add(Tracked(&mut read_perm), used);
 
+                // Proof BEFORE fetch_add to satisfy precondition
                 proof {
                     let _ = self.shared.instance.borrow().check_read_equality(&read_token, &cons_token);
                     let _ = self.shared.instance.borrow().check_consumer_obs_in_range(&mut cons_token);
-
+                    assert(read_perm@.value + used <= self.shared.instance@.length());
+                }
+                let _ = self.shared.read.fetch_add(Tracked(&mut read_perm), used);
+                proof {
                     let _ = self.shared.instance.borrow().add_read_at_release(used as nat, &mut read_token, &mut cons_token, &mut grant_state_token);
                 }
 
                 proof { gs = GhostStuffUsize { perm: read_perm, token: read_token }; }
             });
 
+            // After add_read_at_release: cons_start = read+used, cons_end might change
+            // full_cons_ptr covers [base+old_cs, base+old_ce) from can_release
+            // New cons region [base+new_cs, base+new_ce) is a subset of old (new_cs >= old_cs)
+            proof {
+                self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                let new_cs = grant_state_token.value().cons_start;
+                let new_ce = grant_state_token.value().cons_end;
+                // add_read_at_release doesn't change prod
+                assert(grant_state_token.value().prod_start == old_ps);
+                assert(grant_state_token.value().prod_end == old_pe);
+                // cons_start advanced, cons_end unchanged or different
+                assert(new_cs >= old_cs);
+                assert(new_ce <= old_ce);
+                assert(set_int_range(base + new_cs, base + new_ce).subset_of(full_cons_ptr.dom())) by {
+                    assert forall |i: int| set_int_range(base + new_cs, base + new_ce).contains(i)
+                        implies full_cons_ptr.dom().contains(i) by {
+                        assert(base + new_cs <= i && i < base + new_ce);
+                        assert(new_cs >= old_cs);
+                        assert(i >= base + old_cs);
+                        assert(new_ce <= old_ce);
+                        assert(i < base + old_ce);
+                    };
+                };
+            }
+            let tracked (remaining, consumed) = full_cons_ptr.split(set_int_range(
+                self.buffer_ptr as int + grant_state_token.value().cons_start,
+                self.buffer_ptr as int + grant_state_token.value().cons_end));
+            proof { full_cons_ptr = remaining; }
+            proof {
+                // Establish full_cons_ptr.dom() in terms of cons_token (persists outside invariant block)
+                self.shared.instance.borrow().check_grant_cons_eq(&cons_token, &grant_state_token);
+                assert(full_cons_ptr.dom() =~= set_int_range(
+                    self.buffer_ptr as int + cons_token.value().grant_start(),
+                    self.buffer_ptr as int + cons_token.value().grant_end()));
+            }
+            let tracked current_pool = current_pool.join(consumed);
+
+            // Prove bp.wf(inst)
+            proof {
+                let new_ps = grant_state_token.value().prod_start;
+                let new_pe = grant_state_token.value().prod_end;
+                let new_cs = grant_state_token.value().cons_start;
+                let new_ce = grant_state_token.value().cons_end;
+                let whole_set = set_int_range(base, base + len);
+                let new_prod_set = set_int_range(new_ps + base, new_pe + base);
+                let new_cons_set = set_int_range(new_cs + base, new_ce + base);
+
+                assert(current_pool.dom() =~= Set::new(|i: int|
+                    whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i))) by {
+                    assert forall |i: int| current_pool.dom().contains(i) <==>
+                        (whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i)) by {
+                        // current_pool = old_pool + consumed
+                        // consumed = [base+old_cs, base+new_cs) (the "eaten" part of cons)
+                        // remaining = [base+new_cs, base+new_ce) (kept by GrantR)
+                        // old_pool = whole_set \ old_prod_set \ old_cons_set
+                        // current_pool = whole_set \ old_prod_set \ old_cons_set ∪ consumed
+                        //   = whole_set \ old_prod_set \ [base+new_cs, base+old_ce)
+                        // Since new_ce <= old_ce: old_cons = [old_cs, old_ce), new cons = [new_cs, new_ce)
+                        // Hmm, need to think about this more carefully
+                    };
+                };
+                assert(new_prod_set.disjoint(new_cons_set)) by {
+                    assert forall |i: int| !(new_prod_set.contains(i) && new_cons_set.contains(i)) by {
+                        if new_ps == new_pe || new_cs == new_ce {
+                        } else if new_pe <= new_cs {
+                            if new_prod_set.contains(i) { assert(i < base + new_pe); assert(i < base + new_cs); }
+                        } else {
+                            assert(new_ce <= new_ps);
+                            if new_cons_set.contains(i) { assert(i < base + new_ce); assert(i < base + new_ps); }
+                        }
+                    };
+                };
+            }
             proof { bp = GhostBufferPermission { pool: current_pool, grant_state_token}; }
         });
 
@@ -2154,7 +3015,49 @@ impl<'a> GrantR<'a> {
                 grant_state_token: mut grant_state_token,
             } = bp;
 
-            /* ここら辺に pool に関するロジックが必要 */
+            // Save ghost snapshots BEFORE mutation
+            let ghost base = self.buffer_ptr as int;
+            let ghost len = self.shared.instance@.length() as int;
+            let ghost old_ps = grant_state_token.value().prod_start;
+            let ghost old_pe = grant_state_token.value().prod_end;
+            let ghost old_cs = grant_state_token.value().cons_start;
+            let ghost old_ce = grant_state_token.value().cons_end;
+
+            // Establish old bounds, disjointness, full_cons_ptr.dom(), and old pool domain
+            proof {
+                self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                self.shared.instance.borrow().check_grant_cons_eq(&cons_token, &grant_state_token);
+                // Connect full_cons_ptr.dom() to old_cs/old_ce via cons_token bridge
+                assert(full_cons_ptr.dom() =~= set_int_range(base + old_cs, base + old_ce));
+                // Save old pool domain
+                assert forall |i: int| current_pool.dom().contains(i) <==>
+                    (base <= i && i < base + len
+                     && !(base + old_ps <= i && i < base + old_pe)
+                     && !(base + old_cs <= i && i < base + old_ce)) by {};
+            }
+
+            // Join remaining cons PointsToRaw back to pool (end_release resets cons to empty)
+            let tracked mut current_pool = current_pool.join(full_cons_ptr);
+
+            // Save joined pool domain BEFORE end_release mutation
+            proof {
+                assert forall |i: int| current_pool.dom().contains(i) <==>
+                    (base <= i && i < base + len
+                     && !(base + old_ps <= i && i < base + old_pe)) by {
+                    if current_pool.dom().contains(i) {
+                        if full_cons_ptr.dom().contains(i) {
+                            // in cons: within whole from bounds, not in prod from disjointness
+                        }
+                    } else {
+                        if base <= i && i < base + len && !(base + old_ps <= i && i < base + old_pe) {
+                            if base + old_cs <= i && i < base + old_ce {
+                                assert(full_cons_ptr.dom().contains(i));
+                            }
+                        }
+                    }
+                };
+            }
+
             open_atomic_invariant!(self.shared.read_in_progress_inv.borrow().borrow() => gs => {
                 let tracked GhostStuffBool { perm: mut read_in_progress_perm, token: mut read_in_progress_token } = gs;
 
@@ -2166,6 +3069,35 @@ impl<'a> GrantR<'a> {
                 proof { gs = GhostStuffBool { perm: read_in_progress_perm, token: read_in_progress_token }; }
             });
 
+            // After end_release: cons_start == cons_end == read (cons empty), prod unchanged
+            proof {
+                self.shared.instance.borrow().check_grant_bounds_disjoint(&grant_state_token);
+                let new_ps = grant_state_token.value().prod_start;
+                let new_pe = grant_state_token.value().prod_end;
+                let new_cs = grant_state_token.value().cons_start;
+                let new_ce = grant_state_token.value().cons_end;
+                let whole_set = set_int_range(base, base + len);
+                let new_prod_set = set_int_range(new_ps + base, new_pe + base);
+                let new_cons_set = set_int_range(new_cs + base, new_ce + base);
+
+                assert(new_ps == old_ps);
+                assert(new_pe == old_pe);
+                assert(new_cs == new_ce); // cons is empty after end_release
+
+                // current_pool.dom() was saved before mutation as whole \ prod
+                // new_cons is empty, new_prod == old_prod
+                assert(current_pool.dom() =~= Set::new(|i: int|
+                    whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i))) by {
+                    assert forall |i: int| current_pool.dom().contains(i) <==>
+                        (whole_set.contains(i) && !new_prod_set.contains(i) && !new_cons_set.contains(i)) by {
+                        // new_cons_set is empty since new_cs == new_ce
+                        // current_pool.dom() = whole \ old_prod = whole \ new_prod (from saved formula)
+                    };
+                };
+                assert(new_prod_set.disjoint(new_cons_set)) by {
+                    assert forall |i: int| !(new_prod_set.contains(i) && new_cons_set.contains(i)) by {};
+                };
+            }
             proof { bp = GhostBufferPermission { pool: current_pool, grant_state_token}; }
         });
 
