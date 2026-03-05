@@ -1541,6 +1541,7 @@ impl<'a> Producer<'a> {
     fn grant_exact(&mut self, sz: usize) -> (r: Result<GrantW, &'static str>)
         requires
             old(self).is_idle(),
+            sz > 0,
         ensures
             self.wf(),
             match r {
@@ -1816,9 +1817,22 @@ impl<'a> Producer<'a> {
             }
         };
 
+        // Prove no overflow for pointer arithmetic: buffer_ptr + start <= usize::MAX
+        // From sz > 0 and start + sz <= length: start < length
+        // From Producer.wf(): buffer_ptr + length <= usize::MAX + 1
+        proof {
+            let ghost len = self.shared.instance@.length() as int;
+            assert(start as int + sz as int <= len);
+            assert(start as int + 1 <= len);
+            assert(self.buffer_ptr as int + start as int <= usize::MAX as int);
+        }
+
         Ok (
             GrantW {
-                buffer_ptr: self.buffer_ptr,
+                buffer_ptr: {
+                    let addr = self.buffer_ptr as usize + start;
+                    with_exposed_provenance(addr, expose_provenance(self.buffer_ptr))
+                },
                 sz,
                 shared: VBBufferShared {
                     length: self.shared.length,
@@ -1869,11 +1883,11 @@ impl<'a> GrantW<'a> {
         &&& self.points_to_raw_token@ is Some
         &&& self.points_to_raw_token@->0.provenance() == self.shared.instance@.provenance()
         &&& self.points_to_raw_token@->0.dom() =~= set_int_range(
-            self.buffer_ptr as int + self.prod_token@->0.value().grant_start(),
-            self.buffer_ptr as int + self.prod_token@->0.value().grant_end())
-        &&& self.buffer_ptr as int == self.shared.instance@.base_addr()
+            self.buffer_ptr as int,
+            self.buffer_ptr as int + self.sz as int)
+        &&& self.buffer_ptr as int == self.shared.instance@.base_addr() + self.prod_token@->0.value().grant_start()
         &&& self.buffer_ptr@.provenance == self.shared.instance@.provenance()
-        &&& self.buffer_ptr as int + self.shared.instance@.length() <= usize::MAX + 1
+        &&& self.shared.instance@.base_addr() + self.shared.instance@.length() <= usize::MAX + 1
     }
 
     pub closed spec fn is_commited(&self) -> bool {
@@ -1949,7 +1963,7 @@ impl<'a> GrantW<'a> {
             } = bp;
 
             // Save ghost snapshots BEFORE mutation
-            let ghost base = self.buffer_ptr as int;
+            let ghost base = self.shared.instance@.base_addr() as int;
             let ghost buf_len = self.shared.instance@.length() as int;
             let ghost old_ps = grant_state_token.value().prod_start;
             let ghost old_pe = grant_state_token.value().prod_end;
@@ -2007,15 +2021,15 @@ impl<'a> GrantW<'a> {
                 };
             }
             let tracked (kept, returned) = full_prod_ptr.split(set_int_range(
-                self.buffer_ptr as int + grant_state_token.value().prod_start,
-                self.buffer_ptr as int + grant_state_token.value().prod_end));
+                base + grant_state_token.value().prod_start,
+                base + grant_state_token.value().prod_end));
             proof { full_prod_ptr = kept; }
             proof {
                 // Establish full_prod_ptr.dom() in terms of prod_token (persists outside invariant block)
                 self.shared.instance.borrow().check_grant_prod_eq(&prod_token, &grant_state_token);
                 assert(full_prod_ptr.dom() =~= set_int_range(
-                    self.buffer_ptr as int + prod_token.value().grant_start(),
-                    self.buffer_ptr as int + prod_token.value().grant_end()));
+                    base + prod_token.value().grant_start(),
+                    base + prod_token.value().grant_end()));
             }
             let tracked current_pool = current_pool.join(returned);
 
@@ -2163,7 +2177,7 @@ impl<'a> GrantW<'a> {
             } = bp;
 
             // Save ghost snapshots BEFORE mutation
-            let ghost base = self.buffer_ptr as int;
+            let ghost base = self.shared.instance@.base_addr() as int;
             let ghost buf_len2 = self.shared.instance@.length() as int;
             let ghost old_ps = grant_state_token.value().prod_start;
             let ghost old_pe = grant_state_token.value().prod_end;
@@ -2781,21 +2795,26 @@ impl<'a> Consumer<'a> {
         //let grant_slice = unsafe { from_raw_parts_mut(start_of_buf_ptr.offset(read as isize), sz) };
 
         // Verify can_release preconditions before returning
+        // GrantR.buffer_ptr will be base + read = base + grant_start
         proof {
             let cpr = cons_points_to_raw;
+            let ghost grant_ptr_int = self.buffer_ptr as int + read as int;
             assert(cpr is Some);
             assert(cpr->0.provenance() == self.shared.instance@.provenance());
-            assert(cpr->0.dom() =~= set_int_range(
-                self.buffer_ptr as int + cons_token.value().grant_start(),
-                self.buffer_ptr as int + cons_token.value().grant_end()));
-            assert(self.buffer_ptr as int == self.shared.instance@.base_addr());
+            // dom in terms of the offset pointer: [grant_ptr, grant_ptr + sz)
+            assert(cpr->0.dom() =~= set_int_range(grant_ptr_int, grant_ptr_int + sz as int));
+            // grant_ptr == base_addr + grant_start
+            assert(grant_ptr_int == self.shared.instance@.base_addr() + cons_token.value().grant_start());
             assert(self.buffer_ptr@.provenance == self.shared.instance@.provenance());
-            assert(self.buffer_ptr as int + self.shared.instance@.length() <= usize::MAX + 1);
+            assert(self.shared.instance@.base_addr() + self.shared.instance@.length() <= usize::MAX + 1);
         }
 
         Ok(
             GrantR {
-                buffer_ptr: self.buffer_ptr, // FIXME! add offset
+                buffer_ptr: {
+                    let addr = self.buffer_ptr as usize + read;
+                    with_exposed_provenance(addr, expose_provenance(self.buffer_ptr))
+                },
                 sz,
                 shared: VBBufferShared {
                     length: self.shared.length,
@@ -2846,11 +2865,11 @@ impl<'a> GrantR<'a> {
         &&& self.points_to_raw_token@ is Some
         &&& self.points_to_raw_token@->0.provenance() == self.shared.instance@.provenance()
         &&& self.points_to_raw_token@->0.dom() =~= set_int_range(
-            self.buffer_ptr as int + self.cons_token@->0.value().grant_start(),
-            self.buffer_ptr as int + self.cons_token@->0.value().grant_end())
-        &&& self.buffer_ptr as int == self.shared.instance@.base_addr()
+            self.buffer_ptr as int,
+            self.buffer_ptr as int + self.sz as int)
+        &&& self.buffer_ptr as int == self.shared.instance@.base_addr() + self.cons_token@->0.value().grant_start()
         &&& self.buffer_ptr@.provenance == self.shared.instance@.provenance()
-        &&& self.buffer_ptr as int + self.shared.instance@.length() <= usize::MAX + 1
+        &&& self.shared.instance@.base_addr() + self.shared.instance@.length() <= usize::MAX + 1
     }
 
     pub closed spec fn released(&self) -> bool {
@@ -2905,7 +2924,7 @@ impl<'a> GrantR<'a> {
             } = bp;
 
             // Save ghost snapshots BEFORE mutation
-            let ghost base = self.buffer_ptr as int;
+            let ghost base = self.shared.instance@.base_addr() as int;
             let ghost len = self.shared.instance@.length() as int;
             let ghost old_ps = grant_state_token.value().prod_start;
             let ghost old_pe = grant_state_token.value().prod_end;
@@ -2958,15 +2977,15 @@ impl<'a> GrantR<'a> {
                 };
             }
             let tracked (remaining, consumed) = full_cons_ptr.split(set_int_range(
-                self.buffer_ptr as int + grant_state_token.value().cons_start,
-                self.buffer_ptr as int + grant_state_token.value().cons_end));
+                base + grant_state_token.value().cons_start,
+                base + grant_state_token.value().cons_end));
             proof { full_cons_ptr = remaining; }
             proof {
                 // Establish full_cons_ptr.dom() in terms of cons_token (persists outside invariant block)
                 self.shared.instance.borrow().check_grant_cons_eq(&cons_token, &grant_state_token);
                 assert(full_cons_ptr.dom() =~= set_int_range(
-                    self.buffer_ptr as int + cons_token.value().grant_start(),
-                    self.buffer_ptr as int + cons_token.value().grant_end()));
+                    base + cons_token.value().grant_start(),
+                    base + cons_token.value().grant_end()));
             }
             let tracked current_pool = current_pool.join(consumed);
 
@@ -3016,7 +3035,7 @@ impl<'a> GrantR<'a> {
             } = bp;
 
             // Save ghost snapshots BEFORE mutation
-            let ghost base = self.buffer_ptr as int;
+            let ghost base = self.shared.instance@.base_addr() as int;
             let ghost len = self.shared.instance@.length() as int;
             let ghost old_ps = grant_state_token.value().prod_start;
             let ghost old_pe = grant_state_token.value().prod_end;
