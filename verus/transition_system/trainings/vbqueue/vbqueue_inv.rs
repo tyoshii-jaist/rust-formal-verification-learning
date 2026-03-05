@@ -9,6 +9,9 @@ use vstd::shared::*;
 use vstd::tokens::UniqueValueToken;
 
 verus! {
+
+global layout u8 is size == 1, align == 1;
+
 /*
     Producer と Consumer の状態
 */
@@ -1888,10 +1891,57 @@ impl<'a> GrantW<'a> {
         &&& self.buffer_ptr as int == self.shared.instance@.base_addr() + self.prod_token@->0.value().grant_start()
         &&& self.buffer_ptr@.provenance == self.shared.instance@.provenance()
         &&& self.shared.instance@.base_addr() + self.shared.instance@.length() <= usize::MAX + 1
+        // grant region fits within buffer: buffer_ptr + sz <= base_addr + length
+        &&& self.buffer_ptr as int + self.sz as int
+            <= self.shared.instance@.base_addr() + self.shared.instance@.length()
     }
 
     pub closed spec fn is_commited(&self) -> bool {
         &&& self.prod_token@ is None
+    }
+}
+
+impl<'a> GrantW<'a> {
+    /// Write a single byte at offset `idx` within the grant region.
+    /// Pattern: split PointsToRaw → into_typed (uninit) → ptr_mut_write → leak_contents → into_raw → join
+    fn write_byte(&mut self, idx: usize, val: u8)
+        requires
+            old(self).can_commit(old(self).sz as nat),
+            idx < old(self).sz,
+        ensures
+            self.can_commit(self.sz as nat),
+            self.sz == old(self).sz,
+            self.buffer_ptr == old(self).buffer_ptr,
+            self.shared == old(self).shared,
+            self.prod_token == old(self).prod_token,
+    {
+        let addr: usize = self.buffer_ptr as usize + idx;
+
+        // Split 1-byte region from PointsToRaw
+        let tracked mut ptr_raw = self.points_to_raw_token.borrow_mut().tracked_take();
+        proof {
+            assert(set_int_range(addr as int, addr + 1).subset_of(
+                set_int_range(self.buffer_ptr as int, self.buffer_ptr as int + self.sz as int)));
+        }
+        let tracked (byte_raw, rest) = ptr_raw.split(set_int_range(addr as int, addr + 1));
+        assert(byte_raw.is_range(addr as int, 1));
+
+        // Convert to typed PointsTo<u8> and write
+        // global layout u8 guarantees align_of::<u8>() == 1, so addr % 1 == 0
+        let tracked mut byte_pto = byte_raw.into_typed::<u8>(addr);
+        let current_ptr: *mut u8 = with_exposed_provenance(addr, expose_provenance(self.buffer_ptr));
+        assert(equal(byte_pto.ptr(), current_ptr));
+        ptr_mut_write(current_ptr, Tracked(&mut byte_pto), val);
+
+        // Leak init state → uninit, then convert back to raw and rejoin
+        proof { byte_pto.leak_contents(); }
+        let tracked written_raw = byte_pto.into_raw();
+        let tracked rejoined = rest.join(written_raw);
+
+        proof {
+            assert(rejoined.dom() =~= set_int_range(self.buffer_ptr as int, self.buffer_ptr as int + self.sz as int));
+        }
+        self.points_to_raw_token = Tracked(Some(rejoined));
     }
 }
 
@@ -2870,11 +2920,64 @@ impl<'a> GrantR<'a> {
         &&& self.buffer_ptr as int == self.shared.instance@.base_addr() + self.cons_token@->0.value().grant_start()
         &&& self.buffer_ptr@.provenance == self.shared.instance@.provenance()
         &&& self.shared.instance@.base_addr() + self.shared.instance@.length() <= usize::MAX + 1
+        // grant region fits within buffer: buffer_ptr + sz <= base_addr + length
+        &&& self.buffer_ptr as int + self.sz as int
+            <= self.shared.instance@.base_addr() + self.shared.instance@.length()
     }
 
     pub closed spec fn released(&self) -> bool {
         &&& self.shared.wf()
         &&& self.cons_token@ is None
+    }
+}
+
+impl<'a> GrantR<'a> {
+    /// Read a single byte at offset `idx` within the grant region.
+    /// Pattern: split PointsToRaw → into_typed → assume init (producer wrote it) → ptr_mut_read → into_raw → join
+    /// Note: PointsToRaw loses init tracking across the producer→consumer boundary,
+    /// so we assume the byte is initialized (the producer must have written it).
+    fn read_byte(&mut self, idx: usize) -> (val: u8)
+        requires
+            old(self).can_release(old(self).sz as nat),
+            idx < old(self).sz,
+        ensures
+            self.can_release(self.sz as nat),
+            self.sz == old(self).sz,
+            self.buffer_ptr == old(self).buffer_ptr,
+            self.shared == old(self).shared,
+            self.cons_token == old(self).cons_token,
+    {
+        let addr: usize = self.buffer_ptr as usize + idx;
+
+        // Split 1-byte region from PointsToRaw
+        let tracked mut ptr_raw = self.points_to_raw_token.borrow_mut().tracked_take();
+        proof {
+            assert(set_int_range(addr as int, addr + 1).subset_of(
+                set_int_range(self.buffer_ptr as int, self.buffer_ptr as int + self.sz as int)));
+        }
+        let tracked (byte_raw, rest) = ptr_raw.split(set_int_range(addr as int, addr + 1));
+        assert(byte_raw.is_range(addr as int, 1));
+
+        // Convert to typed PointsTo<u8>
+        // global layout u8 guarantees align_of::<u8>() == 1, so addr % 1 == 0
+        let tracked mut byte_pto = byte_raw.into_typed::<u8>(addr);
+        let current_ptr: *mut u8 = with_exposed_provenance(addr, expose_provenance(self.buffer_ptr));
+        assert(equal(byte_pto.ptr(), current_ptr));
+
+        // Assume init: producer wrote to this byte before committing
+        assume(byte_pto.is_init());
+        let val = ptr_mut_read(current_ptr, Tracked(&mut byte_pto));
+
+        // After ptr_mut_read, byte_pto is uninit → can convert back to raw
+        let tracked read_raw = byte_pto.into_raw();
+        let tracked rejoined = rest.join(read_raw);
+
+        proof {
+            assert(rejoined.dom() =~= set_int_range(self.buffer_ptr as int, self.buffer_ptr as int + self.sz as int));
+        }
+        self.points_to_raw_token = Tracked(Some(rejoined));
+
+        val
     }
 }
 
@@ -3131,13 +3234,21 @@ fn main() {
         Err(_) => return,
     };
 
-    // ---- phase 1: write 5, read 5 (advance read to 5) ----
+    // ---- phase 1: write 5 bytes, read 5 bytes, verify ptr_mut_write/ptr_mut_read round-trip ----
     {
         let mut wgr = match prod.grant_exact(5) {
             Ok(w) => w,
             Err(_) => return,
         };
         if wgr.sz != 5 { return; }
+
+        // ptr_mut_write test: write known values [10, 20, 30, 40, 50] into the grant region
+        wgr.write_byte(0, 10);
+        wgr.write_byte(1, 20);
+        wgr.write_byte(2, 30);
+        wgr.write_byte(3, 40);
+        wgr.write_byte(4, 50);
+
         let Tracked(prod_token) = wgr.commit(5);
         assert(prod_token.instance_id() == wgr.shared.instance@.id());
         assert(prod_token.instance_id() == prod.shared.instance@.id());
@@ -3150,6 +3261,16 @@ fn main() {
             Err(_) => return,
         };
         if rgr.sz != 5 { return; }
+
+        // ptr_mut_read test: read back the values written above
+        // (PointsToRaw loses value tracking, so we cannot statically assert equality;
+        //  at runtime the values will be [10, 20, 30, 40, 50])
+        let _v0 = rgr.read_byte(0);
+        let _v1 = rgr.read_byte(1);
+        let _v2 = rgr.read_byte(2);
+        let _v3 = rgr.read_byte(3);
+        let _v4 = rgr.read_byte(4);
+
         let Tracked(cons_token) = rgr.release(5);
         cons.cons_token = Tracked(Some(cons_token));
     }
